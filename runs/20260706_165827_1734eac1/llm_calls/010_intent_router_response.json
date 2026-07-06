@@ -1,0 +1,10 @@
+{
+  "agent": "IntentRouter",
+  "provider": "qwen",
+  "transport": "curl",
+  "model": "qwen-turbo",
+  "is_mock": false,
+  "raw_response": "{\"intent\":\"experiment_planning\", \"confidence\":0.95, \"reason\":\"用户明确请求规划一个实验，符合experiment_planning的定义，即询问设计实验计划、参数空间或下一步计划，但未授权执行。\"}",
+  "response_sha256": "36b7546587751fdea974054ecb45f667a01dad8ee94e87b8ee1bcee344068059",
+  "timestamp": "2026-07-06T09:48:22.178085+00:00"
+}

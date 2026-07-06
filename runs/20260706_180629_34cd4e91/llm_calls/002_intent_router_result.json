@@ -1,0 +1,8 @@
+{
+  "intent": "capability_question",
+  "qwen_intent": "capability_question",
+  "confidence": 0.95,
+  "reason": "The user is asking about the system's capabilities, which directly matches the 'capability_question' intent.",
+  "rule_corrected": false,
+  "timestamp": "2026-07-06T10:06:55.928950+00:00"
+}

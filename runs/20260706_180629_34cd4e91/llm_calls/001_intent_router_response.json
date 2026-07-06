@@ -1,0 +1,10 @@
+{
+  "agent": "IntentRouter",
+  "provider": "qwen",
+  "transport": "curl",
+  "model": "qwen-turbo",
+  "is_mock": false,
+  "raw_response": "{\"intent\":\"casual_chat\", \"confidence\":0.95, \"reason\":\"The user's message '你好' is a greeting, which falls under casual chat.\"}",
+  "response_sha256": "057b88489bfe45efcac1cb7008895badb590e1dad78abb9a290be36a880d1418",
+  "timestamp": "2026-07-06T10:06:38.659021+00:00"
+}

@@ -47,10 +47,23 @@ This project does not train a new foundation model. It improves agent behavior t
 - **Skill policy**: prompts are modularized under `src/skills/` for base dialogue, intent routing, tool policy, experiment planning, result analysis, visualization, and readable responses.
 - **Intent routing**: `src/agents/intent_router.py` calls Qwen for intent classification, then applies safety corrections so capability questions, conceptual explanations, and broad research consultations do not accidentally trigger tools.
 - **Tool-use approval**: `src/policies/tool_use_policy.py` implements a code-level approval layer. Experiment tools are blocked for casual chat, capability questions, conceptual explanations, and research consultation. Experiment planning asks for confirmation before execution.
+- **Response composer**: `src/agents/response_composer.py` converts internal decisions, skill outputs, tool results, and audit metadata into user-facing assistant messages, sections, tables, figures, and suggested actions.
+- **Tool result summarizer**: `src/skills/tool_result_summarizer.py` turns soft-swimmer experiment output into concise conclusions, best-candidate notes, constraint status, next-step suggestions, and table-friendly rows.
 - **Dialogue evals**: `evals/dialogue_behavior_cases.yaml` and `tools/test_agent_behavior.py` provide behavior checks for intent, tool calls, and raw-JSON suppression.
 - **Readable response guard**: `src/utils/readable_response.py` prevents raw tool JSON from appearing as the main chat response.
 
-The design borrows ideas from Qwen-Agent tool-use planning, AgentScope evaluation practices, LangGraph-style human-in-the-loop approval, and DSPy-style modular prompts/pipelines, but intentionally avoids introducing those heavy frameworks in this MVP.
+The runtime is intentionally organized as four lightweight layers: Intent Router -> Skill Handler -> Tool Policy -> Response Composer.
+
+### Agent design references
+
+The design borrows ideas from:
+
+- Qwen-Agent tool usage, planning, and memory patterns.
+- LangGraph-style human-in-the-loop confirmation before tool execution.
+- DSPy-style modular pipelines and eval-driven prompt improvement.
+- NeMo Guardrails-style dialogue path constraints and output-shape control.
+
+FlowScientist does not directly depend on those heavier frameworks in this MVP. It implements a lightweight `intent_router`, modular skill prompts, code-level tool approval, a response composer, and behavior evals.
 
 ## Why This Is Not One-Shot Hypothesis Generation
 
@@ -281,13 +294,14 @@ The frontend is chat-first. Type natural-language questions, research goals, con
 - update the visible research state in the sidebar
 - propose experiment plans without auto-running them unless execution is explicit
 - generate Qwen-designed experiment tool calls only when the user authorizes execution
-- display natural-language tool summaries in chat
-- keep raw tool JSON in hidden/collapsible audit payloads
+- display natural-language tool summaries, sections, tables, and figures in chat
+- render suggested actions as clickable buttons that send explicit follow-up messages
+- keep raw tool JSON and audit payloads out of the main chat; developer debug panels are hidden by default
 - show generated figures directly when the plot tool is called
 - analyze results and revise the next plan
 - save `conversation.json`, `llm_calls/`, and `tool_calls/` under `runs/{run_id}/`
 
-The audit panel shows total LLM calls, total tool calls, last Qwen response excerpt, last tool result, and whether the run is valid for competition submission.
+The audit panel shows total LLM calls, total tool calls, last Qwen response excerpt, and whether the run is valid for competition submission. Detailed decision traces and raw tool payloads are only shown when the sidebar developer debug checkbox is enabled.
 
 ## Run Examples
 

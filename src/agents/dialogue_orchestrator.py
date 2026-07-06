@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from src.agents.intent_router import IntentRouter
+from src.agents.response_composer import compose_user_response
 from src.config import settings
 from src.llm import get_llm_provider
 from src.llm.base import LLMProvider
@@ -22,7 +23,6 @@ from src.utils.llm_audit import parse_llm_json
 from src.utils.readable_response import (
     ensure_readable_assistant_message,
     ensure_user_readable_response,
-    summarize_tool_result,
 )
 from src.utils.response_guard import needs_response_rewrite, rewrite_prompt
 
@@ -75,31 +75,21 @@ class DialogueOrchestrator:
             decision = self._default_tool_call_for_intent(intent, message)
             decision = self._apply_tool_policy(decision, intent, message)
 
-        self._apply_decision(decision)
-
         if self._has_tool_call(decision):
             tool_result = self._execute_tool(decision["tool_call"])
             tool_name = decision["tool_call"].get("tool_name", "")
-            self.state.append_message(
-                "tool",
-                summarize_tool_result(tool_name, tool_result),
-                tool_name=tool_name,
-                raw_tool_result=tool_result,
-                raw_data=tool_result,
-                figure_path=tool_result.get("figure_path"),
+            composed = compose_user_response(
+                intent=intent,
+                selected_skill=self.state.current_skill or "",
+                user_message=message,
+                skill_output=decision,
+                tool_result=tool_result,
+                tool_permission=self._latest_tool_permission,
+                state=self.state,
             )
-            if tool_name == "run_soft_swimmer_experiment":
-                follow_up = self._ask_qwen(
-                    (
-                        "A permitted soft-swimmer demonstration experiment has completed. "
-                        "Explain the result in natural language. Do not expose raw JSON. "
-                        f"Tool result: {json.dumps(tool_result, ensure_ascii=False)}"
-                    ),
-                    phase="result_analysis",
-                    intent="result_analysis",
-                )
-                follow_up = self._apply_tool_policy(follow_up, "result_analysis", message)
-                self._apply_decision(follow_up)
+            self._append_composed_message(composed, tool_name=tool_name)
+        else:
+            self._apply_decision(decision, user_message=message)
 
         self._refresh_audit_counts()
         self._record_decision_trace(message, tool_calls_before)
@@ -326,31 +316,48 @@ with problem analysis and next-step recommendations. The latest user message has
         }
         return ensure_user_readable_response(decision)
 
-    def _apply_decision(self, decision: dict[str, Any]) -> None:
+    def _apply_decision(self, decision: dict[str, Any], user_message: str = "") -> None:
         decision = ensure_user_readable_response(decision)
         update = decision.get("state_update", {}) or {}
         update["current_intent"] = self.state.current_intent
         update["current_skill"] = self.state.current_skill
         update["tool_execution_allowed"] = self.state.tool_execution_allowed
         self.state.apply_state_update(update)
-        message = ensure_readable_assistant_message(decision.get("assistant_message", ""))
+        composed = compose_user_response(
+            intent=self.state.current_intent or "",
+            selected_skill=self.state.current_skill or "",
+            user_message=user_message,
+            skill_output=decision,
+            tool_result=None,
+            tool_permission=self._latest_tool_permission,
+            state=self.state,
+        )
+        self._append_composed_message(composed)
+
+    def _append_composed_message(
+        self, composed: dict[str, Any], tool_name: str | None = None
+    ) -> None:
+        message = ensure_readable_assistant_message(composed.get("assistant_message", ""))
         message = self._guard_and_rewrite_message(message)
         if message:
             self.state.append_message(
                 "assistant",
                 message,
-                next_action=decision.get("next_action"),
-                tool_call=decision.get("tool_call"),
-                raw_data=decision.get("raw_data"),
+                sections=composed.get("sections", []),
+                tables=composed.get("tables", []),
+                figures=composed.get("figures", []),
+                suggested_actions=composed.get("suggested_actions", []),
+                raw_debug=composed.get("raw_debug", {}),
                 intent=self.state.current_intent,
                 skill=self.state.current_skill,
+                tool_name=tool_name,
             )
-        if decision.get("raw_data") is not None:
+        if composed.get("raw_debug") is not None:
             self.state.raw_data.append(
                 {
-                    "source": "assistant_decision",
+                    "source": "response_composer",
                     "intent": self.state.current_intent,
-                    "data": decision.get("raw_data"),
+                    "data": composed.get("raw_debug"),
                     "timestamp": _timestamp(),
                 }
             )

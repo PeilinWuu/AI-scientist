@@ -1,0 +1,10 @@
+{
+  "agent": "DialogueOrchestratorRepair",
+  "provider": "qwen",
+  "transport": "curl",
+  "model": "qwen-turbo",
+  "is_mock": false,
+  "prompt": "SYSTEM:\nYou are a JSON repair assistant for FlowScientist. Convert the previous assistant text into valid DialogueOrchestrator JSON only.\n\nUSER:\n\nOriginal phase: experiment_planning_decision\nClassified intent: experiment_planning\nOriginal user message: 帮我规划一个实验\nPrevious non-JSON assistant content:\n你希望规划一个实验，但目前还没有明确的实验目标或具体参数范围。为了更好地帮助你设计实验，请提供以下信息：\n\n1. **实验目标**：你希望通过这个实验验证什么？例如，提高推进效率、减少能量消耗、优化运动稳定性等。\n2. **控制变量**：你打算调整哪些参数？比如振幅、频率、波长、刚度、相位等。\n3. **约束条件**：是否有需要遵守的限制？例如最大应变、最小推力等。\n4. **优先级**：在多个目标之间，哪个更重要？例如速度优先、能耗优先、稳定性优先等。\n\n请补充这些信息后，我可以为你生成一个详细的实验计划。\n\nReturn strict JSON:\n{\n  \"assistant_message\": \"...\",\n  \"state_update\": {},\n  \"next_action\": \"ask_clarification|propose_plan|call_tool|analyze_result|generate_report\",\n  \"tool_call\": {}\n}\n",
+  "prompt_sha256": "5818e53665a610999d1ef634cdad4256e46bb8680507b44de0c4e40da6228546",
+  "timestamp": "2026-07-06T09:48:24.521067+00:00"
+}

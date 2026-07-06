@@ -1,0 +1,10 @@
+{
+  "agent": "IntentRouter",
+  "provider": "qwen",
+  "transport": "curl",
+  "model": "qwen-turbo",
+  "is_mock": false,
+  "raw_response": "{\n  \"intent\": \"research_consultation\",\n  \"confidence\": 0.95,\n  \"reason\": \"用户请求重复之前交代的任务背景，这表明他们希望回顾或确认之前讨论的研究方向和内容。这属于研究咨询的范畴，而不是直接要求执行任务或生成结果。\"\n}",
+  "response_sha256": "7b092713bea7904d22f870f56ec0f4a0e5980c7d7264bf604e4ce82603142d19",
+  "timestamp": "2026-07-06T09:49:07.487282+00:00"
+}

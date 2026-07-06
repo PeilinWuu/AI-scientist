@@ -1,0 +1,10 @@
+{
+  "agent": "IntentRouter",
+  "provider": "qwen",
+  "transport": "curl",
+  "model": "qwen-turbo",
+  "is_mock": false,
+  "raw_response": "{\"intent\":\"casual_chat\", \"confidence\":0.95, \"reason\":\"用户回复'好的'，属于非正式的对话回应，没有涉及具体任务或问题。\"}",
+  "response_sha256": "d131bd57a71f8e79e6323b4111026f8a054783b1cc31a8f560533eed1fa9e541",
+  "timestamp": "2026-07-06T09:52:54.612742+00:00"
+}

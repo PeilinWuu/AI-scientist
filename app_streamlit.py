@@ -6,6 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
 
+import pandas as pd
 import streamlit as st
 
 from src.agents.dialogue_orchestrator import DialogueOrchestrator
@@ -42,6 +43,63 @@ def real_qwen_run(state: ConversationState) -> bool:
     )
 
 
+def action_to_message(action: str) -> str:
+    """Translate a suggested action button into an explicit user request."""
+
+    mapping = {
+        "generate_plan": "请基于上面的研究任务生成实验任务规划。",
+        "design_adapter": "请设计 CFD/FreeFlow adapter 的数据接口。",
+        "confirm_run_soft_swimmer": "我确认运行当前简化 soft-swimmer 示例工具。",
+        "generate_report": "请生成一份阶段报告。",
+        "plot_efficiency": "把已有结果画成效率柱状图。",
+        "plot_speed_energy": "把刚才结果画成速度-能耗散点图。",
+        "continue_next_round": "请根据刚才结果继续下一轮实验。",
+    }
+    return mapping.get(action, action)
+
+
+def render_message_payload(message: dict, show_developer_debug: bool, message_index: int) -> None:
+    """Render only user-facing response-composer fields in the main chat."""
+
+    st.write(message.get("content", ""))
+
+    for section in message.get("sections", []) or []:
+        title = section.get("title") or "说明"
+        content = section.get("content") or ""
+        if content:
+            st.markdown(f"**{title}**")
+            st.write(content)
+
+    for table in message.get("tables", []) or []:
+        rows = table.get("rows") or []
+        if rows:
+            if table.get("title"):
+                st.markdown(f"**{table['title']}**")
+            st.dataframe(pd.DataFrame(rows), use_container_width=True)
+
+    figure_path = message.get("figure_path")
+    if figure_path and Path(figure_path).exists():
+        st.image(figure_path)
+    for figure in message.get("figures", []) or []:
+        path = figure.get("figure_path")
+        if path and Path(path).exists():
+            st.image(path, caption=figure.get("caption") or None)
+
+    actions = message.get("suggested_actions") or []
+    if actions:
+        cols = st.columns(min(len(actions), 4))
+        for index, action in enumerate(actions):
+            label = action.get("label") or action.get("action") or "执行"
+            action_id = action.get("action") or label
+            if cols[index % len(cols)].button(label, key=f"action_{message_index}_{index}_{action_id}"):
+                st.session_state.queued_user_message = action_to_message(action_id)
+                st.rerun()
+
+    if show_developer_debug and message.get("raw_debug"):
+        with st.expander("Developer debug: raw decision / audit payload", expanded=False):
+            st.json(message["raw_debug"])
+
+
 st.set_page_config(page_title="FlowScientist", layout="wide")
 
 if "conversation_state" not in st.session_state:
@@ -49,6 +107,7 @@ if "conversation_state" not in st.session_state:
 
 state: ConversationState = st.session_state.conversation_state
 llm_status = get_llm_status()
+queued_user_message = st.session_state.pop("queued_user_message", None)
 
 with st.sidebar:
     st.header("FlowScientist State")
@@ -67,6 +126,7 @@ with st.sidebar:
     st.write(f"**Target metric:** {state.target_metric or 'unknown'}")
     st.metric("Tool calls", state.total_tool_calls)
     st.metric("LLM calls", state.total_llm_calls)
+    show_developer_debug = st.checkbox("Show developer debug panels", value=False)
     st.divider()
     st.write(f"**LLM Provider:** {llm_status['llm_provider']}")
     st.write(f"**Model:** {llm_status['llm_model']}")
@@ -81,7 +141,7 @@ with st.sidebar:
     if st.button("Start new conversation"):
         st.session_state.conversation_state = create_state()
         st.rerun()
-    if state.last_decision_trace:
+    if show_developer_debug and state.last_decision_trace:
         with st.expander("Decision trace", expanded=False):
             st.json(state.last_decision_trace)
 
@@ -99,11 +159,12 @@ audit_cols[2].metric("Mock mode", str(state.llm_backend.get("is_mock", True)).lo
 audit_cols[3].metric("REAL_QWEN_RUN", str(real_qwen_run(state)).lower())
 st.write(f"LLM call logs: `{Path(state.run_dir) / 'llm_calls'}`")
 st.write(f"Tool call logs: `{Path(state.run_dir) / 'tool_calls'}`")
-st.write(f"Decision trace: `{Path(state.run_dir) / 'decision_trace.jsonl'}`")
+if show_developer_debug:
+    st.write(f"Decision trace: `{Path(state.run_dir) / 'decision_trace.jsonl'}`")
 if state.last_qwen_response_excerpt:
     st.caption(f"Last Qwen response excerpt: {state.last_qwen_response_excerpt}")
-if state.last_tool_result:
-    with st.expander("Last tool result", expanded=False):
+if show_developer_debug and state.last_tool_result:
+    with st.expander("Developer debug: last tool result", expanded=False):
         st.json(state.last_tool_result)
 if state.llm_backend.get("is_mock", True):
     st.error("This run is not valid for competition submission because it is in mock mode.")
@@ -114,29 +175,23 @@ elif state.total_tool_calls == 0:
 
 st.divider()
 
-for message in state.messages:
+for message_index, message in enumerate(state.messages):
     role = message["role"]
     chat_role = "assistant" if role == "tool" else role
     with st.chat_message(chat_role):
         if role == "tool":
             st.markdown(f"**Tool called:** `{message.get('tool_name', 'unknown')}`")
-        st.write(message["content"])
-        figure_path = message.get("figure_path")
-        if figure_path and Path(figure_path).exists():
-            st.image(figure_path)
-        raw_data = message.get("raw_data")
-        if raw_data:
-            with st.expander("Raw data / audit payload", expanded=False):
-                st.json(raw_data)
+        render_message_payload(message, show_developer_debug, message_index)
 
 user_message = st.chat_input(
     "Ask about fluid simulation, plan an experiment, request a tool run, or visualize results..."
 )
-if user_message:
+effective_user_message = queued_user_message or user_message
+if effective_user_message:
     orchestrator = DialogueOrchestrator(state)
     with st.spinner("FlowScientist is reasoning with Qwen and tools..."):
         try:
-            state = orchestrator.handle_user_message(user_message)
+            state = orchestrator.handle_user_message(effective_user_message)
             st.session_state.conversation_state = state
             st.rerun()
         except Exception as exc:  # noqa: BLE001 - Streamlit should show actionable failure.

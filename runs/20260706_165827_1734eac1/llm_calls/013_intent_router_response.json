@@ -1,0 +1,10 @@
+{
+  "agent": "IntentRouter",
+  "provider": "qwen",
+  "transport": "curl",
+  "model": "qwen-turbo",
+  "is_mock": false,
+  "raw_response": "{\"intent\":\"capability_question\", \"confidence\":0.95, \"reason\":\"用户询问系统是否能够记住之前对话的内容，这属于询问系统功能和能力的问题。\"}",
+  "response_sha256": "c8aabeaaae268f66495550adf3978833fe675dbf0277da5495fb1399ae77384d",
+  "timestamp": "2026-07-06T09:48:43.821936+00:00"
+}

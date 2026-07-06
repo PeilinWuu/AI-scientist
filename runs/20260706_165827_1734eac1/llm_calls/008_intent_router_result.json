@@ -1,0 +1,8 @@
+{
+  "intent": "research_consultation",
+  "qwen_intent": "research_consultation",
+  "confidence": 0.95,
+  "reason": "用户当前的输入是'继续'，这表明他们希望继续之前的讨论或任务。根据上下文，用户正在与系统进行关于仿生软体游泳机器人优化问题的研究咨询，系统也处于研究咨询状态。因此，用户的最新消息属于研究咨询意图。",
+  "rule_corrected": false,
+  "timestamp": "2026-07-06T09:51:34.956502+00:00"
+}

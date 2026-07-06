@@ -237,30 +237,41 @@ def _print_rows(rows: list[dict]) -> None:
 
 def _run_dialogue_regression() -> list[str]:
     failures: list[str] = []
+    forbidden_main_tokens = [
+        "repair_note",
+        "raw_response",
+        "tool_name",
+        "audit payload",
+        "{",
+    ]
     state = _new_dialogue_state()
     orchestrator = DialogueOrchestrator(state, llm=EvalDialogueProvider())
 
     state = orchestrator.handle_user_message("为什么说你在流场优化方面有优势？")
-    reply = _last_assistant(state)
+    reply = _last_assistant_user_facing_text(state)
     if state.current_intent != "capability_question":
         failures.append(f"case1 intent={state.current_intent}")
     for text in ["优势", "工具", "边界"]:
         if text not in reply:
             failures.append(f"case1 missing response text: {text}")
+    if "问题理解" in reply and "建议下一步" in reply:
+        failures.append("case1 reused research consultation template")
+    failures.extend(_forbidden_token_failures("case1", reply, forbidden_main_tokens))
     if state.total_tool_calls != 0:
         failures.append("case1 should not call tool")
 
     complex_goal = "仿生软体游泳机器人（微型海蛞蝓）过渡区流场与运动控制闭环优化，Re=150，包含目标函数和约束。"
     state = orchestrator.handle_user_message(complex_goal)
-    reply = _last_assistant(state)
+    reply = _last_assistant_user_facing_text(state)
     if state.current_intent not in {"research_consultation", "experiment_planning"}:
         failures.append(f"case2 intent={state.current_intent}")
-    for text in ["流固耦合", "约束优化", "下一步", "当前原型"]:
+    for text in ["问题理解", "当前能力边界", "建议下一步", "流固耦合", "约束优化"]:
         if text not in reply:
             failures.append(f"case2 missing response text: {text}")
     forbidden = "FlowScientist 是一个专注于流体模拟和流场优化的对话式 AI 科学家，它在以下几个方面具有优势"
     if forbidden in reply:
         failures.append("case2 repeated capability template")
+    failures.extend(_forbidden_token_failures("case2", reply, forbidden_main_tokens))
     if state.total_tool_calls != 0:
         failures.append("case2 should not call tool")
 
@@ -269,14 +280,20 @@ def _run_dialogue_regression() -> list[str]:
         failures.append(f"case3 intent={state.current_intent}")
     if state.total_tool_calls != 1:
         failures.append("case3 should call tool once")
+    last_message = _last_assistant_message(state)
+    if not last_message.get("tables"):
+        failures.append("case3 should expose table-friendly rows")
+    tool_reply = _last_assistant_user_facing_text(state)
+    failures.extend(_forbidden_token_failures("case3", tool_reply, forbidden_main_tokens))
 
     state = _new_dialogue_state()
     state = DialogueOrchestrator(state, llm=EvalDialogueProvider()).handle_user_message("你好")
-    reply = _last_assistant(state)
+    reply = _last_assistant_user_facing_text(state)
     if state.current_intent != "casual_chat":
         failures.append(f"case4 intent={state.current_intent}")
     if len(reply) > 80 or "优势" in reply:
         failures.append("case4 greeting should be short")
+    failures.extend(_forbidden_token_failures("case4", reply, forbidden_main_tokens))
 
     return failures
 
@@ -296,11 +313,42 @@ def _new_dialogue_state() -> ConversationState:
     )
 
 
-def _last_assistant(state: ConversationState) -> str:
+def _last_assistant_message(state: ConversationState) -> dict:
     for message in reversed(state.messages):
         if message.get("role") == "assistant":
-            return str(message.get("content", ""))
-    return ""
+            return message
+    return {}
+
+
+def _last_assistant_user_facing_text(state: ConversationState) -> str:
+    message = _last_assistant_message(state)
+    parts = [str(message.get("content", ""))]
+    for section in message.get("sections", []) or []:
+        parts.append(str(section.get("title", "")))
+        parts.append(str(section.get("content", "")))
+    for table in message.get("tables", []) or []:
+        title = table.get("title")
+        if title:
+            parts.append(str(title))
+    for figure in message.get("figures", []) or []:
+        caption = figure.get("caption")
+        if caption:
+            parts.append(str(caption))
+    for action in message.get("suggested_actions", []) or []:
+        label = action.get("label")
+        if label:
+            parts.append(str(label))
+    return "\n".join(part for part in parts if part)
+
+
+def _forbidden_token_failures(case_id: str, reply: str, forbidden_tokens: list[str]) -> list[str]:
+    failures: list[str] = []
+    for token in forbidden_tokens:
+        if token in reply:
+            failures.append(f"{case_id} leaked forbidden token: {token}")
+    if reply.count("candidate_id") > 1:
+        failures.append(f"{case_id} repeated raw candidate_id")
+    return failures
 
 
 if __name__ == "__main__":

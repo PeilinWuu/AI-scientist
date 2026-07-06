@@ -1,0 +1,10 @@
+{
+  "agent": "DialogueOrchestratorRepair",
+  "provider": "qwen",
+  "transport": "curl",
+  "model": "qwen-turbo",
+  "is_mock": false,
+  "prompt": "SYSTEM:\nYou are a JSON repair assistant for FlowScientist. Convert the previous assistant text into valid DialogueOrchestrator JSON only.\n\nUSER:\n\nOriginal phase: visualization_request_decision\nClassified intent: visualization_request\nOriginal user message: 你好，可以整理成图表吗？\nPrevious non-JSON assistant content:\n这是一个关于流体仿真与优化的研究咨询问题，目前尚未进行任何实验或模拟。为了生成图表，我们需要先进行实验或提供相关数据。\n\n请告诉我您希望查看哪种类型的图表（例如：效率对比、速度-能耗散点图、稳定性-效率散点图、参数趋势图或指标趋势图），或者是否需要我帮助您设计一个实验计划来获取数据。\n\nReturn strict JSON:\n{\n  \"assistant_message\": \"...\",\n  \"state_update\": {},\n  \"next_action\": \"ask_clarification|propose_plan|call_tool|analyze_result|generate_report\",\n  \"tool_call\": {}\n}\n",
+  "prompt_sha256": "2747c46cae5470191df98150b6159d12fa33db613e6b6ce5ada4f71a46079b78",
+  "timestamp": "2026-07-06T09:48:05.893492+00:00"
+}

@@ -1,0 +1,8 @@
+{
+  "intent": "visualization_request",
+  "qwen_intent": "visualization_request",
+  "confidence": 0.85,
+  "reason": "用户询问是否可以将内容整理成图表，这符合visualization_request的定义，即请求生成图表或可视化内容。",
+  "rule_corrected": false,
+  "timestamp": "2026-07-06T09:48:04.840515+00:00"
+}

@@ -1,0 +1,10 @@
+{
+  "agent": "IntentRouter",
+  "provider": "qwen",
+  "transport": "curl",
+  "model": "qwen-turbo",
+  "is_mock": false,
+  "raw_response": "{\"intent\":\"tool_execution\", \"confidence\":0.95, \"reason\":\"用户输入'好的，拆吧'表明其希望执行一个具体的任务，即拆解问题。这符合tool_execution的定义，即明确要求运行实验/模拟工具或测试参数。\"}",
+  "response_sha256": "ad97c522cefa4ab4eca8652f10d2561666aa8bcee6154806d7e5d6ed48d9f4f8",
+  "timestamp": "2026-07-06T09:51:52.144060+00:00"
+}

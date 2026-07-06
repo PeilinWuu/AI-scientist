@@ -1,0 +1,8 @@
+{
+  "intent": "tool_execution",
+  "qwen_intent": "tool_execution",
+  "confidence": 0.95,
+  "reason": "用户输入'确认'是对之前提出的运行soft-swimmer轻量示例工具的明确同意，符合tool_execution意图。",
+  "rule_corrected": false,
+  "timestamp": "2026-07-06T09:52:05.401369+00:00"
+}
