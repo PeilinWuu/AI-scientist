@@ -1,0 +1,10 @@
+{
+  "agent": "DialogueOrchestrator",
+  "provider": "qwen",
+  "transport": "test-double",
+  "model": "guard-test",
+  "is_mock": false,
+  "raw_response": "{\"assistant_message\": \"我将生成效率柱状图。\", \"state_update\": {}, \"next_action\": \"call_tool\", \"tool_call\": {\"tool_name\": \"generate_experiment_plot\", \"arguments\": {\"figure_type\": \"efficiency_by_candidate\"}}}",
+  "response_sha256": "0fb04e66e389e9b6980db128baa61296baf3ec15ff6f18462d421fe92d194018",
+  "timestamp": "2026-07-06T07:31:10.592658+00:00"
+}

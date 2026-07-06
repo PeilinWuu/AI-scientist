@@ -1,0 +1,37 @@
+{
+  "llm_provider": "qwen",
+  "llm_transport": "eval-dialogue",
+  "llm_model": "dialogue-eval",
+  "llm_base_url": "",
+  "is_mock": false,
+  "total_llm_calls": 8,
+  "total_tool_calls": 1,
+  "current_intent": "tool_execution",
+  "current_skill": "tool_execution_skill",
+  "tool_execution_allowed": true,
+  "last_tool_permission": {
+    "allowed": false,
+    "requires_confirmation": false,
+    "reason": "No tool call proposed by the selected skill.",
+    "user_facing_message": ""
+  },
+  "last_decision_trace": {
+    "timestamp": "2026-07-06T08:54:38.563664+00:00",
+    "user_message": "请直接运行当前内置的 soft-swimmer 示例工具，测试一组参数。",
+    "detected_intent": "tool_execution",
+    "selected_skill": "tool_execution_skill",
+    "tool_permission": {
+      "allowed": false,
+      "requires_confirmation": false,
+      "reason": "No tool call proposed by the selected skill.",
+      "user_facing_message": ""
+    },
+    "whether_tool_called": true,
+    "assistant_message": "你好。",
+    "reasoning_summary": "intent=tool_execution; skill=tool_execution_skill; tool_allowed=False; tool_called=True",
+    "latest_llm_response_excerpt": "{\"assistant_message\": \"你好。\", \"state_update\": {}, \"next_action\": \"ask_clarification\", \"tool_call\": {}}"
+  },
+  "llm_calls_path": "runs\\agent_dialogue_eval_165438_86be\\llm_calls",
+  "tool_calls_path": "runs\\agent_dialogue_eval_165438_86be\\tool_calls",
+  "last_llm_response_excerpt": "{\"assistant_message\": \"你好。\", \"state_update\": {}, \"next_action\": \"ask_clarification\", \"tool_call\": {}}"
+}

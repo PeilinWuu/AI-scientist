@@ -26,6 +26,12 @@ class ConversationState:
     current_plan: dict[str, Any] = field(default_factory=dict)
     final_report: str | None = None
     llm_backend: dict[str, Any] = field(default_factory=dict)
+    current_intent: str | None = None
+    current_skill: str | None = None
+    tool_execution_allowed: bool = False
+    last_tool_permission: dict[str, Any] = field(default_factory=dict)
+    last_decision_trace: dict[str, Any] = field(default_factory=dict)
+    raw_data: list[dict[str, Any]] = field(default_factory=list)
     total_llm_calls: int = 0
     total_tool_calls: int = 0
     last_qwen_response_excerpt: str = ""
@@ -56,6 +62,11 @@ class ConversationState:
             **self.llm_backend,
             "total_llm_calls": self.total_llm_calls,
             "total_tool_calls": self.total_tool_calls,
+            "current_intent": self.current_intent,
+            "current_skill": self.current_skill,
+            "tool_execution_allowed": self.tool_execution_allowed,
+            "last_tool_permission": self.last_tool_permission,
+            "last_decision_trace": self.last_decision_trace,
             "llm_calls_path": str(Path(self.run_dir) / "llm_calls"),
             "tool_calls_path": str(Path(self.run_dir) / "tool_calls"),
             "last_llm_response_excerpt": self.last_qwen_response_excerpt,
@@ -81,7 +92,11 @@ class ConversationState:
             "planning_preference",
             "current_plan",
             "final_report",
+            "current_intent",
+            "current_skill",
         ]:
             if key in update and update[key] is not None:
                 setattr(self, key, update[key])
+        if "tool_execution_allowed" in update:
+            self.tool_execution_allowed = bool(update["tool_execution_allowed"])
         self.save()

@@ -1,0 +1,10 @@
+{
+  "agent": "DialogueOrchestrator",
+  "provider": "qwen",
+  "transport": "curl",
+  "model": "qwen-turbo",
+  "is_mock": false,
+  "raw_response": "{\n  \"assistant_message\": \"Hello again! How can I assist you today?\",\n  \"state_update\": {\n    \"research_goal\": null,\n    \"constraints\": {},\n    \"target_metric\": null,\n    \"priority_weights\": {},\n    \"planning_preference\": null,\n    \"current_plan\": {},\n    \"final_report\": \"\"\n  },\n  \"next_action\": \"ask_clarification\",\n  \"tool_call\": {\n    \"tool_name\": \"\",\n    \"arguments\": {}\n  }\n}",
+  "response_sha256": "88827c16d4c979ae8321f89840d74f82c51e5a30882bd1d9af3c8e28cd4ecdc4",
+  "timestamp": "2026-07-06T07:34:14.226110+00:00"
+}

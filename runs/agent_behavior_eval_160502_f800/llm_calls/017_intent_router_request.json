@@ -1,0 +1,10 @@
+{
+  "agent": "IntentRouter",
+  "provider": "qwen",
+  "transport": "eval-double",
+  "model": "intent-eval",
+  "is_mock": false,
+  "prompt": "SYSTEM:\nYou are the IntentRouter for FlowScientist. Return strict JSON only.\n\nClassify the user's latest message into exactly one intent:\n- casual_chat: greeting, thanks, small talk.\n- capability_question: asks what the system can do, why it is useful, project meaning, boundaries, or advantages.\n- conceptual_explanation: asks for concepts, principles, why/how explanations.\n- research_consultation: describes a research direction without asking to run or plan a concrete experiment.\n- experiment_planning: asks to design an experiment plan, parameter space, or next-step plan, but does not authorize execution.\n- tool_execution: explicitly asks to run an experiment/simulation/tool or test parameters.\n- result_analysis: provides results or asks about existing results.\n- visualization_request: asks for plot/chart/curve/scatter/visualization/comparison figure.\n- report_generation: asks for a report, summary, PPT material, or research plan document.\n\nOnly tool_execution may run the experiment tool. Visualization_request may run a\nplot tool only when usable data exists. Experiment_planning should propose a plan\nand ask for confirmation.\n\nSchema: {\"intent\":\"...\", \"confidence\":0.0, \"reason\":\"...\"}.\n\nUSER:\nuser_message=show plot of speed energy scatter\nstate_snapshot={\"messages\": []}\nvalid_intents=[\"casual_chat\", \"capability_question\", \"conceptual_explanation\", \"research_consultation\", \"experiment_planning\", \"tool_execution\", \"result_analysis\", \"visualization_request\", \"report_generation\"]",
+  "prompt_sha256": "288f4f73507624a82d9b69fd0ac83580daa1c71a945327a8e10495c0dabf85e0",
+  "timestamp": "2026-07-06T08:05:02.533545+00:00"
+}

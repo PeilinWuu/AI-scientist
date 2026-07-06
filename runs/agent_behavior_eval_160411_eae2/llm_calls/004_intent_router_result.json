@@ -1,0 +1,8 @@
+{
+  "intent": "research_consultation",
+  "qwen_intent": "research_consultation",
+  "confidence": 0.3,
+  "reason": "eval default",
+  "rule_corrected": false,
+  "timestamp": "2026-07-06T08:04:11.701772+00:00"
+}

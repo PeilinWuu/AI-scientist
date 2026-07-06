@@ -1,0 +1,10 @@
+{
+  "agent": "DialogueOrchestrator",
+  "provider": "qwen",
+  "transport": "curl",
+  "model": "qwen-turbo",
+  "is_mock": false,
+  "raw_response": "{\n  \"assistant_message\": \"本次实验测试了4组候选参数，其中候选1（amplitude=0.25, frequency=1.5, wavelength=1.2, stiffness=0.5, phase=0.5）表现最佳。它的综合效率最高，达到2.0081，平均速度为1.1459，能量消耗为0.5359，稳定性得分为0.9590。其他候选的效率均低于该值，且部分候选的速度或稳定性稍逊。建议优先考虑候选1，并根据具体需求进一步调整参数。\",\n  \"state_update\": {\n    \"research_goal\": null,\n    \"constraints\": {},\n    \"target_metric\": \"efficiency\",\n    \"priority_weights\": {\n      \"mean_speed\": 0.0,\n      \"energy_cost\": 0.0,\n      \"efficiency\": 1.0,\n      \"stability_score\": 0.0\n    },\n    \"planning_preference\": \"balanced_efficiency\",\n    \"current_plan\": {},\n    \"final_report\": \"\"\n  },\n  \"next_action\": \"ask_clarification\",\n  \"tool_call\": {}\n}",
+  "response_sha256": "44c2cd73f871d5f292a5608e6afdeb411dae819902f05331c48c0393e441def1",
+  "timestamp": "2026-07-06T07:35:04.427173+00:00"
+}

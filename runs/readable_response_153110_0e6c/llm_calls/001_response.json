@@ -1,0 +1,10 @@
+{
+  "agent": "DialogueOrchestrator",
+  "provider": "qwen",
+  "transport": "test-double",
+  "model": "readable-test",
+  "is_mock": false,
+  "raw_response": "{\"assistant_message\": \"{\\\"results\\\": [{\\\"candidate_id\\\": \\\"C001\\\", \\\"efficiency\\\": 1.2}, {\\\"candidate_id\\\": \\\"C002\\\", \\\"efficiency\\\": 1.4}], \\\"best_candidate\\\": {\\\"candidate_id\\\": \\\"C002\\\"}}\", \"state_update\": {}, \"next_action\": \"call_tool\", \"tool_call\": {\"tool_name\": \"run_soft_swimmer_experiment\", \"arguments\": {\"candidates\": [{\"candidate_id\": \"C001\", \"amplitude\": 0.22, \"frequency\": 1.1, \"wavelength\": 1.0, \"stiffness\": 0.55, \"phase\": 0.2}, {\"candidate_id\": \"C002\", \"amplitude\": 0.26, \"frequency\": 1.4, \"wavelength\": 1.2, \"stiffness\": 0.6, \"phase\": 0.35}, {\"candidate_id\": \"C003\", \"amplitude\": 0.3, \"frequency\": 1.7, \"wavelength\": 1.4, \"stiffness\": 0.5, \"phase\": 0.5}, {\"candidate_id\": \"C004\", \"amplitude\": 0.34, \"frequency\": 2.0, \"wavelength\": 1.6, \"stiffness\": 0.65, \"phase\": 0.65}]}}}",
+  "response_sha256": "830fcc76fe19969e60588ef08ef59b164d15ec59dd00b84fe1e4bb4835f4757b",
+  "timestamp": "2026-07-06T07:31:10.527107+00:00"
+}

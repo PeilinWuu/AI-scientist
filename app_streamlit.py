@@ -57,6 +57,12 @@ with st.sidebar:
     st.write(state.research_goal or "Not clarified yet")
     st.write("**Current constraints**")
     st.json(state.constraints or {})
+    st.write(f"**Current intent:** {state.current_intent or 'unknown'}")
+    st.write(f"**Current skill:** {state.current_skill or 'unknown'}")
+    st.write(f"**Tool execution allowed:** {str(state.tool_execution_allowed).lower()}")
+    permission = state.last_tool_permission or {}
+    st.write(f"**Tool requires confirmation:** {str(permission.get('requires_confirmation', False)).lower()}")
+    st.caption(f"Tool policy reason: {permission.get('reason', 'n/a')}")
     st.write(f"**Planning preference:** {state.planning_preference or 'unknown'}")
     st.write(f"**Target metric:** {state.target_metric or 'unknown'}")
     st.metric("Tool calls", state.total_tool_calls)
@@ -75,9 +81,15 @@ with st.sidebar:
     if st.button("Start new conversation"):
         st.session_state.conversation_state = create_state()
         st.rerun()
+    if state.last_decision_trace:
+        with st.expander("Decision trace", expanded=False):
+            st.json(state.last_decision_trace)
 
 st.title("FlowScientist")
-st.caption("Qwen-powered conversational experiment planner for soft-swimmer flow optimization")
+st.caption(
+    "Qwen-powered conversational AI Scientist for general fluid simulation and "
+    "flow-field optimization. The soft-swimmer simulator is one demo tool."
+)
 
 st.subheader("Audit Evidence")
 audit_cols = st.columns(4)
@@ -87,13 +99,18 @@ audit_cols[2].metric("Mock mode", str(state.llm_backend.get("is_mock", True)).lo
 audit_cols[3].metric("REAL_QWEN_RUN", str(real_qwen_run(state)).lower())
 st.write(f"LLM call logs: `{Path(state.run_dir) / 'llm_calls'}`")
 st.write(f"Tool call logs: `{Path(state.run_dir) / 'tool_calls'}`")
+st.write(f"Decision trace: `{Path(state.run_dir) / 'decision_trace.jsonl'}`")
 if state.last_qwen_response_excerpt:
     st.caption(f"Last Qwen response excerpt: {state.last_qwen_response_excerpt}")
 if state.last_tool_result:
     with st.expander("Last tool result", expanded=False):
         st.json(state.last_tool_result)
-if state.total_llm_calls == 0 or state.llm_backend.get("is_mock", True):
-    st.error("This run is not valid for competition submission.")
+if state.llm_backend.get("is_mock", True):
+    st.error("This run is not valid for competition submission because it is in mock mode.")
+elif state.total_llm_calls == 0:
+    st.info("No Qwen call has been recorded in this conversation yet.")
+elif state.total_tool_calls == 0:
+    st.info("This conversation has real Qwen evidence but no tool call yet. That is expected for capability or conceptual questions.")
 
 st.divider()
 
@@ -102,11 +119,18 @@ for message in state.messages:
     chat_role = "assistant" if role == "tool" else role
     with st.chat_message(chat_role):
         if role == "tool":
-            st.markdown("**Tool result**")
+            st.markdown(f"**Tool called:** `{message.get('tool_name', 'unknown')}`")
         st.write(message["content"])
+        figure_path = message.get("figure_path")
+        if figure_path and Path(figure_path).exists():
+            st.image(figure_path)
+        raw_data = message.get("raw_data")
+        if raw_data:
+            with st.expander("Raw data / audit payload", expanded=False):
+                st.json(raw_data)
 
 user_message = st.chat_input(
-    "Describe your soft-swimmer research goal, constraints, or feedback..."
+    "Ask about fluid simulation, plan an experiment, request a tool run, or visualize results..."
 )
 if user_message:
     orchestrator = DialogueOrchestrator(state)

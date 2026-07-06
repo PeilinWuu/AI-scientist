@@ -1,0 +1,10 @@
+{
+  "agent": "IntentRouter",
+  "provider": "qwen",
+  "transport": "curl",
+  "model": "qwen-turbo",
+  "is_mock": false,
+  "raw_response": "{\n  \"intent\": \"research_consultation\",\n  \"confidence\": 0.95,\n  \"reason\": \"用户描述了一个具体的研究方向，涉及仿生软体游泳机器人的流场与运动控制优化，包括流固耦合、Navier-Stokes方程、疲劳约束和多目标函数。但并未明确要求设计实验计划或执行工具，因此属于研究咨询类别。\"\n}",
+  "response_sha256": "62a3ef454b3cbf7fc72425d4e8d3fbc653f75f49b39e3a59dcb2ad40f9e9b107",
+  "timestamp": "2026-07-06T08:06:53.918610+00:00"
+}

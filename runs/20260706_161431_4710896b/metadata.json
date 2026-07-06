@@ -1,0 +1,15 @@
+{
+  "llm_provider": "qwen",
+  "llm_transport": "curl",
+  "llm_model": "qwen-turbo",
+  "llm_base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+  "is_mock": false,
+  "total_llm_calls": 9,
+  "total_tool_calls": 0,
+  "current_intent": "casual_chat",
+  "current_skill": "base_dialogue_skill",
+  "tool_execution_allowed": false,
+  "llm_calls_path": "runs\\20260706_161431_4710896b\\llm_calls",
+  "tool_calls_path": "runs\\20260706_161431_4710896b\\tool_calls",
+  "last_llm_response_excerpt": "{\n  \"assistant_message\": \"我能够理解你的问题。你提到的是一个关于仿生软体游泳机器人在特定流动条件下的优化问题，涉及流体力学、材料科学和控制理论等多个领域。目前，FlowScientist 可以帮助你进行以下工作：\\n\\n1. **理解与规划**：我可以帮助你梳理研究目标、约束条件，并设计实验或参数优化方案。\\n2. **工具调用**：如果你需要，我可以调用现有的轻量级软体游泳器虚拟实验工具，评估不同参数组合下的性能指标（如速度、能量消耗、效率等）。\\n3. **结果分析与迭代**：我可以解释仿真或实验结果，识别关键趋势，并提出下一步的优化方向或可视化建议。\\n4. *"
+}

@@ -1,0 +1,12 @@
+{
+  "tool_name": "generate_experiment_plot",
+  "result": {
+    "tool_name": "generate_experiment_plot",
+    "figure_path": "runs\\intent_router_153110_02cc\\figures\\efficiency_by_candidate.png",
+    "figure_type": "efficiency_by_candidate",
+    "caption": "Candidate efficiency comparison.",
+    "summary": "Generated efficiency_by_candidate from 4 candidate rows. Best efficiency candidate is C001 with efficiency=2.2140."
+  },
+  "result_sha256": "bb4fdd170ba4887bf8c04c30d8181c1527f43f6d06c50f17d620ea37f630c694",
+  "timestamp": "2026-07-06T07:31:11.545210+00:00"
+}

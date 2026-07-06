@@ -1,0 +1,10 @@
+{
+  "agent": "DialogueOrchestrator",
+  "provider": "qwen",
+  "transport": "curl",
+  "model": "qwen-turbo",
+  "is_mock": false,
+  "raw_response": "你好！我是FlowScientist，专注于软体游泳机器人的流场优化。请告诉我你的研究目标、约束条件或可用数据，以便我更好地协助你。",
+  "response_sha256": "f6c1405cf4146d27ef96a8a21b794a3f77d4a64d21de42b5c20a74fa008d484f",
+  "timestamp": "2026-07-06T07:55:15.828516+00:00"
+}

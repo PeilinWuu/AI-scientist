@@ -28,8 +28,8 @@ def main() -> int:
         return 1
 
     goals = [
-        "I want to maximize swimming speed, energy cost can increase moderately.",
-        "I want to minimize energy cost and keep swimming stable.",
+        "I want to maximize swimming speed, energy cost can increase moderately. Please run an initial experiment.",
+        "I want to minimize energy cost and keep swimming stable. Please run an initial experiment.",
     ]
     rows = []
     for goal in goals:

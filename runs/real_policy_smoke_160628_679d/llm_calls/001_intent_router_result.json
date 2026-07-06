@@ -1,0 +1,8 @@
+{
+  "intent": "capability_question",
+  "qwen_intent": "capability_question",
+  "confidence": 0.95,
+  "reason": "The user is asking about the system's advantages in a specific domain (soft robotic fish flow field optimization), which falls under capability questions that inquire about what the system can do and why it is useful.",
+  "rule_corrected": false,
+  "timestamp": "2026-07-06T08:06:34.074619+00:00"
+}

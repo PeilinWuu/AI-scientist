@@ -1,0 +1,10 @@
+{
+  "agent": "IntentRouter",
+  "provider": "qwen",
+  "transport": "curl",
+  "model": "qwen-turbo",
+  "is_mock": false,
+  "raw_response": "{\n  \"intent\": \"tool_execution\",\n  \"confidence\": 0.95,\n  \"reason\": \"用户明确请求运行一次实验，测试建议的参数。这符合 tool_execution 的定义，即 explicitly asks to run an experiment/simulation/tool or test parameters.\"\n}",
+  "response_sha256": "00edc5b1a609aef185592df77a8ed2d1aa555cfa099d730b292a9f5c237eaeff",
+  "timestamp": "2026-07-06T08:07:17.219487+00:00"
+}

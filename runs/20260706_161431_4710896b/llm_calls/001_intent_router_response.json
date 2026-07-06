@@ -1,0 +1,10 @@
+{
+  "agent": "IntentRouter",
+  "provider": "qwen",
+  "transport": "curl",
+  "model": "qwen-turbo",
+  "is_mock": false,
+  "raw_response": "{\"intent\":\"capability_question\", \"confidence\":0.95, \"reason\":\"The user is asking about the system's advantages in flow field optimization, which falls under a capability question.\"}",
+  "response_sha256": "47a84fd893457286a112bdb5a717966c5c2204bf48dcba7e558944e4b904c74a",
+  "timestamp": "2026-07-06T08:15:14.828462+00:00"
+}

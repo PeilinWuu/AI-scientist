@@ -1,0 +1,15 @@
+{
+  "llm_provider": "qwen",
+  "llm_transport": "test-double",
+  "llm_model": "guard-test",
+  "llm_base_url": "",
+  "is_mock": false,
+  "total_llm_calls": 6,
+  "total_tool_calls": 2,
+  "current_intent": "visualization_request",
+  "current_skill": "visualization_skill",
+  "tool_execution_allowed": true,
+  "llm_calls_path": "runs\\intent_router_153110_02cc\\llm_calls",
+  "tool_calls_path": "runs\\intent_router_153110_02cc\\tool_calls",
+  "last_llm_response_excerpt": "{\"assistant_message\": \"我将生成效率柱状图。\", \"state_update\": {}, \"next_action\": \"call_tool\", \"tool_call\": {\"tool_name\": \"generate_experiment_plot\", \"arguments\": {\"figure_type\": \"efficiency_by_candidate\"}}}"
+}

@@ -8,14 +8,23 @@ from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
+from src.agents.intent_router import IntentRouter
 from src.config import settings
 from src.llm import get_llm_provider
 from src.llm.base import LLMProvider
+from src.policies.tool_use_policy import decide_tool_permission
+from src.skills import READABLE_RESPONSE_SKILL, TOOL_POLICY_SKILL, get_skill_prompt
 from src.state.conversation_state import ConversationState
 from src.tools import get_default_tools
 from src.tools.base import Tool
 from src.utils.io import ensure_dir, write_json
 from src.utils.llm_audit import parse_llm_json
+from src.utils.readable_response import (
+    ensure_readable_assistant_message,
+    ensure_user_readable_response,
+    summarize_tool_result,
+)
+from src.utils.response_guard import needs_response_rewrite, rewrite_prompt
 
 
 class DialogueOrchestrator:
@@ -36,96 +45,113 @@ class DialogueOrchestrator:
         ensure_dir(self.tool_calls_dir)
         if hasattr(self.llm, "set_debug_dir"):
             self.llm.set_debug_dir(self.llm_calls_dir)
+        self.intent_router = IntentRouter(llm=self.llm, llm_calls_dir=self.llm_calls_dir)
+        self._latest_tool_permission: dict[str, Any] = {
+            "allowed": False,
+            "requires_confirmation": False,
+            "reason": "No tool call proposed yet.",
+            "user_facing_message": "",
+        }
 
     def handle_user_message(self, message: str) -> ConversationState:
-        """Append user input, ask Qwen what to do, execute tools if requested."""
+        """Route intent, ask Qwen, apply policy, and optionally execute a tool."""
 
+        tool_calls_before = self.state.total_tool_calls
+        self._latest_tool_permission = {
+            "allowed": False,
+            "requires_confirmation": False,
+            "reason": "No tool call proposed.",
+            "user_facing_message": "",
+        }
         self.state.append_message("user", message)
-        decision = self._ask_qwen(user_message=message, phase="dialogue_decision")
-        if decision.get("next_action") != "call_tool" and self._looks_like_concrete_goal(message):
-            decision = self._ask_qwen(
-                user_message=(
-                    "The user's goal is concrete enough for an initial virtual experiment. "
-                    "Generate a Qwen-designed tool_call now with 4 to 6 candidates. "
-                    f"Original user message: {message}"
-                ),
-                phase="force_experiment_planning",
-            )
-        if self._needs_candidate_repair(decision):
-            decision = self._ask_qwen(
-                user_message=(
-                    "Your previous tool_call did not include enough candidate designs. "
-                    "Return next_action='call_tool' with tool_name='run_soft_swimmer_experiment' "
-                    "and 4 to 6 candidate designs inside arguments.candidates. "
-                    f"Original user message: {message}"
-                ),
-                phase="repair_tool_candidates",
-            )
+        router_result = self.intent_router.classify(message, self._state_snapshot())
+        intent = router_result["intent"]
+        self._set_intent_state(intent, router_result)
+
+        decision = self._ask_qwen(message, phase=f"{intent}_decision", intent=intent)
+        decision = self._apply_tool_policy(decision, intent, message)
+
+        if self._should_fill_default_tool_call(decision, intent):
+            decision = self._default_tool_call_for_intent(intent, message)
+            decision = self._apply_tool_policy(decision, intent, message)
+
         self._apply_decision(decision)
 
-        if decision.get("next_action") == "call_tool" and decision.get("tool_call"):
+        if self._has_tool_call(decision):
             tool_result = self._execute_tool(decision["tool_call"])
+            tool_name = decision["tool_call"].get("tool_name", "")
             self.state.append_message(
                 "tool",
-                json.dumps(tool_result, ensure_ascii=False),
-                tool_name=decision["tool_call"].get("tool_name"),
+                summarize_tool_result(tool_name, tool_result),
+                tool_name=tool_name,
+                raw_tool_result=tool_result,
+                raw_data=tool_result,
+                figure_path=tool_result.get("figure_path"),
             )
-            follow_up = self._ask_qwen(
-                user_message=(
-                    "A tool call has completed. Analyze this result and decide the next step: "
-                    f"{json.dumps(tool_result, ensure_ascii=False)}"
-                ),
-                phase="analyze_result",
-            )
-            self._apply_decision(follow_up)
+            if tool_name == "run_soft_swimmer_experiment":
+                follow_up = self._ask_qwen(
+                    (
+                        "A permitted soft-swimmer demonstration experiment has completed. "
+                        "Explain the result in natural language. Do not expose raw JSON. "
+                        f"Tool result: {json.dumps(tool_result, ensure_ascii=False)}"
+                    ),
+                    phase="result_analysis",
+                    intent="result_analysis",
+                )
+                follow_up = self._apply_tool_policy(follow_up, "result_analysis", message)
+                self._apply_decision(follow_up)
 
         self._refresh_audit_counts()
+        self._record_decision_trace(message, tool_calls_before)
         self.state.save()
         return self.state
 
     def run_three_rounds(self, initial_goal: str) -> ConversationState:
-        """Convenience workflow driven through the dialogue orchestrator."""
+        """Convenience workflow with explicit execution authorization."""
 
         self.handle_user_message(initial_goal)
+        self.handle_user_message("请运行一次实验，测试你建议的参数。")
         for _ in range(2):
-            self.handle_user_message(
-                "Continue with the next experiment round using the latest tool result."
-            )
+            self.handle_user_message("请根据刚才结果继续下一轮实验。")
         return self.state
 
-    def _ask_qwen(self, user_message: str, phase: str) -> dict[str, Any]:
-        """Call Qwen and parse strict JSON dialogue decision."""
+    def _set_intent_state(self, intent: str, router_result: dict[str, Any]) -> None:
+        self.state.current_intent = intent
+        self.state.current_skill = self._skill_name_for_intent(intent)
+        self.state.tool_execution_allowed = False
+        self.state.raw_data.append(
+            {"source": "intent_router", "data": router_result, "timestamp": _timestamp()}
+        )
+        self.state.save()
 
+    def _ask_qwen(self, user_message: str, phase: str, intent: str) -> dict[str, Any]:
         metadata = self.llm.metadata()
         if settings.qwen_require_real and metadata.get("is_mock", True):
             raise RuntimeError("Real Qwen is required. Mock fallback is disabled.")
-        system_prompt = self._system_prompt()
-        prompt = self._user_prompt(user_message, phase)
-        raw = self._record_llm_call(system_prompt, prompt)
-        decision = self._parse_or_repair_decision(raw, user_message, phase)
+        system_prompt = self._system_prompt(intent)
+        user_prompt = self._user_prompt(user_message, phase, intent)
+        raw = self._record_llm_call(system_prompt, user_prompt, agent="DialogueOrchestrator")
+        decision = self._parse_or_repair_decision(raw, user_message, phase, intent)
         return self._normalize_decision(decision)
 
     def _parse_or_repair_decision(
-        self, raw_response: str, user_message: str, phase: str
+        self, raw_response: str, user_message: str, phase: str, intent: str
     ) -> dict[str, Any]:
-        """Parse Qwen JSON, repair once with real Qwen, then return safe JSON."""
-
         try:
             return parse_llm_json(raw_response, "DialogueOrchestrator")
         except Exception:
             repair_system_prompt = (
-                "You are a JSON repair assistant for FlowScientist. Convert the "
-                "previous assistant text into valid DialogueOrchestrator JSON only. "
-                "Do not call tools unless the original user message clearly requests "
-                "an experiment."
+                "You are a JSON repair assistant for FlowScientist. Convert the previous "
+                "assistant text into valid DialogueOrchestrator JSON only."
             )
             repair_user_prompt = f"""
 Original phase: {phase}
+Classified intent: {intent}
 Original user message: {user_message}
 Previous non-JSON assistant content:
 {raw_response}
 
-Return strict JSON with this schema:
+Return strict JSON:
 {{
   "assistant_message": "...",
   "state_update": {{}},
@@ -134,50 +160,65 @@ Return strict JSON with this schema:
 }}
 """
             try:
-                repaired = self._record_llm_call(repair_system_prompt, repair_user_prompt)
+                repaired = self._record_llm_call(
+                    repair_system_prompt, repair_user_prompt, agent="DialogueOrchestratorRepair"
+                )
                 return parse_llm_json(repaired, "DialogueOrchestrator")
             except Exception:
-                return self._safe_clarification_decision(user_message, raw_response)
+                return self._safe_decision(intent, raw_response)
 
-    def _safe_clarification_decision(
-        self, user_message: str, raw_response: str
-    ) -> dict[str, Any]:
-        """Local safe JSON wrapper after real-Qwen repair failed."""
-
-        if self._is_greeting_or_meta_question(user_message):
-            assistant_message = (
-                "你好，我是 FlowScientist，可以帮助你围绕软体游动机器人流场优化来澄清目标、"
-                "规划实验、调用仿真工具并根据结果迭代。请告诉我你的研究目标、约束或已有数据。"
+    def _safe_decision(self, intent: str, raw_response: str) -> dict[str, Any]:
+        if intent == "research_consultation":
+            message = (
+                "这是一个流体仿真与优化研究咨询问题。我会先帮助你拆解物理模型、设计变量、"
+                "目标函数、约束条件和仿真数据接口；当前不会直接运行 soft-swimmer 轻量示例工具。"
+            )
+        elif intent in {"capability_question", "casual_chat"}:
+            message = (
+                "我是 FlowScientist，一个面向通用流体仿真与流场优化的对话式 AI Scientist。"
+                "当前已实现的可执行工具是 soft-swimmer 轻量虚拟实验工具，其他 CFD/FreeFlow "
+                "和实验仪器接口属于可扩展方向。"
             )
         else:
-            assistant_message = (
-                "I need one more clarification before planning an experiment. "
-                "Please specify whether you prioritize swimming speed, energy cost, "
-                "stability, or efficiency, and any constraints you want to enforce."
-            )
+            message = "我会先给出可读的分析和下一步建议；只有在你明确授权时才调用工具。"
         return {
-            "assistant_message": assistant_message,
+            "assistant_message": message,
             "state_update": {},
             "next_action": "ask_clarification",
             "tool_call": {},
-            "repair_note": raw_response[:300],
+            "raw_data": {"repair_note": raw_response[:300]},
         }
 
-    def _system_prompt(self) -> str:
+    def _system_prompt(self, intent: str) -> str:
         tool_specs = {
             name: {"description": tool.description, "schema": tool.schema}
             for name, tool in self.tools.items()
         }
         return f"""
-You are FlowScientist, a Qwen-powered conversational AI Scientist for soft robotic swimmer flow-field optimization.
-You control the scientific loop: clarify goals, plan experiments, call tools, analyze tool results, revise plans, and generate reports.
+You are FlowScientist, a conversational AI Scientist for general fluid simulation and flow-field optimization.
+
+The currently implemented executable experiment tool is a lightweight soft-swimmer virtual experiment tool.
+It is not a real CFD, Navier-Stokes, or FSI solver. Other domains such as airfoil optimization,
+pipe-flow drag reduction, microfluidic mixing, porous-media flow, vortex-shedding drag reduction,
+heat-transfer optimization, and hull/underwater-vehicle drag optimization are extensible directions,
+not all implemented tools.
+
+Current intent: {intent}
+Current skill:
+{get_skill_prompt(intent)}
+
+Tool policy:
+{TOOL_POLICY_SKILL}
+
+Readable response policy:
+{READABLE_RESPONSE_SKILL}
 
 Available tools:
 {json.dumps(tool_specs, ensure_ascii=False)}
 
-Return strict JSON only. No markdown. Schema:
+Return strict JSON only:
 {{
-  "assistant_message": "natural language reply to user",
+  "assistant_message": "natural language reply to user, never raw JSON",
   "state_update": {{
     "research_goal": "...",
     "constraints": {{}},
@@ -189,105 +230,155 @@ Return strict JSON only. No markdown. Schema:
   }},
   "next_action": "ask_clarification|propose_plan|call_tool|analyze_result|generate_report",
   "tool_call": {{
-    "tool_name": "run_soft_swimmer_experiment",
+    "tool_name": "run_soft_swimmer_experiment|generate_experiment_plot|generate_research_plan_report",
     "arguments": {{}}
   }}
 }}
 
-If the user's goal is concrete enough, choose next_action="call_tool" and call run_soft_swimmer_experiment.
-Do not ask clarification when the user already states an optimization direction such as maximizing speed, minimizing energy, improving efficiency, or prioritizing stability.
-If the user only greets you or asks what you can do, respond naturally as FlowScientist and ask for the soft-swimmer research goal, constraints, or available data. Do not call a tool for a greeting.
-For high-speed goals, use higher frequency/amplitude candidates.
-For low-energy goals, use lower frequency/amplitude candidates.
-For stability-first goals, use lower amplitude and higher stiffness candidates.
-All tool candidate parameters must obey these bounds:
-- amplitude: 0.05 to 0.50
-- frequency: 0.5 to 3.0
-- wavelength: 0.6 to 2.0
-- stiffness: 0.1 to 1.0
-- phase: 0.0 to 1.0
+For complex research goals, do not call tools immediately. First explain the problem,
+separate prototype capability from real CFD/FSI needs, propose next steps, and ask the user whether to:
+A. generate an experiment task plan, B. run the simplified soft-swimmer demo, or C. design a CFD adapter data interface.
+
+Do not repeat your capability introduction unless the latest user message explicitly asks
+about your capability, advantages, role, or scope. For concrete research tasks, respond
+with problem analysis and next-step recommendations. The latest user message has highest priority.
 """
 
-    def _user_prompt(self, user_message: str, phase: str) -> str:
-        state_snapshot = {
-            "research_goal": self.state.research_goal,
-            "constraints": self.state.constraints,
-            "target_metric": self.state.target_metric,
-            "priority_weights": self.state.priority_weights,
-            "planning_preference": self.state.planning_preference,
-            "experiment_history": self.state.experiment_history[-3:],
-            "current_plan": self.state.current_plan,
-            "messages": self.state.messages[-8:],
-        }
+    def _user_prompt(self, user_message: str, phase: str, intent: str) -> str:
         return (
             f"phase={phase}\n"
+            f"classified_intent={intent}\n"
             f"user_message={user_message}\n"
-            f"current_state={json.dumps(state_snapshot, ensure_ascii=False)}"
+            f"current_state={json.dumps(self._state_snapshot(), ensure_ascii=False)}"
         )
 
-    def _record_llm_call(self, system_prompt: str, user_prompt: str) -> str:
+    def _record_llm_call(self, system_prompt: str, user_prompt: str, agent: str) -> str:
         index = self._next_index(self.llm_calls_dir, "*_request.json")
         metadata = self.llm.metadata()
         prompt = f"SYSTEM:\n{system_prompt}\n\nUSER:\n{user_prompt}"
-        request_payload = {
-            "agent": "DialogueOrchestrator",
-            "provider": metadata.get("provider"),
-            "transport": metadata.get("transport"),
-            "model": metadata.get("model"),
-            "is_mock": bool(metadata.get("is_mock", True)),
-            "prompt": prompt,
-            "prompt_sha256": _hash(prompt),
-            "timestamp": _timestamp(),
-        }
-        write_json(self.llm_calls_dir / f"{index:03d}_request.json", request_payload)
+        write_json(
+            self.llm_calls_dir / f"{index:03d}_request.json",
+            {
+                "agent": agent,
+                "provider": metadata.get("provider"),
+                "transport": metadata.get("transport"),
+                "model": metadata.get("model"),
+                "is_mock": bool(metadata.get("is_mock", True)),
+                "prompt": prompt,
+                "prompt_sha256": _hash(prompt),
+                "timestamp": _timestamp(),
+            },
+        )
         raw = self.llm.generate(system_prompt, user_prompt) or ""
         if settings.qwen_require_real and not raw.strip():
             raise RuntimeError("Qwen returned an empty dialogue response.")
-        response_payload = {
-            "agent": "DialogueOrchestrator",
-            "provider": metadata.get("provider"),
-            "transport": metadata.get("transport"),
-            "model": metadata.get("model"),
-            "is_mock": bool(metadata.get("is_mock", True)),
-            "raw_response": raw,
-            "response_sha256": _hash(raw),
-            "timestamp": _timestamp(),
-        }
-        write_json(self.llm_calls_dir / f"{index:03d}_response.json", response_payload)
+        write_json(
+            self.llm_calls_dir / f"{index:03d}_response.json",
+            {
+                "agent": agent,
+                "provider": metadata.get("provider"),
+                "transport": metadata.get("transport"),
+                "model": metadata.get("model"),
+                "is_mock": bool(metadata.get("is_mock", True)),
+                "raw_response": raw,
+                "response_sha256": _hash(raw),
+                "timestamp": _timestamp(),
+            },
+        )
         self.state.last_qwen_response_excerpt = raw[:300]
         return raw
 
+    def _apply_tool_policy(
+        self, decision: dict[str, Any], intent: str, user_message: str
+    ) -> dict[str, Any]:
+        decision = self._normalize_decision(decision)
+        if decision.get("next_action") != "call_tool":
+            self._latest_tool_permission = {
+                "allowed": False,
+                "requires_confirmation": False,
+                "reason": "No tool call proposed by the selected skill.",
+                "user_facing_message": "",
+            }
+            self.state.last_tool_permission = self._latest_tool_permission
+            return ensure_user_readable_response(decision)
+
+        permission = decide_tool_permission(intent, user_message, self.state, decision.get("tool_call"))
+        self._latest_tool_permission = permission
+        self.state.last_tool_permission = permission
+        self.state.tool_execution_allowed = bool(permission["allowed"])
+        if permission["allowed"]:
+            decision["tool_permission"] = permission
+            return ensure_user_readable_response(decision)
+
+        blocked_tool_call = decision.get("tool_call")
+        decision["next_action"] = "propose_plan" if permission["requires_confirmation"] else "ask_clarification"
+        decision["tool_call"] = {}
+        if permission["user_facing_message"]:
+            existing = ensure_readable_assistant_message(decision.get("assistant_message", ""))
+            decision["assistant_message"] = (
+                existing.rstrip() + "\n\n" + permission["user_facing_message"]
+                if existing
+                else permission["user_facing_message"]
+            )
+        decision["raw_data"] = {
+            "blocked_tool_call": blocked_tool_call,
+            "tool_permission": permission,
+        }
+        return ensure_user_readable_response(decision)
+
     def _apply_decision(self, decision: dict[str, Any]) -> None:
-        self.state.apply_state_update(decision.get("state_update", {}))
-        assistant_message = decision.get("assistant_message") or ""
-        if assistant_message:
+        decision = ensure_user_readable_response(decision)
+        update = decision.get("state_update", {}) or {}
+        update["current_intent"] = self.state.current_intent
+        update["current_skill"] = self.state.current_skill
+        update["tool_execution_allowed"] = self.state.tool_execution_allowed
+        self.state.apply_state_update(update)
+        message = ensure_readable_assistant_message(decision.get("assistant_message", ""))
+        message = self._guard_and_rewrite_message(message)
+        if message:
             self.state.append_message(
                 "assistant",
-                assistant_message,
+                message,
                 next_action=decision.get("next_action"),
                 tool_call=decision.get("tool_call"),
+                raw_data=decision.get("raw_data"),
+                intent=self.state.current_intent,
+                skill=self.state.current_skill,
+            )
+        if decision.get("raw_data") is not None:
+            self.state.raw_data.append(
+                {
+                    "source": "assistant_decision",
+                    "intent": self.state.current_intent,
+                    "data": decision.get("raw_data"),
+                    "timestamp": _timestamp(),
+                }
             )
 
     def _execute_tool(self, tool_call: dict[str, Any]) -> dict[str, Any]:
         tool_name = tool_call.get("tool_name")
         if tool_name not in self.tools:
             raise ValueError(f"Unknown tool: {tool_name}")
-        arguments = tool_call.get("arguments") or {}
+        arguments = dict(tool_call.get("arguments") or {})
+        if tool_name == "generate_experiment_plot":
+            arguments.setdefault("run_dir", self.state.run_dir)
+            arguments.setdefault("experiment_history", self.state.experiment_history)
+            arguments.setdefault("figure_type", "efficiency_by_candidate")
+        if tool_name == "generate_research_plan_report":
+            arguments.setdefault("research_goal", self.state.research_goal)
+            arguments.setdefault("planning_preference", self.state.planning_preference)
+            arguments.setdefault("experiment_history", self.state.experiment_history)
+            arguments.setdefault("llm_backend", self.state.llm_backend)
+
         index = self._next_index(self.tool_calls_dir, "*_request.json")
         request_path = self.tool_calls_dir / f"{index:03d}_{tool_name}_request.json"
         response_path = self.tool_calls_dir / f"{index:03d}_{tool_name}_response.json"
-        request_payload = {
-            "tool_name": tool_name,
-            "arguments": arguments,
-            "timestamp": _timestamp(),
-        }
-        write_json(request_path, request_payload)
+        write_json(request_path, {"tool_name": tool_name, "arguments": arguments, "timestamp": _timestamp()})
         result = self.tools[tool_name].run(arguments)
         if tool_name == "generate_research_plan_report" and result.get("markdown"):
             self.state.final_report = result["markdown"]
-            (Path(self.state.run_dir) / "final_report.md").write_text(
-                result["markdown"], encoding="utf-8"
-            )
+            (Path(self.state.run_dir) / "final_report.md").write_text(result["markdown"], encoding="utf-8")
+
         response_payload = {
             "tool_name": tool_name,
             "result": result,
@@ -296,10 +387,168 @@ All tool candidate parameters must obey these bounds:
         }
         write_json(response_path, response_payload)
         self.state.tool_calls.append(response_payload)
-        self.state.experiment_history.append(result)
+        if tool_name == "run_soft_swimmer_experiment":
+            self.state.experiment_history.append(result)
+        self.state.raw_data.append({"source": tool_name, "data": result, "timestamp": _timestamp()})
         self.state.last_tool_result = result
         self.state.total_tool_calls = len(self.state.tool_calls)
         return result
+
+    def _should_fill_default_tool_call(self, decision: dict[str, Any], intent: str) -> bool:
+        return intent in {"tool_execution", "visualization_request", "report_generation"} and not self._has_tool_call(decision)
+
+    def _default_tool_call_for_intent(self, intent: str, message: str) -> dict[str, Any]:
+        if intent == "tool_execution":
+            return self._default_soft_swimmer_tool_call(message)
+        if intent == "visualization_request":
+            return self._default_plot_tool_call()
+        if intent == "report_generation":
+            return {
+                "assistant_message": "我将基于当前对话和实验历史生成阶段报告。",
+                "state_update": {},
+                "next_action": "call_tool",
+                "tool_call": {"tool_name": "generate_research_plan_report", "arguments": {}},
+            }
+        return {"assistant_message": "", "state_update": {}, "next_action": "ask_clarification", "tool_call": {}}
+
+    def _default_soft_swimmer_tool_call(self, message: str) -> dict[str, Any]:
+        text = message.lower()
+        if "energy" in text or "能耗" in message:
+            candidates = [
+                {"candidate_id": "C001", "amplitude": 0.16, "frequency": 0.8, "wavelength": 1.1, "stiffness": 0.65, "phase": 0.25},
+                {"candidate_id": "C002", "amplitude": 0.20, "frequency": 1.0, "wavelength": 1.2, "stiffness": 0.70, "phase": 0.35},
+                {"candidate_id": "C003", "amplitude": 0.24, "frequency": 1.2, "wavelength": 1.3, "stiffness": 0.60, "phase": 0.45},
+                {"candidate_id": "C004", "amplitude": 0.18, "frequency": 0.9, "wavelength": 1.4, "stiffness": 0.75, "phase": 0.55},
+            ]
+        elif "speed" in text or "速度" in message:
+            candidates = [
+                {"candidate_id": "C001", "amplitude": 0.30, "frequency": 2.0, "wavelength": 1.0, "stiffness": 0.45, "phase": 0.20},
+                {"candidate_id": "C002", "amplitude": 0.36, "frequency": 2.3, "wavelength": 1.1, "stiffness": 0.50, "phase": 0.35},
+                {"candidate_id": "C003", "amplitude": 0.40, "frequency": 2.6, "wavelength": 1.2, "stiffness": 0.55, "phase": 0.50},
+                {"candidate_id": "C004", "amplitude": 0.32, "frequency": 2.8, "wavelength": 1.4, "stiffness": 0.60, "phase": 0.65},
+            ]
+        else:
+            candidates = [
+                {"candidate_id": "C001", "amplitude": 0.22, "frequency": 1.1, "wavelength": 1.0, "stiffness": 0.55, "phase": 0.20},
+                {"candidate_id": "C002", "amplitude": 0.26, "frequency": 1.4, "wavelength": 1.2, "stiffness": 0.60, "phase": 0.35},
+                {"candidate_id": "C003", "amplitude": 0.30, "frequency": 1.7, "wavelength": 1.4, "stiffness": 0.50, "phase": 0.50},
+                {"candidate_id": "C004", "amplitude": 0.34, "frequency": 2.0, "wavelength": 1.6, "stiffness": 0.65, "phase": 0.65},
+            ]
+        return {
+            "assistant_message": "你已明确授权运行实验。我将调用当前内置的 soft-swimmer 轻量示例工具，并在完成后解释结果。",
+            "state_update": {"planning_preference": self.state.planning_preference or "balanced_efficiency"},
+            "next_action": "call_tool",
+            "tool_call": {
+                "tool_name": "run_soft_swimmer_experiment",
+                "arguments": {"candidates": candidates, "constraints": self.state.constraints or {}, "random_seed": 42},
+            },
+        }
+
+    def _default_plot_tool_call(self) -> dict[str, Any]:
+        return {
+            "assistant_message": "我将基于已有实验历史生成效率柱状图，并在聊天中显示图像。",
+            "state_update": {},
+            "next_action": "call_tool",
+            "tool_call": {"tool_name": "generate_experiment_plot", "arguments": {"figure_type": "efficiency_by_candidate"}},
+        }
+
+    def _has_tool_call(self, decision: dict[str, Any]) -> bool:
+        call = decision.get("tool_call") or {}
+        return decision.get("next_action") == "call_tool" and bool(call.get("tool_name"))
+
+    def _state_snapshot(self) -> dict[str, Any]:
+        return {
+            "research_goal": self.state.research_goal,
+            "constraints": self.state.constraints,
+            "target_metric": self.state.target_metric,
+            "priority_weights": self.state.priority_weights,
+            "planning_preference": self.state.planning_preference,
+            "current_intent": self.state.current_intent,
+            "current_skill": self.state.current_skill,
+            "tool_execution_allowed": self.state.tool_execution_allowed,
+            "experiment_history": self.state.experiment_history[-3:],
+            "current_plan": self.state.current_plan,
+            "messages": self.state.messages[-8:],
+        }
+
+    def _guard_and_rewrite_message(self, message: str) -> str:
+        previous = self._previous_assistant_message()
+        should_rewrite, reason = needs_response_rewrite(
+            message, previous, self.state.current_intent or ""
+        )
+        if not should_rewrite:
+            return message
+        system_prompt, user_prompt = rewrite_prompt(
+            self.state.messages[-1]["content"] if self.state.messages else "",
+            message,
+            self.state.current_intent or "",
+            reason,
+        )
+        try:
+            repaired = self._record_llm_call(
+                system_prompt, user_prompt, agent="ResponseGuard"
+            )
+            repaired = ensure_readable_assistant_message(repaired)
+            second_check, _ = needs_response_rewrite(
+                repaired, previous, self.state.current_intent or ""
+            )
+            if not second_check:
+                self.state.raw_data.append(
+                    {
+                        "source": "response_guard",
+                        "data": {"reason": reason, "original": message[:500]},
+                        "timestamp": _timestamp(),
+                    }
+                )
+                return repaired
+        except Exception as exc:  # noqa: BLE001 - keep UI alive with deterministic fallback.
+            self.state.raw_data.append(
+                {
+                    "source": "response_guard_error",
+                    "data": {"reason": reason, "error": str(exc)},
+                    "timestamp": _timestamp(),
+                }
+            )
+        if self.state.current_intent == "research_consultation":
+            return (
+                "这是一个具体的流场优化研究任务，而不是能力介绍问题。我的理解是：你关注的是带有"
+                "流固耦合、运动控制和约束优化特征的推进问题。当前内置的 soft-swimmer lightweight "
+                "tool 不能直接求解完整 Navier-Stokes/FSI/材料疲劳约束。建议下一步先明确设计变量、"
+                "目标函数、约束和边界条件，再选择 A. 实验任务规划，B. CFD/FreeFlow adapter 数据接口设计，"
+                "或 C. 使用当前简化 soft-swimmer 工具做演示。"
+            )
+        return message
+
+    def _previous_assistant_message(self) -> str | None:
+        for item in reversed(self.state.messages[:-1]):
+            if item.get("role") == "assistant":
+                return str(item.get("content", ""))
+        return None
+
+    def _record_decision_trace(self, user_message: str, tool_calls_before: int) -> None:
+        assistant_messages = [m for m in self.state.messages if m.get("role") == "assistant"]
+        assistant_message = assistant_messages[-1]["content"] if assistant_messages else ""
+        whether_tool_called = self.state.total_tool_calls > tool_calls_before
+        trace = {
+            "timestamp": _timestamp(),
+            "user_message": user_message,
+            "detected_intent": self.state.current_intent,
+            "selected_skill": self.state.current_skill,
+            "tool_permission": self._latest_tool_permission,
+            "whether_tool_called": whether_tool_called,
+            "assistant_message": assistant_message,
+            "reasoning_summary": (
+                f"intent={self.state.current_intent}; skill={self.state.current_skill}; "
+                f"tool_allowed={self._latest_tool_permission.get('allowed')}; "
+                f"tool_called={whether_tool_called}"
+            ),
+            "latest_llm_response_excerpt": self.state.last_qwen_response_excerpt,
+        }
+        self.state.last_decision_trace = trace
+        self.state.last_tool_permission = self._latest_tool_permission
+        path = Path(self.state.run_dir) / "decision_trace.jsonl"
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(trace, ensure_ascii=False, default=str) + "\n")
 
     def _refresh_audit_counts(self) -> None:
         self.state.total_llm_calls = len(list(self.llm_calls_dir.glob("*_response.json")))
@@ -314,11 +563,11 @@ All tool candidate parameters must obey these bounds:
         self._write_current_report()
 
     def _write_current_report(self) -> None:
-        """Write a continuously updated audit-friendly Markdown report."""
-
         report = "\n".join(
             [
                 "# FlowScientist Conversation Report",
+                "",
+                "FlowScientist is a conversational AI Scientist for general fluid simulation and flow-field optimization. The current executable demo tool is a soft-swimmer virtual experiment tool.",
                 "",
                 "## LLM Backend",
                 f"- Provider: {self.state.llm_backend.get('llm_provider')}",
@@ -327,22 +576,17 @@ All tool candidate parameters must obey these bounds:
                 f"- Mock mode: {str(self.state.llm_backend.get('is_mock', True)).lower()}",
                 f"- Total LLM calls: {self.state.total_llm_calls}",
                 f"- Total tool calls: {self.state.total_tool_calls}",
-                f"- LLM call logs: {self.llm_calls_dir}",
-                f"- Tool call logs: {self.tool_calls_dir}",
+                "",
+                "## Current Intent State",
+                f"- Intent: {self.state.current_intent}",
+                f"- Skill: {self.state.current_skill}",
+                f"- Tool execution allowed: {self.state.tool_execution_allowed}",
                 "",
                 "## Research Goal",
                 str(self.state.research_goal or "Not clarified yet"),
                 "",
-                "## Current Planning State",
-                f"- Target metric: {self.state.target_metric}",
-                f"- Planning preference: {self.state.planning_preference}",
-                f"- Priority weights: {self.state.priority_weights}",
-                "",
                 "## Conversation Messages",
-                "\n".join(
-                    f"- {message['role']}: {message['content']}"
-                    for message in self.state.messages[-12:]
-                ),
+                "\n".join(f"- {m['role']}: {m['content']}" for m in self.state.messages[-12:]),
                 "",
                 "## Experiment History",
                 json.dumps(self.state.experiment_history, ensure_ascii=False, indent=2, default=str),
@@ -352,6 +596,7 @@ All tool candidate parameters must obey these bounds:
         (Path(self.state.run_dir) / "final_report.md").write_text(report, encoding="utf-8")
 
     def _normalize_decision(self, decision: dict[str, Any]) -> dict[str, Any]:
+        decision = dict(decision or {})
         decision.setdefault("assistant_message", "")
         decision.setdefault("state_update", {})
         decision.setdefault("next_action", "ask_clarification")
@@ -359,45 +604,19 @@ All tool candidate parameters must obey these bounds:
             decision["tool_call"] = {}
         return decision
 
-    def _looks_like_concrete_goal(self, message: str) -> bool:
-        """Detect goals that should trigger an initial experiment plan."""
-
-        text = message.lower()
-        keywords = [
-            "maximize",
-            "minimize",
-            "optimize",
-            "improve",
-            "speed",
-            "energy",
-            "stable",
-            "stability",
-            "efficiency",
-            "提高",
-            "降低",
-            "优化",
-            "稳定",
-            "能耗",
-        ]
-        return any(keyword in text for keyword in keywords)
-
-    def _is_greeting_or_meta_question(self, message: str) -> bool:
-        """Detect greetings and capability questions."""
-
-        text = message.lower().strip()
-        greetings = ["你好", "hello", "hi", "hey", "你能做什么", "what can you do"]
-        return any(item in text for item in greetings)
-
-    def _needs_candidate_repair(self, decision: dict[str, Any]) -> bool:
-        """Require a useful batch when Qwen chooses the simulator tool."""
-
-        if decision.get("next_action") != "call_tool":
-            return False
-        tool_call = decision.get("tool_call") or {}
-        if tool_call.get("tool_name") != "run_soft_swimmer_experiment":
-            return False
-        candidates = (tool_call.get("arguments") or {}).get("candidates") or []
-        return len(candidates) < 4
+    def _skill_name_for_intent(self, intent: str) -> str:
+        mapping = {
+            "casual_chat": "base_dialogue_skill",
+            "capability_question": "capability_skill",
+            "conceptual_explanation": "conceptual_explanation_skill",
+            "research_consultation": "research_consultation_skill",
+            "experiment_planning": "experiment_planning_skill",
+            "tool_execution": "tool_execution_skill",
+            "result_analysis": "result_analysis_skill",
+            "visualization_request": "visualization_skill",
+            "report_generation": "report_skill",
+        }
+        return mapping.get(intent, "base_dialogue_skill")
 
     def _next_index(self, directory: Path, pattern: str) -> int:
         return len(list(directory.glob(pattern))) + 1

@@ -1,0 +1,10 @@
+{
+  "agent": "IntentRouter",
+  "provider": "qwen",
+  "transport": "curl",
+  "model": "qwen-turbo",
+  "is_mock": false,
+  "raw_response": "{\n  \"intent\": \"capability_question\",\n  \"confidence\": 0.95,\n  \"reason\": \"The user is asking about the system's advantages in a specific domain (soft robotic fish flow field optimization), which falls under capability questions that inquire about what the system can do and why it is useful.\"\n}",
+  "response_sha256": "7bf6bd04fb3e8b94e378499838cbcef7e30aae9d1b3440a33356b5676857baca",
+  "timestamp": "2026-07-06T08:06:34.073622+00:00"
+}

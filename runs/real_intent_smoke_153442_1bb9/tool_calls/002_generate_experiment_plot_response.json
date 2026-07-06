@@ -1,0 +1,12 @@
+{
+  "tool_name": "generate_experiment_plot",
+  "result": {
+    "tool_name": "generate_experiment_plot",
+    "figure_path": "runs\\real_intent_smoke_153442_1bb9\\figures\\efficiency_by_candidate.png",
+    "figure_type": "efficiency_by_candidate",
+    "caption": "Candidate efficiency comparison.",
+    "summary": "Generated efficiency_by_candidate from 4 candidate rows. Best efficiency candidate is 1 with efficiency=2.0081."
+  },
+  "result_sha256": "e390f732fa0b9bb9848be286bd0553d7dd5c698f34b4c5ac5dcee49c048280ad",
+  "timestamp": "2026-07-06T07:35:32.025356+00:00"
+}

@@ -1,0 +1,218 @@
+[
+  {
+    "case_id": "case_001",
+    "user_message": "你好，你能做什么？",
+    "expected_intent": ["capability_question", "casual_chat"],
+    "should_call_tool": false,
+    "expected_tool": null,
+    "should_show_raw_json": false,
+    "expected_behavior": "Answer capabilities naturally without running an experiment."
+  },
+  {
+    "case_id": "case_002",
+    "user_message": "为什么说你在软体机器人鱼流场优化方面有优势？",
+    "expected_intent": ["capability_question"],
+    "should_call_tool": false,
+    "expected_tool": null,
+    "should_show_raw_json": false,
+    "expected_behavior": "Explain advantages and capability boundaries; do not call simulator."
+  },
+  {
+    "case_id": "case_003",
+    "user_message": "什么是流固耦合？",
+    "expected_intent": ["conceptual_explanation"],
+    "should_call_tool": false,
+    "expected_tool": null,
+    "should_show_raw_json": false,
+    "expected_behavior": "Explain the concept without tool use."
+  },
+  {
+    "case_id": "case_004",
+    "user_message": "我想研究翼型减阻，你有什么建议？",
+    "expected_intent": ["research_consultation"],
+    "should_call_tool": false,
+    "expected_tool": null,
+    "should_show_raw_json": false,
+    "expected_behavior": "Discuss method and data requirements without running soft-swimmer tool."
+  },
+  {
+    "case_id": "case_005",
+    "user_message": "请帮我设计一轮机器鱼推进效率优化实验。",
+    "expected_intent": ["experiment_planning"],
+    "should_call_tool": false,
+    "expected_tool": null,
+    "should_show_raw_json": false,
+    "expected_behavior": "Propose a plan and ask whether to run the demo tool."
+  },
+  {
+    "case_id": "case_006",
+    "user_message": "同意，运行你刚才建议的实验。",
+    "expected_intent": ["tool_execution"],
+    "should_call_tool": true,
+    "expected_tool": "run_soft_swimmer_experiment",
+    "should_show_raw_json": false,
+    "expected_behavior": "Run the soft-swimmer demo tool after explicit approval."
+  },
+  {
+    "case_id": "case_007",
+    "user_message": "把刚才结果画成效率柱状图。",
+    "expected_intent": ["visualization_request"],
+    "should_call_tool": true,
+    "expected_tool": "generate_experiment_plot",
+    "should_show_raw_json": false,
+    "expected_behavior": "Call plot tool when experiment history exists."
+  },
+  {
+    "case_id": "case_008",
+    "user_message": "生成一份阶段报告。",
+    "expected_intent": ["report_generation"],
+    "should_call_tool": true,
+    "expected_tool": "generate_research_plan_report",
+    "should_show_raw_json": false,
+    "expected_behavior": "Generate report from conversation context."
+  },
+  {
+    "case_id": "case_009",
+    "user_message": "仿生软体游泳机器人微型海蛞蝓过渡区流场与运动控制闭环优化，考虑流固耦合、疲劳约束和多目标函数，请给我建议。",
+    "expected_intent": ["research_consultation"],
+    "should_call_tool": false,
+    "expected_tool": null,
+    "should_show_raw_json": false,
+    "expected_behavior": "Treat as complex research consultation; explain CFD/FSI limits and ask next path."
+  },
+  {
+    "case_id": "case_010",
+    "user_message": "如何把 FreeFlow 的结果接入你这个系统？",
+    "expected_intent": ["conceptual_explanation", "research_consultation"],
+    "should_call_tool": false,
+    "expected_tool": null,
+    "should_show_raw_json": false,
+    "expected_behavior": "Explain adapter/data interface, not run simulator."
+  },
+  {
+    "case_id": "case_011",
+    "user_message": "请运行一次实验，测试这些参数。",
+    "expected_intent": ["tool_execution"],
+    "should_call_tool": true,
+    "expected_tool": "run_soft_swimmer_experiment",
+    "should_show_raw_json": false,
+    "expected_behavior": "Run experiment tool."
+  },
+  {
+    "case_id": "case_012",
+    "user_message": "请开始仿真。",
+    "expected_intent": ["tool_execution"],
+    "should_call_tool": true,
+    "expected_tool": "run_soft_swimmer_experiment",
+    "should_show_raw_json": false,
+    "expected_behavior": "Run the available demo simulation tool with honest caveat."
+  },
+  {
+    "case_id": "case_013",
+    "user_message": "请分析刚才的实验结果。",
+    "expected_intent": ["result_analysis"],
+    "should_call_tool": false,
+    "expected_tool": null,
+    "should_show_raw_json": false,
+    "expected_behavior": "Analyze existing result, do not launch new experiment."
+  },
+  {
+    "case_id": "case_014",
+    "user_message": "继续下一轮实验。",
+    "expected_intent": ["tool_execution"],
+    "should_call_tool": true,
+    "expected_tool": "run_soft_swimmer_experiment",
+    "should_show_raw_json": false,
+    "expected_behavior": "Continue next round after explicit request."
+  },
+  {
+    "case_id": "case_015",
+    "user_message": "能不能解释一下管道流减阻的常见策略？",
+    "expected_intent": ["conceptual_explanation"],
+    "should_call_tool": false,
+    "expected_tool": null,
+    "should_show_raw_json": false,
+    "expected_behavior": "Explain strategies without using soft-swimmer tool."
+  },
+  {
+    "case_id": "case_016",
+    "user_message": "我想做微流控混合效率优化。",
+    "expected_intent": ["research_consultation"],
+    "should_call_tool": false,
+    "expected_tool": null,
+    "should_show_raw_json": false,
+    "expected_behavior": "Ask clarifying questions and suggest planning workflow."
+  },
+  {
+    "case_id": "case_017",
+    "user_message": "show plot of speed energy scatter",
+    "expected_intent": ["visualization_request"],
+    "should_call_tool": true,
+    "expected_tool": "generate_experiment_plot",
+    "should_show_raw_json": false,
+    "expected_behavior": "Generate scatter plot if data exists."
+  },
+  {
+    "case_id": "case_018",
+    "user_message": "请给我一个PPT材料大纲。",
+    "expected_intent": ["report_generation"],
+    "should_call_tool": true,
+    "expected_tool": "generate_research_plan_report",
+    "should_show_raw_json": false,
+    "expected_behavior": "Use report-generation path."
+  },
+  {
+    "case_id": "case_019",
+    "user_message": "谢谢，先不用运行。",
+    "expected_intent": ["casual_chat"],
+    "should_call_tool": false,
+    "expected_tool": null,
+    "should_show_raw_json": false,
+    "expected_behavior": "Acknowledge without tool use."
+  },
+  {
+    "case_id": "case_020",
+    "user_message": "请设计 CFD adapter 的数据接口。",
+    "expected_intent": ["experiment_planning", "research_consultation"],
+    "should_call_tool": false,
+    "expected_tool": null,
+    "should_show_raw_json": false,
+    "expected_behavior": "Design interface, do not run toy simulator."
+  },
+  {
+    "case_id": "case_021",
+    "user_message": "为什么说你在流场优化方面有优势？",
+    "expected_intent": ["capability_question"],
+    "should_call_tool": false,
+    "expected_tool": null,
+    "should_show_raw_json": false,
+    "expected_behavior": "Explain advantages, tools, and boundaries without running tools."
+  },
+  {
+    "case_id": "case_022",
+    "user_message": "仿生软体游泳机器人（微型海蛞蝓）过渡区流场与运动控制闭环优化，Re=150，包含目标函数和约束。",
+    "expected_intent": ["research_consultation", "experiment_planning"],
+    "should_call_tool": false,
+    "expected_tool": null,
+    "should_show_raw_json": false,
+    "expected_behavior": "Analyze FSI/control optimization task and next steps; do not repeat capability template."
+  },
+  {
+    "case_id": "case_023",
+    "user_message": "请直接运行当前内置的 soft-swimmer 示例工具，测试一组参数。",
+    "expected_intent": ["tool_execution"],
+    "should_call_tool": true,
+    "expected_tool": "run_soft_swimmer_experiment",
+    "should_show_raw_json": false,
+    "expected_behavior": "Run tool only after explicit request."
+  },
+  {
+    "case_id": "case_024",
+    "user_message": "你好",
+    "expected_intent": ["casual_chat"],
+    "should_call_tool": false,
+    "expected_tool": null,
+    "should_show_raw_json": false,
+    "expected_behavior": "Short greeting without full capability introduction."
+  }
+]

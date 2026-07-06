@@ -1,0 +1,10 @@
+{
+  "agent": "DialogueOrchestrator",
+  "provider": "qwen",
+  "transport": "eval-dialogue",
+  "model": "dialogue-eval",
+  "is_mock": false,
+  "raw_response": "{\"assistant_message\": \"你好。\", \"state_update\": {}, \"next_action\": \"ask_clarification\", \"tool_call\": {}}",
+  "response_sha256": "dbca0ea95fe240a80113ae10731bc02a4920a7e3a3dca4af3a4ea705279d959b",
+  "timestamp": "2026-07-06T08:56:11.773575+00:00"
+}

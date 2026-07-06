@@ -1,6 +1,6 @@
 # FlowScientist
 
-FlowScientist is a chat-first, Qwen-powered AI Scientist for **scientific experiment task planning and feedback iteration**. It targets soft robotic swimmer and flow-field optimization scenarios.
+FlowScientist is a chat-first, Qwen-powered AI Scientist for **scientific experiment task planning and feedback iteration**. Its target positioning is broader than one simulator: it is a conversational AI Scientist for **general fluid simulation and flow-field optimization**, with a soft-swimmer virtual experiment tool as one available demonstration tool.
 
 The primary product form is a conversational agent: the user discusses research goals and constraints with Qwen-powered FlowScientist, and FlowScientist decides when to clarify, plan experiments, call tools, analyze results, and revise the next plan.
 
@@ -21,7 +21,36 @@ User <-> Qwen-powered FlowScientist
   -> final research plan report
 ```
 
-The virtual simulator is not the product itself. It is a tool used by the Qwen-powered AI Scientist to demonstrate experiment execution and feedback iteration. The system can later replace this tool with FreeFlow, CFD, or real lab instruments.
+The virtual simulator is not the product itself. It is a tool used by the Qwen-powered AI Scientist to demonstrate experiment execution and feedback iteration. The system can later replace this tool with FreeFlow, CFD solvers, experiment-instrument APIs, or post-processing scripts.
+
+## FlowScientist Is a Conversational AI Scientist, Not Just a Simulator
+
+Qwen is the controller for dialogue, scientific planning, tool-use decisions, result interpretation, and iteration suggestions. Tools are callable execution or visualization modules. The current executable experiment tool is the soft-swimmer virtual experiment tool, and it is intentionally presented as a demonstration backend rather than as the whole product.
+
+FlowScientist can be extended toward:
+
+- soft-swimmer / robotic-fish propulsion efficiency optimization
+- airfoil or wing aerodynamic optimization
+- pipe-flow drag reduction
+- microfluidic mixing efficiency optimization
+- porous-media flow analysis
+- vortex-shedding and bluff-body drag reduction
+- thermal-flow coupled heat-transfer optimization
+- hull or underwater-vehicle drag optimization
+
+These are extensible application directions. The current prototype has implemented the soft-swimmer demo tool, plus a plotting tool for experiment-history visualization. It does not pretend that all CFD tools above are already connected.
+
+## Agent Behavior Optimization
+
+This project does not train a new foundation model. It improves agent behavior through a lightweight control layer around Qwen:
+
+- **Skill policy**: prompts are modularized under `src/skills/` for base dialogue, intent routing, tool policy, experiment planning, result analysis, visualization, and readable responses.
+- **Intent routing**: `src/agents/intent_router.py` calls Qwen for intent classification, then applies safety corrections so capability questions, conceptual explanations, and broad research consultations do not accidentally trigger tools.
+- **Tool-use approval**: `src/policies/tool_use_policy.py` implements a code-level approval layer. Experiment tools are blocked for casual chat, capability questions, conceptual explanations, and research consultation. Experiment planning asks for confirmation before execution.
+- **Dialogue evals**: `evals/dialogue_behavior_cases.yaml` and `tools/test_agent_behavior.py` provide behavior checks for intent, tool calls, and raw-JSON suppression.
+- **Readable response guard**: `src/utils/readable_response.py` prevents raw tool JSON from appearing as the main chat response.
+
+The design borrows ideas from Qwen-Agent tool-use planning, AgentScope evaluation practices, LangGraph-style human-in-the-loop approval, and DSPy-style modular prompts/pipelines, but intentionally avoids introducing those heavy frameworks in this MVP.
 
 ## Why This Is Not One-Shot Hypothesis Generation
 
@@ -83,6 +112,7 @@ FlowScientist-Loop/
       mock_provider.py
       qwen_provider.py
     agents/
+      dialogue_orchestrator.py
       problem_analyst.py
       experiment_planner.py
       data_analyst.py
@@ -92,6 +122,18 @@ FlowScientist-Loop/
       base_adapter.py
       freeflow_csv_adapter.py
       soft_swimmer_simulator.py
+    skills/
+      base_dialogue_skill.py
+      intent_router_skill.py
+      experiment_planning_skill.py
+      result_analysis_skill.py
+      visualization_skill.py
+      report_skill.py
+    tools/
+      base.py
+      soft_swimmer_tool.py
+      plot_tool.py
+      report_tool.py
     workflow/
       experiment_loop.py
     utils/
@@ -171,6 +213,9 @@ Run a goal-sensitivity check to verify that different goals change Qwen analysis
 ```bash
 python tools/test_goal_sensitivity.py
 python tools/test_dialogue_goal_sensitivity.py
+python tools/test_intent_router.py
+python tools/test_readable_response.py
+python tools/test_agent_behavior.py
 ```
 
 ## Using Real Qwen When Python HTTPS Fails
@@ -228,12 +273,17 @@ Main endpoints:
 streamlit run app_streamlit.py
 ```
 
-The frontend is chat-first. Type natural-language research goals, constraints, or feedback into the chat box. FlowScientist will:
+The frontend is chat-first. Type natural-language questions, research goals, constraints, planning requests, explicit tool-execution requests, or visualization requests into the chat box. FlowScientist will:
 
+- classify the current intent before deciding whether tools are allowed
+- answer capability and conceptual questions without running experiments
 - ask clarifying questions when information is insufficient
 - update the visible research state in the sidebar
-- generate Qwen-designed experiment tool calls when ready
-- display tool results inside the chat
+- propose experiment plans without auto-running them unless execution is explicit
+- generate Qwen-designed experiment tool calls only when the user authorizes execution
+- display natural-language tool summaries in chat
+- keep raw tool JSON in hidden/collapsible audit payloads
+- show generated figures directly when the plot tool is called
 - analyze results and revise the next plan
 - save `conversation.json`, `llm_calls/`, and `tool_calls/` under `runs/{run_id}/`
 
@@ -275,6 +325,9 @@ The tests cover:
 - energy and stability constraint violations
 - planner feedback rules
 - workflow artifact persistence for multi-iteration runs
+- intent routing and tool-use guard behavior
+- readable response post-processing so raw JSON is not shown as chat content
+- dialogue behavior eval cases under `evals/dialogue_behavior_cases.yaml`
 
 ## How to Generate Demo Assets
 
@@ -345,7 +398,7 @@ The adapter interface is defined in:
 - `stability_score`
 - `vortex_loss`
 
-If a FreeFlow or CFD pipeline can output this schema, it can replace the lightweight simulator without rewriting the agent workflow, API, or UI.
+If a FreeFlow or CFD pipeline can output this schema, it can replace the lightweight simulator without rewriting the dialogue agent, API, or UI. In the chat-first architecture, a new solver should usually be added as a new tool module under `src/tools/`, with a corresponding adapter under `src/simulator/` or another integration layer.
 
 ## Suggested Screenshots for PPT/PDF
 

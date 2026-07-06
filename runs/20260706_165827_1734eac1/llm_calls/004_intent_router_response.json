@@ -1,0 +1,10 @@
+{
+  "agent": "IntentRouter",
+  "provider": "qwen",
+  "transport": "curl",
+  "model": "qwen-turbo",
+  "is_mock": false,
+  "raw_response": "{\n  \"intent\": \"research_consultation\",\n  \"confidence\": 0.95,\n  \"reason\": \"The user provided a detailed description of a research task involving the optimization of a soft robotic swimmer in a transitional flow regime, including physical background, mathematical models, and constraints. This aligns with the 'research_consultation' intent as it outlines a research direction without explicitly requesting an experiment or analysis.\"\n}",
+  "response_sha256": "e6ccb50dbd061407322e3ec0dc47cd581d0e957c26ed5c3eb58a94808377273c",
+  "timestamp": "2026-07-06T08:58:52.162514+00:00"
+}

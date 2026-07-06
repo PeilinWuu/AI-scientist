@@ -1,0 +1,10 @@
+{
+  "agent": "IntentRouter",
+  "provider": "qwen",
+  "transport": "curl",
+  "model": "qwen-turbo",
+  "is_mock": false,
+  "raw_response": "{\n  \"intent\": \"research_consultation\",\n  \"confidence\": 0.95,\n  \"reason\": \"用户提供了详细的研究任务描述，包括物理背景、优化数学模型和约束条件，但并未明确请求执行实验或生成报告，而是可能希望获得研究方向上的建议或分析。\"\n}",
+  "response_sha256": "6ea8b2393cfa300f56c6f8f02dab47899639c9c022db4cd57fd6bdd3296ab31d",
+  "timestamp": "2026-07-06T08:15:40.915224+00:00"
+}

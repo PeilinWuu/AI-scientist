@@ -1,0 +1,10 @@
+{
+  "agent": "DialogueOrchestratorRepair",
+  "provider": "qwen",
+  "transport": "curl",
+  "model": "qwen-turbo",
+  "is_mock": false,
+  "prompt": "SYSTEM:\nYou are a JSON repair assistant for FlowScientist. Convert the previous assistant text into valid DialogueOrchestrator JSON only.\n\nUSER:\n\nOriginal phase: casual_chat_decision\nClassified intent: casual_chat\nOriginal user message: 你好\nPrevious non-JSON assistant content:\n你好！我是FlowScientist，一个专注于流体模拟和流动场优化的对话式AI科学家。你可以问我关于流体动力学、实验设计、参数优化、结果分析等问题，或者想了解如何使用我们的软体游泳者虚拟实验工具。有什么我可以帮你的吗？\n\nReturn strict JSON:\n{\n  \"assistant_message\": \"...\",\n  \"state_update\": {},\n  \"next_action\": \"ask_clarification|propose_plan|call_tool|analyze_result|generate_report\",\n  \"tool_call\": {}\n}\n",
+  "prompt_sha256": "b88f22dec68ae3d4c6ed34278d5d0cfb1f266cd76738ed3ff3495c83d513f1f8",
+  "timestamp": "2026-07-06T08:58:37.174475+00:00"
+}
