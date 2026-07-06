@@ -1,0 +1,50 @@
+{
+  "iteration": 3,
+  "strategy": "Feedback-aware local search around the best feasible design. Main adjustment: increase frequency or amplitude to recover propulsion speed.",
+  "candidates": [
+    {
+      "candidate_id": "iter3_cand1",
+      "params": {
+        "amplitude": 0.16,
+        "frequency": 1.07,
+        "wavelength": 1.13,
+        "stiffness": 0.49,
+        "phase": 0.206875
+      },
+      "rationale": "Increase thrust for low speed"
+    },
+    {
+      "candidate_id": "iter3_cand2",
+      "params": {
+        "amplitude": 0.14,
+        "frequency": 1.17,
+        "wavelength": 1.0799999999999998,
+        "stiffness": 0.52,
+        "phase": 0.226875
+      },
+      "rationale": "Frequency increase with controlled body shape"
+    },
+    {
+      "candidate_id": "iter3_cand3",
+      "params": {
+        "amplitude": 0.18,
+        "frequency": 0.97,
+        "wavelength": 1.18,
+        "stiffness": 0.49,
+        "phase": 0.186875
+      },
+      "rationale": "Amplitude increase with mild smoothing"
+    },
+    {
+      "candidate_id": "iter3_cand4",
+      "params": {
+        "amplitude": 0.13,
+        "frequency": 1.05,
+        "wavelength": 1.13,
+        "stiffness": 0.45,
+        "phase": 0.246875
+      },
+      "rationale": "Use flexibility to recover speed"
+    }
+  ]
+}

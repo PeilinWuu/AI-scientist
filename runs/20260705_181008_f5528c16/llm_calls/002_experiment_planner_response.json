@@ -1,0 +1,10 @@
+{
+  "agent": "ExperimentPlannerAgent",
+  "provider": "qwen",
+  "transport": "curl",
+  "model": "qwen-turbo",
+  "is_mock": false,
+  "raw_response": "{\n  \"planning_rationale\": \"The next candidate plan should follow the current preference of 'low_energy' because the target metric is 'energy_cost', and the priority weights emphasize minimizing energy cost. The constraints require an energy cost below 1.4, so focusing on low-energy solutions aligns with both the objective and the constraints.\",\n  \"expected_tradeoff\": \"Focusing on low-energy solutions may limit exploration of higher-energy configurations that could potentially improve stability or other secondary metrics, but this trade-off is acceptable given the primary focus on energy cost.\"\n}",
+  "response_sha256": "5cb2786ba99406aeded965c21b9474cffd448ea51bf202b20b6001c85592707e",
+  "timestamp": "2026-07-05T10:10:20.149114+00:00"
+}

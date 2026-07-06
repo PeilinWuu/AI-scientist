@@ -1,0 +1,8 @@
+{
+  "energy_too_high": false,
+  "stability_too_low": false,
+  "speed_too_low": true,
+  "efficiency_improved": false,
+  "next_strategy": "increase frequency or amplitude to recover propulsion speed",
+  "message": "Next planner should increase frequency or amplitude to recover propulsion speed. This links measured results directly to the next experiment plan."
+}

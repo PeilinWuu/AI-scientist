@@ -1,0 +1,81 @@
+{
+  "iteration": 1,
+  "strategy": "Qwen-guided first pass for planning_preference=low_energy.",
+  "candidates": [
+    {
+      "candidate_id": "iter1_cand1",
+      "params": {
+        "amplitude": 0.14,
+        "frequency": 0.85,
+        "wavelength": 1.2,
+        "stiffness": 0.45,
+        "phase": 0.2
+      },
+      "rationale": "Qwen low-energy conservative baseline"
+    },
+    {
+      "candidate_id": "iter1_cand2",
+      "params": {
+        "amplitude": 0.16,
+        "frequency": 1.05,
+        "wavelength": 1.3,
+        "stiffness": 0.5,
+        "phase": 0.25
+      },
+      "rationale": "Low frequency efficiency probe"
+    },
+    {
+      "candidate_id": "iter1_cand3",
+      "params": {
+        "amplitude": 0.18,
+        "frequency": 1.15,
+        "wavelength": 1.1,
+        "stiffness": 0.42,
+        "phase": 0.2
+      },
+      "rationale": "Moderate amplitude low-cost gait"
+    },
+    {
+      "candidate_id": "iter1_cand4",
+      "params": {
+        "amplitude": 0.12,
+        "frequency": 1.25,
+        "wavelength": 1.45,
+        "stiffness": 0.55,
+        "phase": 0.3
+      },
+      "rationale": "Very low amplitude energy saver"
+    },
+    {
+      "candidate_id": "iter1_cand5",
+      "params": {
+        "amplitude": 0.2,
+        "frequency": 0.95,
+        "wavelength": 1.0,
+        "stiffness": 0.48,
+        "phase": 0.18
+      },
+      "rationale": "Energy-speed compromise"
+    },
+    {
+      "candidate_id": "iter1_cand6",
+      "params": {
+        "amplitude": 0.15,
+        "frequency": 1.35,
+        "wavelength": 1.25,
+        "stiffness": 0.6,
+        "phase": 0.25
+      },
+      "rationale": "Stable low-energy variant"
+    }
+  ],
+  "planning_source": "qwen_problem_analysis + previous_iteration_feedback",
+  "llm_evidence": {
+    "llm_used": true,
+    "llm_provider": "qwen",
+    "llm_transport": "curl",
+    "llm_model": "qwen-turbo",
+    "llm_response_excerpt": "{\n  \"planning_rationale\": \"The next candidate plan should follow the current preference of 'low_energy' because the target metric is 'energy_cost', and the priority weights emphasize minimizing energy cost. The constraints require an energy cost below 1.4, so focusing on low-energy solutions aligns ",
+    "llm_response_sha256": "5cb2786ba99406aeded965c21b9474cffd448ea51bf202b20b6001c85592707e"
+  }
+}

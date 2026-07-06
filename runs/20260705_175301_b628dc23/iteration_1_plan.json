@@ -1,0 +1,72 @@
+{
+  "iteration": 1,
+  "strategy": "Structured first pass over balanced, speed, flexibility, and stability regimes.",
+  "candidates": [
+    {
+      "candidate_id": "iter1_cand1",
+      "params": {
+        "amplitude": 0.16,
+        "frequency": 1.05,
+        "wavelength": 1.1,
+        "stiffness": 0.45,
+        "phase": 0.2
+      },
+      "rationale": "Balanced low-risk baseline"
+    },
+    {
+      "candidate_id": "iter1_cand2",
+      "params": {
+        "amplitude": 0.24,
+        "frequency": 1.6,
+        "wavelength": 1.1,
+        "stiffness": 0.48,
+        "phase": 0.25
+      },
+      "rationale": "Higher thrust with moderate cost"
+    },
+    {
+      "candidate_id": "iter1_cand3",
+      "params": {
+        "amplitude": 0.3,
+        "frequency": 2.1,
+        "wavelength": 1.0,
+        "stiffness": 0.55,
+        "phase": 0.25
+      },
+      "rationale": "Aggressive speed-seeking candidate"
+    },
+    {
+      "candidate_id": "iter1_cand4",
+      "params": {
+        "amplitude": 0.18,
+        "frequency": 2.3,
+        "wavelength": 1.25,
+        "stiffness": 0.5,
+        "phase": 0.35
+      },
+      "rationale": "Frequency-focused candidate"
+    },
+    {
+      "candidate_id": "iter1_cand5",
+      "params": {
+        "amplitude": 0.26,
+        "frequency": 1.35,
+        "wavelength": 0.85,
+        "stiffness": 0.35,
+        "phase": 0.15
+      },
+      "rationale": "Flexible body exploration"
+    },
+    {
+      "candidate_id": "iter1_cand6",
+      "params": {
+        "amplitude": 0.2,
+        "frequency": 1.45,
+        "wavelength": 1.45,
+        "stiffness": 0.7,
+        "phase": 0.3
+      },
+      "rationale": "Stiffer swimmer exploration"
+    }
+  ]
+}

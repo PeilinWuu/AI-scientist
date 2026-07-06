@@ -1,0 +1,10 @@
+{
+  "agent": "ProblemAnalystAgent",
+  "provider": "qwen",
+  "transport": "curl",
+  "model": "qwen-turbo",
+  "is_mock": false,
+  "raw_response": "{\n  \"problem_statement\": \"Design a soft robotic swimmer that minimizes energy cost while ensuring stable swimming motion.\",\n  \"target_metric\": \"energy_cost\",\n  \"priority_weights\": {\n    \"mean_speed\": 0.0,\n    \"energy_cost\": 1.0,\n    \"efficiency\": 0.0,\n    \"stability_score\": 0.0\n  },\n  \"constraints_interpretation\": \"The experiment must ensure a minimum stability score of 0.75 and an energy cost below 1.4. The parameters such as amplitude, frequency, wavelength, stiffness, and phase must remain within their specified ranges to achieve the desired performance.\",\n  \"planning_preference\": \"low_energy\"\n}",
+  "response_sha256": "7f3d2e0c5ce89e2c3059917dcaf370c8589c60b95dbafcb7f699a7306e4cfa4a",
+  "timestamp": "2026-07-05T10:10:13.955548+00:00"
+}

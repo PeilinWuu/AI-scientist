@@ -1,0 +1,10 @@
+{
+  "llm_provider": "qwen",
+  "llm_transport": "curl",
+  "llm_model": "qwen-turbo",
+  "llm_base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+  "is_mock": false,
+  "total_llm_calls": 5,
+  "llm_calls_path": "runs\\20260705_181008_f5528c16\\llm_calls",
+  "last_llm_response_excerpt": "The first iteration of the closed-loop experiment was guided by Qwen, focusing on a low-energy strategy to minimize energy cost while ensuring stable swimming motion. All six candidates met the constraints, with energy costs well below the maximum allowed (1.4) and stability scores above the minimum"
+}

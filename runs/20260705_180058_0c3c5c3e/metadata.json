@@ -1,0 +1,7 @@
+{
+  "llm_provider": "qwen",
+  "llm_transport": "curl",
+  "llm_model": "qwen-turbo",
+  "llm_base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+  "is_mock": false
+}

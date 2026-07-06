@@ -1,0 +1,31 @@
+{
+  "iteration": 2,
+  "target_metric": "stability_score",
+  "best_candidate": {
+    "candidate_id": "iter2_cand3",
+    "amplitude": 0.22,
+    "frequency": 1.5,
+    "wavelength": 1.14,
+    "stiffness": 0.52,
+    "phase": 0.23,
+    "mean_speed": 1.18243,
+    "energy_cost": 0.49436,
+    "efficiency": 2.28203,
+    "stability_score": 0.97014,
+    "vortex_loss": 0.10236,
+    "constraint_violation": false
+  },
+  "failure_reasons": [
+    "No hard constraint failure in this iteration."
+  ],
+  "trends": {
+    "mean_speed_mean": 1.27539,
+    "energy_cost_mean": 0.57647,
+    "efficiency_mean": 2.11699,
+    "stability_score_mean": 0.94937,
+    "feasible_count": 4,
+    "total_count": 4
+  },
+  "improvement_vs_previous_best": 0.01901,
+  "summary": "Best candidate is iter2_cand3 by stability_score. Mean efficiency this round is 2.11699, with 4/4 feasible candidates. Main issue: none"
+}

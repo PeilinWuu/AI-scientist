@@ -1,0 +1,10 @@
+{
+  "agent": "DataAnalystAgent",
+  "provider": "qwen",
+  "transport": "curl",
+  "model": "qwen-turbo",
+  "is_mock": false,
+  "raw_response": "In the first iteration, all candidates met the constraints, with the best candidate (iter1_cand5) achieving the highest mean speed of 1.71255 while maintaining a stability score above 0.89. The other candidates showed varying levels of performance, with iter1_cand2 and iter1_cand3 also performing well but with lower speeds. No constraint violations were observed, and no failure reasons were identified, indicating that all candidates successfully adhered to the defined parameters.",
+  "response_sha256": "0fe14877efbac5010e284a68cc089e876a96e46e0d01f16774dcdc20f29372ec",
+  "timestamp": "2026-07-05T10:09:56.166194+00:00"
+}

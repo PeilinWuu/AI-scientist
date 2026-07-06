@@ -1,0 +1,40 @@
+{
+  "iteration": 1,
+  "target_metric": "mean_speed",
+  "best_candidate": {
+    "candidate_id": "iter1_cand5",
+    "amplitude": 0.3,
+    "frequency": 2.65,
+    "wavelength": 1.1,
+    "stiffness": 0.58,
+    "phase": 0.25,
+    "mean_speed": 1.71255,
+    "energy_cost": 1.64831,
+    "efficiency": 0.95928,
+    "stability_score": 0.89792,
+    "vortex_loss": 0.12142,
+    "constraint_violation": false
+  },
+  "failure_reasons": [
+    "No hard constraint failure in this iteration."
+  ],
+  "trends": {
+    "mean_speed_mean": 1.53297,
+    "energy_cost_mean": 1.19197,
+    "efficiency_mean": 1.2568,
+    "stability_score_mean": 0.93357,
+    "feasible_count": 6,
+    "total_count": 6
+  },
+  "improvement_vs_previous_best": null,
+  "summary": "Best candidate is iter1_cand5 by mean_speed. Mean efficiency this round is 1.2568, with 6/6 feasible candidates. Main issue: none",
+  "qwen_data_analysis": "In the first iteration, all candidates met the constraints, with the best candidate (iter1_cand5) achieving the highest mean speed of 1.71255 while maintaining a stability score above 0.89. The other candidates showed varying levels of performance, with iter1_cand2 and iter1_cand3 also performing well but with lower speeds. No constraint violations were observed, and no failure reasons were identified, indicating that all candidates successfully adhered to the defined parameters.",
+  "llm_evidence": {
+    "llm_used": true,
+    "llm_provider": "qwen",
+    "llm_transport": "curl",
+    "llm_model": "qwen-turbo",
+    "llm_response_excerpt": "In the first iteration, all candidates met the constraints, with the best candidate (iter1_cand5) achieving the highest mean speed of 1.71255 while maintaining a stability score above 0.89. The other candidates showed varying levels of performance, with iter1_cand2 and iter1_cand3 also performing we",
+    "llm_response_sha256": "0fe14877efbac5010e284a68cc089e876a96e46e0d01f16774dcdc20f29372ec"
+  }
+}

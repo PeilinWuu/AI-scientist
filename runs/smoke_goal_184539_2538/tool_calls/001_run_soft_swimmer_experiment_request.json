@@ -1,0 +1,18 @@
+{
+  "tool_name": "run_soft_swimmer_experiment",
+  "arguments": {
+    "candidates": [
+      {
+        "candidate_id": "initial_run",
+        "amplitude": 0.2,
+        "frequency": 1.0,
+        "wavelength": 1.0,
+        "stiffness": 0.5,
+        "phase": 0.5
+      }
+    ],
+    "constraints": {},
+    "random_seed": 42
+  },
+  "timestamp": "2026-07-05T10:45:45.909370+00:00"
+}

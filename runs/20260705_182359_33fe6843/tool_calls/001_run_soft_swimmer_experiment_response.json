@@ -1,0 +1,43 @@
+{
+  "tool_name": "run_soft_swimmer_experiment",
+  "result": {
+    "tool_name": "run_soft_swimmer_experiment",
+    "results": [
+      {
+        "candidate_id": "C1",
+        "amplitude": 0.5,
+        "frequency": 1.0,
+        "wavelength": 2.0,
+        "stiffness": 0.8,
+        "phase": 0.0,
+        "mean_speed": 0.31282,
+        "energy_cost": 0.7578,
+        "efficiency": 0.32182,
+        "stability_score": 0.69801,
+        "vortex_loss": 0.36641,
+        "constraint_violation": false
+      }
+    ],
+    "best_candidate": {
+      "candidate_id": "C1",
+      "amplitude": 0.5,
+      "frequency": 1.0,
+      "wavelength": 2.0,
+      "stiffness": 0.8,
+      "phase": 0.0,
+      "mean_speed": 0.31282,
+      "energy_cost": 0.7578,
+      "efficiency": 0.32182,
+      "stability_score": 0.69801,
+      "vortex_loss": 0.36641,
+      "constraint_violation": false
+    },
+    "summary": {
+      "num_candidates": 1,
+      "feasible_count": 1,
+      "best_efficiency": 0.32182
+    }
+  },
+  "result_sha256": "db6cc78b5d4f9d761fda3e8c880515f1b94625ab9216d503a296668bb66826bd",
+  "timestamp": "2026-07-05T10:24:06.332168+00:00"
+}

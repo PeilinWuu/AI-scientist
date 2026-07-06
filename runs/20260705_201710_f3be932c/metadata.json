@@ -1,0 +1,12 @@
+{
+  "llm_provider": "qwen",
+  "llm_transport": "curl",
+  "llm_model": "qwen-turbo",
+  "llm_base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+  "is_mock": false,
+  "total_llm_calls": 6,
+  "total_tool_calls": 1,
+  "llm_calls_path": "runs\\20260705_201710_f3be932c\\llm_calls",
+  "tool_calls_path": "runs\\20260705_201710_f3be932c\\tool_calls",
+  "last_llm_response_excerpt": "{\n  \"assistant_message\": \"The experiment results show that candidate C2 has the highest efficiency of 1.89507, with a mean speed of 0.96174 and energy cost of 0.47945. It also maintains a high stability score of 0.95153. This candidate appears to be the best performer for your goal of achieving high"
+}

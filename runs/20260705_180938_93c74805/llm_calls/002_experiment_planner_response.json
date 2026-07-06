@@ -1,0 +1,10 @@
+{
+  "agent": "ExperimentPlannerAgent",
+  "provider": "qwen",
+  "transport": "curl",
+  "model": "qwen-turbo",
+  "is_mock": false,
+  "raw_response": "{\n  \"planning_rationale\": \"The next candidate plan should follow the current preference for high speed, as the target metric is mean_speed and the priority weight for mean_speed is 1.0, indicating it is the primary objective. The constraints allow for a moderate increase in energy cost, which aligns with the goal of maximizing speed while maintaining stability and efficiency.\",\n  \"expected_tradeoff\": \"Focusing on high speed may lead to higher energy costs, but the constraint on energy cost (max_energy_cost = 3.0) ensures that this increase remains within acceptable limits.\"\n}",
+  "response_sha256": "b6ec88daaf861245ae5f06cea0a68176a6baff924052c87ee28ed205b2b4e043",
+  "timestamp": "2026-07-05T10:09:50.210324+00:00"
+}

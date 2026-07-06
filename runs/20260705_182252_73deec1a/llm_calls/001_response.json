@@ -1,0 +1,10 @@
+{
+  "agent": "DialogueOrchestrator",
+  "provider": "qwen",
+  "transport": "curl",
+  "model": "qwen-turbo",
+  "is_mock": false,
+  "raw_response": "{\n  \"assistant_message\": \"Understood. Your goal is to maximize swimming speed, with a moderate increase in energy cost allowed. I will proceed with a high-speed planning preference.\",\n  \"state_update\": {\n    \"research_goal\": \"Maximize swimming speed with moderate energy cost increase\",\n    \"constraints\": {},\n    \"target_metric\": \"mean_speed\",\n    \"priority_weights\": {\"mean_speed\": 1.0, \"energy_cost\": 0.5, \"efficiency\": 0.3, \"stability_score\": 0.2},\n    \"planning_preference\": \"high_speed\",\n    \"current_plan\": {\n      \"planning_preference\": \"high_speed\",\n      \"target_metric\": \"mean_speed\",\n      \"priority_weights\": {\"mean_speed\": 1.0, \"energy_cost\": 0.5, \"efficiency\": 0.3, \"stability_score\": 0.2}\n    },\n    \"final_report\": \"\"\n  },\n  \"next_action\": \"propose_plan\",\n  \"tool_call\": {}\n}",
+  "response_sha256": "edd60098d438d54e77fccfd7f589b96c0ef91242defe329e47aa393ed81e172b",
+  "timestamp": "2026-07-05T10:22:57.959345+00:00"
+}

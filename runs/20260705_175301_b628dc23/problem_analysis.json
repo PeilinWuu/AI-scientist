@@ -1,0 +1,40 @@
+{
+  "research_goal": "Improve soft swimmer propulsion efficiency",
+  "variables": [
+    "amplitude",
+    "frequency",
+    "wavelength",
+    "stiffness",
+    "phase"
+  ],
+  "constraints": {
+    "min_stability": 0.65,
+    "max_energy_cost": 2.2,
+    "target_metric": "efficiency",
+    "amplitude_range": [
+      0.05,
+      0.5
+    ],
+    "frequency_range": [
+      0.5,
+      3.0
+    ],
+    "wavelength_range": [
+      0.6,
+      2.0
+    ],
+    "stiffness_range": [
+      0.1,
+      1.0
+    ],
+    "phase_range": [
+      0.0,
+      1.0
+    ]
+  },
+  "priorities": [
+    "efficiency"
+  ],
+  "human_feedback": null,
+  "llm_note": "**Goal:**  \nImprove the propulsion efficiency of soft swimmers, which are flexible, bio-inspired robotic or biological systems designed to move through fluid environments.\n\n**Constraints:**  \n- Maintain the soft and flexible nature of the swimmer to ensure adaptability and safety in complex environments.  \n- Operate within the physical and material limitations of soft robotics (e.g., limited actuation force, deformation capabilities).  \n- Consider energy consumption and power requirements for sustained operation.  \n- Ensure compatibility with fluid dynamics and environmental conditions (e.g., water, viscous media).  \n- May involve trade-offs between speed, maneuverability, and efficiency."
+}

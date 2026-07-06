@@ -1,0 +1,12 @@
+{
+  "llm_provider": "qwen",
+  "llm_transport": "curl",
+  "llm_model": "qwen-turbo",
+  "llm_base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+  "is_mock": false,
+  "total_llm_calls": 11,
+  "total_tool_calls": 2,
+  "llm_calls_path": "runs\\20260705_185009_0f252aec\\llm_calls",
+  "tool_calls_path": "runs\\20260705_185009_0f252aec\\tool_calls",
+  "last_llm_response_excerpt": "{\n  \"assistant_message\": \"The latest experiment results show that candidate C010 achieved the highest efficiency of 2.22993 with a mean speed of 1.05096 and a stability score of 0.96054. This candidate also had a relatively low energy cost of 0.44589 and minimal vortex loss. The next step is to refi"
+}

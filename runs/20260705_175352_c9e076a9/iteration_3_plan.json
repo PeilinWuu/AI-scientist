@@ -1,0 +1,50 @@
+{
+  "iteration": 3,
+  "strategy": "Feedback-aware local search around the best feasible design. Main adjustment: continue local search around the best measured candidate.",
+  "candidates": [
+    {
+      "candidate_id": "iter3_cand1",
+      "params": {
+        "amplitude": 0.16,
+        "frequency": 1.11,
+        "wavelength": 1.1600000000000001,
+        "stiffness": 0.42,
+        "phase": 0.244375
+      },
+      "rationale": "Re-test current best center"
+    },
+    {
+      "candidate_id": "iter3_cand2",
+      "params": {
+        "amplitude": 0.18,
+        "frequency": 1.2100000000000002,
+        "wavelength": 1.12,
+        "stiffness": 0.44,
+        "phase": 0.244375
+      },
+      "rationale": "Slightly faster local variant"
+    },
+    {
+      "candidate_id": "iter3_cand3",
+      "params": {
+        "amplitude": 0.14,
+        "frequency": 1.01,
+        "wavelength": 1.2000000000000002,
+        "stiffness": 0.45999999999999996,
+        "phase": 0.22437500000000002
+      },
+      "rationale": "Lower-cost local variant"
+    },
+    {
+      "candidate_id": "iter3_cand4",
+      "params": {
+        "amplitude": 0.16,
+        "frequency": 1.1700000000000002,
+        "wavelength": 1.2400000000000002,
+        "stiffness": 0.39,
+        "phase": 0.27437500000000004
+      },
+      "rationale": "Flow-shape local variant"
+    }
+  ]
+}

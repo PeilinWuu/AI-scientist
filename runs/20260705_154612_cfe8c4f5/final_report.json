@@ -1,0 +1,592 @@
+{
+  "run_id": "20260705_154612_cfe8c4f5",
+  "research_goal": "Improve soft swimmer propulsion efficiency while limiting energy cost and unstable oscillation.",
+  "constraints": {
+    "min_stability": 0.65,
+    "max_energy_cost": 2.2,
+    "target_metric": "efficiency",
+    "amplitude_range": [
+      0.05,
+      0.5
+    ],
+    "frequency_range": [
+      0.5,
+      3.0
+    ],
+    "wavelength_range": [
+      0.6,
+      2.0
+    ],
+    "stiffness_range": [
+      0.1,
+      1.0
+    ],
+    "phase_range": [
+      0.0,
+      1.0
+    ]
+  },
+  "problem": {
+    "research_goal": "Improve soft swimmer propulsion efficiency while limiting energy cost and unstable oscillation.",
+    "variables": [
+      "amplitude",
+      "frequency",
+      "wavelength",
+      "stiffness",
+      "phase"
+    ],
+    "constraints": {
+      "min_stability": 0.65,
+      "max_energy_cost": 2.2,
+      "target_metric": "efficiency",
+      "amplitude_range": [
+        0.05,
+        0.5
+      ],
+      "frequency_range": [
+        0.5,
+        3.0
+      ],
+      "wavelength_range": [
+        0.6,
+        2.0
+      ],
+      "stiffness_range": [
+        0.1,
+        1.0
+      ],
+      "phase_range": [
+        0.0,
+        1.0
+      ]
+    },
+    "priorities": [
+      "energy_cost",
+      "efficiency"
+    ],
+    "human_feedback": null,
+    "llm_note": "MockLLM: use constraint-aware local search, compare each iteration against previous results, and update the next plan from measured failures."
+  },
+  "human_feedback": null,
+  "best_iteration": 2,
+  "best_candidate": {
+    "candidate_id": "iter2_cand4",
+    "amplitude": 0.16,
+    "frequency": 1.11,
+    "wavelength": 1.18,
+    "stiffness": 0.42,
+    "phase": 0.2425,
+    "mean_speed": 0.88314,
+    "energy_cost": 0.31542,
+    "efficiency": 2.64356,
+    "stability_score": 0.94011,
+    "vortex_loss": 0.10173,
+    "constraint_violation": false
+  },
+  "iteration_history": [
+    {
+      "iteration": 1,
+      "plan": {
+        "iteration": 1,
+        "strategy": "Structured first pass over balanced, speed, flexibility, and stability regimes.",
+        "candidates": [
+          {
+            "candidate_id": "iter1_cand1",
+            "params": {
+              "amplitude": 0.16,
+              "frequency": 1.05,
+              "wavelength": 1.1,
+              "stiffness": 0.45,
+              "phase": 0.2
+            },
+            "rationale": "Balanced low-risk baseline"
+          },
+          {
+            "candidate_id": "iter1_cand2",
+            "params": {
+              "amplitude": 0.24,
+              "frequency": 1.6,
+              "wavelength": 1.1,
+              "stiffness": 0.48,
+              "phase": 0.25
+            },
+            "rationale": "Higher thrust with moderate cost"
+          },
+          {
+            "candidate_id": "iter1_cand3",
+            "params": {
+              "amplitude": 0.3,
+              "frequency": 2.1,
+              "wavelength": 1.0,
+              "stiffness": 0.55,
+              "phase": 0.25
+            },
+            "rationale": "Aggressive speed-seeking candidate"
+          },
+          {
+            "candidate_id": "iter1_cand4",
+            "params": {
+              "amplitude": 0.18,
+              "frequency": 2.3,
+              "wavelength": 1.25,
+              "stiffness": 0.5,
+              "phase": 0.35
+            },
+            "rationale": "Frequency-focused candidate"
+          },
+          {
+            "candidate_id": "iter1_cand5",
+            "params": {
+              "amplitude": 0.26,
+              "frequency": 1.35,
+              "wavelength": 0.85,
+              "stiffness": 0.35,
+              "phase": 0.15
+            },
+            "rationale": "Flexible body exploration"
+          },
+          {
+            "candidate_id": "iter1_cand6",
+            "params": {
+              "amplitude": 0.2,
+              "frequency": 1.45,
+              "wavelength": 1.45,
+              "stiffness": 0.7,
+              "phase": 0.3
+            },
+            "rationale": "Stiffer swimmer exploration"
+          }
+        ]
+      },
+      "results": [
+        {
+          "candidate_id": "iter1_cand1",
+          "amplitude": 0.16,
+          "frequency": 1.05,
+          "wavelength": 1.1,
+          "stiffness": 0.45,
+          "phase": 0.2,
+          "mean_speed": 0.86408,
+          "energy_cost": 0.32222,
+          "efficiency": 2.55538,
+          "stability_score": 0.95901,
+          "vortex_loss": 0.09491,
+          "constraint_violation": false
+        },
+        {
+          "candidate_id": "iter1_cand2",
+          "amplitude": 0.24,
+          "frequency": 1.6,
+          "wavelength": 1.1,
+          "stiffness": 0.48,
+          "phase": 0.25,
+          "mean_speed": 1.23241,
+          "energy_cost": 0.5499,
+          "efficiency": 2.14387,
+          "stability_score": 0.95153,
+          "vortex_loss": 0.07684,
+          "constraint_violation": false
+        },
+        {
+          "candidate_id": "iter1_cand3",
+          "amplitude": 0.3,
+          "frequency": 2.1,
+          "wavelength": 1.0,
+          "stiffness": 0.55,
+          "phase": 0.25,
+          "mean_speed": 1.48613,
+          "energy_cost": 1.0741,
+          "efficiency": 1.30563,
+          "stability_score": 0.96055,
+          "vortex_loss": 0.12328,
+          "constraint_violation": false
+        },
+        {
+          "candidate_id": "iter1_cand4",
+          "amplitude": 0.18,
+          "frequency": 2.3,
+          "wavelength": 1.25,
+          "stiffness": 0.5,
+          "phase": 0.35,
+          "mean_speed": 1.31652,
+          "energy_cost": 0.63629,
+          "efficiency": 1.94905,
+          "stability_score": 0.94961,
+          "vortex_loss": 0.11741,
+          "constraint_violation": false
+        },
+        {
+          "candidate_id": "iter1_cand5",
+          "amplitude": 0.26,
+          "frequency": 1.35,
+          "wavelength": 0.85,
+          "stiffness": 0.35,
+          "phase": 0.15,
+          "mean_speed": 0.97469,
+          "energy_cost": 0.53237,
+          "efficiency": 1.71773,
+          "stability_score": 0.96054,
+          "vortex_loss": 0.139,
+          "constraint_violation": false
+        },
+        {
+          "candidate_id": "iter1_cand6",
+          "amplitude": 0.2,
+          "frequency": 1.45,
+          "wavelength": 1.45,
+          "stiffness": 0.7,
+          "phase": 0.3,
+          "mean_speed": 0.86871,
+          "energy_cost": 0.4764,
+          "efficiency": 1.70831,
+          "stability_score": 0.96467,
+          "vortex_loss": 0.14695,
+          "constraint_violation": false
+        }
+      ],
+      "analysis": {
+        "iteration": 1,
+        "target_metric": "efficiency",
+        "best_candidate": {
+          "candidate_id": "iter1_cand1",
+          "amplitude": 0.16,
+          "frequency": 1.05,
+          "wavelength": 1.1,
+          "stiffness": 0.45,
+          "phase": 0.2,
+          "mean_speed": 0.86408,
+          "energy_cost": 0.32222,
+          "efficiency": 2.55538,
+          "stability_score": 0.95901,
+          "vortex_loss": 0.09491,
+          "constraint_violation": false
+        },
+        "failure_reasons": [
+          "No hard constraint failure in this iteration."
+        ],
+        "trends": {
+          "mean_speed_mean": 1.12376,
+          "energy_cost_mean": 0.59855,
+          "efficiency_mean": 1.89666,
+          "stability_score_mean": 0.95765,
+          "feasible_count": 6,
+          "total_count": 6
+        },
+        "improvement_vs_previous_best": null,
+        "summary": "Best candidate is iter1_cand1 by efficiency. Mean efficiency this round is 1.89666, with 6/6 feasible candidates. Main issue: none"
+      },
+      "feedback": {
+        "energy_too_high": false,
+        "stability_too_low": false,
+        "speed_too_low": false,
+        "efficiency_improved": true,
+        "next_strategy": "continue local search around the best measured candidate",
+        "message": "Next planner should continue local search around the best measured candidate. This links measured results directly to the next experiment plan."
+      }
+    },
+    {
+      "iteration": 2,
+      "plan": {
+        "iteration": 2,
+        "strategy": "Feedback-aware local search around the best feasible design. Main adjustment: continue local search around the best measured candidate.",
+        "candidates": [
+          {
+            "candidate_id": "iter2_cand1",
+            "params": {
+              "amplitude": 0.16,
+              "frequency": 1.05,
+              "wavelength": 1.1,
+              "stiffness": 0.45,
+              "phase": 0.21250000000000002
+            },
+            "rationale": "Re-test current best center"
+          },
+          {
+            "candidate_id": "iter2_cand2",
+            "params": {
+              "amplitude": 0.18,
+              "frequency": 1.1500000000000001,
+              "wavelength": 1.06,
+              "stiffness": 0.47000000000000003,
+              "phase": 0.21250000000000002
+            },
+            "rationale": "Slightly faster local variant"
+          },
+          {
+            "candidate_id": "iter2_cand3",
+            "params": {
+              "amplitude": 0.14,
+              "frequency": 0.9500000000000001,
+              "wavelength": 1.1400000000000001,
+              "stiffness": 0.49,
+              "phase": 0.19250000000000003
+            },
+            "rationale": "Lower-cost local variant"
+          },
+          {
+            "candidate_id": "iter2_cand4",
+            "params": {
+              "amplitude": 0.16,
+              "frequency": 1.11,
+              "wavelength": 1.1800000000000002,
+              "stiffness": 0.42000000000000004,
+              "phase": 0.24250000000000002
+            },
+            "rationale": "Flow-shape local variant"
+          }
+        ]
+      },
+      "results": [
+        {
+          "candidate_id": "iter2_cand1",
+          "amplitude": 0.16,
+          "frequency": 1.05,
+          "wavelength": 1.1,
+          "stiffness": 0.45,
+          "phase": 0.2125,
+          "mean_speed": 0.855,
+          "energy_cost": 0.32675,
+          "efficiency": 2.4976,
+          "stability_score": 0.95639,
+          "vortex_loss": 0.08778,
+          "constraint_violation": false
+        },
+        {
+          "candidate_id": "iter2_cand2",
+          "amplitude": 0.18,
+          "frequency": 1.15,
+          "wavelength": 1.06,
+          "stiffness": 0.47,
+          "phase": 0.2125,
+          "mean_speed": 0.94916,
+          "energy_cost": 0.36806,
+          "efficiency": 2.4788,
+          "stability_score": 0.9757,
+          "vortex_loss": 0.08726,
+          "constraint_violation": false
+        },
+        {
+          "candidate_id": "iter2_cand3",
+          "amplitude": 0.14,
+          "frequency": 0.95,
+          "wavelength": 1.14,
+          "stiffness": 0.49,
+          "phase": 0.1925,
+          "mean_speed": 0.7643,
+          "energy_cost": 0.31286,
+          "efficiency": 2.31822,
+          "stability_score": 0.95739,
+          "vortex_loss": 0.10481,
+          "constraint_violation": false
+        },
+        {
+          "candidate_id": "iter2_cand4",
+          "amplitude": 0.16,
+          "frequency": 1.11,
+          "wavelength": 1.18,
+          "stiffness": 0.42,
+          "phase": 0.2425,
+          "mean_speed": 0.88314,
+          "energy_cost": 0.31542,
+          "efficiency": 2.64356,
+          "stability_score": 0.94011,
+          "vortex_loss": 0.10173,
+          "constraint_violation": false
+        }
+      ],
+      "analysis": {
+        "iteration": 2,
+        "target_metric": "efficiency",
+        "best_candidate": {
+          "candidate_id": "iter2_cand4",
+          "amplitude": 0.16,
+          "frequency": 1.11,
+          "wavelength": 1.18,
+          "stiffness": 0.42,
+          "phase": 0.2425,
+          "mean_speed": 0.88314,
+          "energy_cost": 0.31542,
+          "efficiency": 2.64356,
+          "stability_score": 0.94011,
+          "vortex_loss": 0.10173,
+          "constraint_violation": false
+        },
+        "failure_reasons": [
+          "No hard constraint failure in this iteration."
+        ],
+        "trends": {
+          "mean_speed_mean": 0.8629,
+          "energy_cost_mean": 0.33077,
+          "efficiency_mean": 2.48454,
+          "stability_score_mean": 0.9574,
+          "feasible_count": 4,
+          "total_count": 4
+        },
+        "improvement_vs_previous_best": 0.08818,
+        "summary": "Best candidate is iter2_cand4 by efficiency. Mean efficiency this round is 2.48454, with 4/4 feasible candidates. Main issue: none"
+      },
+      "feedback": {
+        "energy_too_high": false,
+        "stability_too_low": false,
+        "speed_too_low": false,
+        "efficiency_improved": true,
+        "next_strategy": "continue local search around the best measured candidate",
+        "message": "Next planner should continue local search around the best measured candidate. This links measured results directly to the next experiment plan."
+      }
+    },
+    {
+      "iteration": 3,
+      "plan": {
+        "iteration": 3,
+        "strategy": "Feedback-aware local search around the best feasible design. Main adjustment: continue local search around the best measured candidate.",
+        "candidates": [
+          {
+            "candidate_id": "iter3_cand1",
+            "params": {
+              "amplitude": 0.16,
+              "frequency": 1.11,
+              "wavelength": 1.1600000000000001,
+              "stiffness": 0.42,
+              "phase": 0.244375
+            },
+            "rationale": "Re-test current best center"
+          },
+          {
+            "candidate_id": "iter3_cand2",
+            "params": {
+              "amplitude": 0.18,
+              "frequency": 1.2100000000000002,
+              "wavelength": 1.12,
+              "stiffness": 0.44,
+              "phase": 0.244375
+            },
+            "rationale": "Slightly faster local variant"
+          },
+          {
+            "candidate_id": "iter3_cand3",
+            "params": {
+              "amplitude": 0.14,
+              "frequency": 1.01,
+              "wavelength": 1.2000000000000002,
+              "stiffness": 0.45999999999999996,
+              "phase": 0.22437500000000002
+            },
+            "rationale": "Lower-cost local variant"
+          },
+          {
+            "candidate_id": "iter3_cand4",
+            "params": {
+              "amplitude": 0.16,
+              "frequency": 1.1700000000000002,
+              "wavelength": 1.2400000000000002,
+              "stiffness": 0.39,
+              "phase": 0.27437500000000004
+            },
+            "rationale": "Flow-shape local variant"
+          }
+        ]
+      },
+      "results": [
+        {
+          "candidate_id": "iter3_cand1",
+          "amplitude": 0.16,
+          "frequency": 1.11,
+          "wavelength": 1.16,
+          "stiffness": 0.42,
+          "phase": 0.2444,
+          "mean_speed": 0.89572,
+          "energy_cost": 0.32578,
+          "efficiency": 2.6053,
+          "stability_score": 0.94201,
+          "vortex_loss": 0.09374,
+          "constraint_violation": false
+        },
+        {
+          "candidate_id": "iter3_cand2",
+          "amplitude": 0.18,
+          "frequency": 1.21,
+          "wavelength": 1.12,
+          "stiffness": 0.44,
+          "phase": 0.2444,
+          "mean_speed": 0.98113,
+          "energy_cost": 0.36188,
+          "efficiency": 2.59274,
+          "stability_score": 0.96046,
+          "vortex_loss": 0.08645,
+          "constraint_violation": false
+        },
+        {
+          "candidate_id": "iter3_cand3",
+          "amplitude": 0.14,
+          "frequency": 1.01,
+          "wavelength": 1.2,
+          "stiffness": 0.46,
+          "phase": 0.2244,
+          "mean_speed": 0.80148,
+          "energy_cost": 0.30999,
+          "efficiency": 2.44799,
+          "stability_score": 0.95347,
+          "vortex_loss": 0.10713,
+          "constraint_violation": false
+        },
+        {
+          "candidate_id": "iter3_cand4",
+          "amplitude": 0.16,
+          "frequency": 1.17,
+          "wavelength": 1.24,
+          "stiffness": 0.39,
+          "phase": 0.2744,
+          "mean_speed": 0.86861,
+          "energy_cost": 0.32971,
+          "efficiency": 2.4914,
+          "stability_score": 0.94436,
+          "vortex_loss": 0.10149,
+          "constraint_violation": false
+        }
+      ],
+      "analysis": {
+        "iteration": 3,
+        "target_metric": "efficiency",
+        "best_candidate": {
+          "candidate_id": "iter3_cand1",
+          "amplitude": 0.16,
+          "frequency": 1.11,
+          "wavelength": 1.16,
+          "stiffness": 0.42,
+          "phase": 0.2444,
+          "mean_speed": 0.89572,
+          "energy_cost": 0.32578,
+          "efficiency": 2.6053,
+          "stability_score": 0.94201,
+          "vortex_loss": 0.09374,
+          "constraint_violation": false
+        },
+        "failure_reasons": [
+          "No hard constraint failure in this iteration."
+        ],
+        "trends": {
+          "mean_speed_mean": 0.88673,
+          "energy_cost_mean": 0.33184,
+          "efficiency_mean": 2.53436,
+          "stability_score_mean": 0.95008,
+          "feasible_count": 4,
+          "total_count": 4
+        },
+        "improvement_vs_previous_best": -0.03826,
+        "summary": "Best candidate is iter3_cand1 by efficiency. Mean efficiency this round is 2.53436, with 4/4 feasible candidates. Main issue: none"
+      },
+      "feedback": {
+        "energy_too_high": false,
+        "stability_too_low": false,
+        "speed_too_low": false,
+        "efficiency_improved": false,
+        "next_strategy": "broaden local search because the last move did not improve the target",
+        "message": "Next planner should broaden local search because the last move did not improve the target. This links measured results directly to the next experiment plan."
+      }
+    }
+  ],
+  "limitations": [
+    "Lightweight virtual experiment backend only.",
+    "Replace formulas with FreeFlow or CFD adapter for real scientific use."
+  ]
+}

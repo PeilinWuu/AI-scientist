@@ -1,0 +1,12 @@
+{
+  "llm_provider": "qwen",
+  "llm_transport": "curl",
+  "llm_model": "qwen-turbo",
+  "llm_base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+  "is_mock": false,
+  "total_llm_calls": 0,
+  "total_tool_calls": 0,
+  "llm_calls_path": "runs\\20260705_183718_5980e69f\\llm_calls",
+  "tool_calls_path": "runs\\20260705_183718_5980e69f\\tool_calls",
+  "last_llm_response_excerpt": ""
+}

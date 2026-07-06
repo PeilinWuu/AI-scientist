@@ -1,0 +1,31 @@
+{
+  "research_goal": "Improve soft swimmer propulsion efficiency while limiting energy cost and unstable oscillation.",
+  "constraints": {
+    "min_stability": 0.72,
+    "max_energy_cost": 2.0,
+    "target_metric": "efficiency",
+    "amplitude_range": [
+      0.05,
+      0.5
+    ],
+    "frequency_range": [
+      0.5,
+      3.0
+    ],
+    "wavelength_range": [
+      0.6,
+      2.0
+    ],
+    "stiffness_range": [
+      0.1,
+      1.0
+    ],
+    "phase_range": [
+      0.0,
+      1.0
+    ]
+  },
+  "max_iterations": 3,
+  "human_feedback": "Pay more attention to stability.",
+  "random_seed": 99
+}

@@ -1,0 +1,10 @@
+{
+  "agent": "ProblemAnalystAgent",
+  "provider": "qwen",
+  "transport": "curl",
+  "model": "qwen-turbo",
+  "is_mock": false,
+  "prompt": "SYSTEM:\nYou are ProblemAnalystAgent for a closed-loop scientific experiment planner. Return strict JSON only. No markdown.\n\nUSER:\n\nAnalyze this soft robotic swimmer experiment goal and constraints.\n\nresearch_goal: Minimize energy cost and prioritize stable swimming motion.\nhuman_feedback: None\nconstraints: {'min_stability': 0.75, 'max_energy_cost': 1.4, 'target_metric': 'energy_cost', 'amplitude_range': (0.05, 0.5), 'frequency_range': (0.5, 3.0), 'wavelength_range': (0.6, 2.0), 'stiffness_range': (0.1, 1.0), 'phase_range': (0.0, 1.0)}\n\nReturn exactly this JSON schema:\n{\n  \"problem_statement\": \"...\",\n  \"target_metric\": \"efficiency|mean_speed|energy_cost|stability_score\",\n  \"priority_weights\": {\n    \"mean_speed\": 0.0,\n    \"energy_cost\": 0.0,\n    \"efficiency\": 0.0,\n    \"stability_score\": 0.0\n  },\n  \"constraints_interpretation\": \"...\",\n  \"planning_preference\": \"high_speed|low_energy|stability_first|balanced_efficiency\"\n}\n",
+  "prompt_sha256": "af99bb7609a9b10d1619aa7480b7f8b28ba8e61dbb47610278dbb0bec05e2b57",
+  "timestamp": "2026-07-05T10:10:08.779536+00:00"
+}
