@@ -1,0 +1,113 @@
+{
+  "tool_name": "run_soft_swimmer_experiment",
+  "result": {
+    "tool_name": "run_soft_swimmer_experiment",
+    "results": [
+      {
+        "candidate_id": "C001",
+        "amplitude": 0.25,
+        "frequency": 1.5,
+        "wavelength": 1.2,
+        "stiffness": 0.5,
+        "phase": 0.5,
+        "mean_speed": 1.14588,
+        "energy_cost": 0.53588,
+        "efficiency": 2.00814,
+        "stability_score": 0.95901,
+        "vortex_loss": 0.13491,
+        "constraint_violation": false
+      },
+      {
+        "candidate_id": "C002",
+        "amplitude": 0.35,
+        "frequency": 2.0,
+        "wavelength": 1.5,
+        "stiffness": 0.6,
+        "phase": 0.7,
+        "mean_speed": 1.01557,
+        "energy_cost": 1.21601,
+        "efficiency": 0.74388,
+        "stability_score": 0.91403,
+        "vortex_loss": 0.23334,
+        "constraint_violation": false
+      },
+      {
+        "candidate_id": "C003",
+        "amplitude": 0.15,
+        "frequency": 1.0,
+        "wavelength": 0.8,
+        "stiffness": 0.4,
+        "phase": 0.3,
+        "mean_speed": 0.64937,
+        "energy_cost": 0.344,
+        "efficiency": 1.76567,
+        "stability_score": 0.96055,
+        "vortex_loss": 0.14728,
+        "constraint_violation": false
+      },
+      {
+        "candidate_id": "C004",
+        "amplitude": 0.4,
+        "frequency": 2.5,
+        "wavelength": 1.8,
+        "stiffness": 0.7,
+        "phase": 0.9,
+        "mean_speed": 0.67987,
+        "energy_cost": 2.37414,
+        "efficiency": 0.23638,
+        "stability_score": 0.82561,
+        "vortex_loss": 0.34541,
+        "constraint_violation": true
+      },
+      {
+        "candidate_id": "C005",
+        "amplitude": 0.2,
+        "frequency": 1.2,
+        "wavelength": 1.0,
+        "stiffness": 0.3,
+        "phase": 0.2,
+        "mean_speed": 0.92828,
+        "energy_cost": 0.40919,
+        "efficiency": 2.1428,
+        "stability_score": 0.94254,
+        "vortex_loss": 0.103,
+        "constraint_violation": false
+      },
+      {
+        "candidate_id": "C006",
+        "amplitude": 0.3,
+        "frequency": 1.8,
+        "wavelength": 1.4,
+        "stiffness": 0.55,
+        "phase": 0.6,
+        "mean_speed": 1.11539,
+        "energy_cost": 0.83365,
+        "efficiency": 1.23425,
+        "stability_score": 0.96467,
+        "vortex_loss": 0.18845,
+        "constraint_violation": false
+      }
+    ],
+    "best_candidate": {
+      "candidate_id": "C005",
+      "amplitude": 0.2,
+      "frequency": 1.2,
+      "wavelength": 1.0,
+      "stiffness": 0.3,
+      "phase": 0.2,
+      "mean_speed": 0.92828,
+      "energy_cost": 0.40919,
+      "efficiency": 2.1428,
+      "stability_score": 0.94254,
+      "vortex_loss": 0.103,
+      "constraint_violation": false
+    },
+    "summary": {
+      "num_candidates": 6,
+      "feasible_count": 5,
+      "best_efficiency": 2.1428
+    }
+  },
+  "result_sha256": "d48ac94b462bf1d6ec62cb367202f1a5052cc3a39184d204ed544f2af072906c",
+  "timestamp": "2026-07-06T06:55:50.554106+00:00"
+}

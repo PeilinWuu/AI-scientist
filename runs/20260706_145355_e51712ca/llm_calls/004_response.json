@@ -1,0 +1,10 @@
+{
+  "agent": "DialogueOrchestrator",
+  "provider": "qwen",
+  "transport": "curl",
+  "model": "qwen-turbo",
+  "is_mock": false,
+  "raw_response": "{\n  \"assistant_message\": \"当然可以！如果你有任何问题、需要帮助，或者只是想聊天，我都很乐意陪你。不过，如果你有与软体机器鱼流场优化相关的问题，我也可以提供专业的帮助。你想聊些什么呢？\",\n  \"state_update\": {},\n  \"next_action\": \"ask_clarification\",\n  \"tool_call\": {}\n}",
+  "response_sha256": "28bd6e989985b920108751a3b0bb23ac0aa97827a68a0620d5d3e4e18e338b1a",
+  "timestamp": "2026-07-06T06:55:06.454486+00:00"
+}

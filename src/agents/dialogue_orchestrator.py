@@ -34,6 +34,8 @@ class DialogueOrchestrator:
         self.tool_calls_dir = Path(state.run_dir) / "tool_calls"
         ensure_dir(self.llm_calls_dir)
         ensure_dir(self.tool_calls_dir)
+        if hasattr(self.llm, "set_debug_dir"):
+            self.llm.set_debug_dir(self.llm_calls_dir)
 
     def handle_user_message(self, message: str) -> ConversationState:
         """Append user input, ask Qwen what to do, execute tools if requested."""
@@ -100,8 +102,66 @@ class DialogueOrchestrator:
         system_prompt = self._system_prompt()
         prompt = self._user_prompt(user_message, phase)
         raw = self._record_llm_call(system_prompt, prompt)
-        decision = parse_llm_json(raw, "DialogueOrchestrator")
+        decision = self._parse_or_repair_decision(raw, user_message, phase)
         return self._normalize_decision(decision)
+
+    def _parse_or_repair_decision(
+        self, raw_response: str, user_message: str, phase: str
+    ) -> dict[str, Any]:
+        """Parse Qwen JSON, repair once with real Qwen, then return safe JSON."""
+
+        try:
+            return parse_llm_json(raw_response, "DialogueOrchestrator")
+        except Exception:
+            repair_system_prompt = (
+                "You are a JSON repair assistant for FlowScientist. Convert the "
+                "previous assistant text into valid DialogueOrchestrator JSON only. "
+                "Do not call tools unless the original user message clearly requests "
+                "an experiment."
+            )
+            repair_user_prompt = f"""
+Original phase: {phase}
+Original user message: {user_message}
+Previous non-JSON assistant content:
+{raw_response}
+
+Return strict JSON with this schema:
+{{
+  "assistant_message": "...",
+  "state_update": {{}},
+  "next_action": "ask_clarification|propose_plan|call_tool|analyze_result|generate_report",
+  "tool_call": {{}}
+}}
+"""
+            try:
+                repaired = self._record_llm_call(repair_system_prompt, repair_user_prompt)
+                return parse_llm_json(repaired, "DialogueOrchestrator")
+            except Exception:
+                return self._safe_clarification_decision(user_message, raw_response)
+
+    def _safe_clarification_decision(
+        self, user_message: str, raw_response: str
+    ) -> dict[str, Any]:
+        """Local safe JSON wrapper after real-Qwen repair failed."""
+
+        if self._is_greeting_or_meta_question(user_message):
+            assistant_message = (
+                "你好，我是 FlowScientist，可以帮助你围绕软体游动机器人流场优化来澄清目标、"
+                "规划实验、调用仿真工具并根据结果迭代。请告诉我你的研究目标、约束或已有数据。"
+            )
+        else:
+            assistant_message = (
+                "I need one more clarification before planning an experiment. "
+                "Please specify whether you prioritize swimming speed, energy cost, "
+                "stability, or efficiency, and any constraints you want to enforce."
+            )
+        return {
+            "assistant_message": assistant_message,
+            "state_update": {},
+            "next_action": "ask_clarification",
+            "tool_call": {},
+            "repair_note": raw_response[:300],
+        }
 
     def _system_prompt(self) -> str:
         tool_specs = {
@@ -320,6 +380,13 @@ All tool candidate parameters must obey these bounds:
             "能耗",
         ]
         return any(keyword in text for keyword in keywords)
+
+    def _is_greeting_or_meta_question(self, message: str) -> bool:
+        """Detect greetings and capability questions."""
+
+        text = message.lower().strip()
+        greetings = ["你好", "hello", "hi", "hey", "你能做什么", "what can you do"]
+        return any(item in text for item in greetings)
 
     def _needs_candidate_repair(self, decision: dict[str, Any]) -> bool:
         """Require a useful batch when Qwen chooses the simulator tool."""

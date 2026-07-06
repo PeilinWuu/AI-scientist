@@ -1,0 +1,12 @@
+{
+  "llm_provider": "qwen",
+  "llm_transport": "curl",
+  "llm_model": "qwen-turbo",
+  "llm_base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+  "is_mock": false,
+  "total_llm_calls": 7,
+  "total_tool_calls": 1,
+  "llm_calls_path": "runs\\20260706_145355_e51712ca\\llm_calls",
+  "tool_calls_path": "runs\\20260706_145355_e51712ca\\tool_calls",
+  "last_llm_response_excerpt": "{\n  \"assistant_message\": \"分析结果显示，候选参数C005在效率方面表现最佳，达到了2.1428。这表明该参数组合在能量利用效率上具有优势。接下来，我将根据当前的优化目标和优先级权重，进一步分析是否需要调整参数或进行更多实验。\",\n  \"state_update\": {\n    \"research_goal\": \"评估软体机器鱼流场优化优势\",\n    \"constraints\": {\n      \"amplitude\": {\n        \"min\": 0.05,\n        \"max\": 0.5\n      },\n      \"frequency\": {\n  "
+}

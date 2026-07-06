@@ -31,6 +31,8 @@ class LLMCallRecorder:
         self.calls_dir = run_dir / "llm_calls"
         ensure_dir(self.calls_dir)
         self.provider = provider
+        if hasattr(self.provider, "set_debug_dir"):
+            self.provider.set_debug_dir(self.calls_dir)
         self.sequence = 0
 
     def call(
@@ -123,12 +125,14 @@ def parse_llm_json(raw_response: str, agent: str) -> dict[str, Any]:
             except json.JSONDecodeError as exc:
                 if settings.qwen_require_real:
                     raise RuntimeError(
-                        f"{agent} returned invalid JSON after repair attempt: {exc}. "
+                        f"Qwen model content is not valid orchestrator JSON. "
+                        f"agent={agent}; parse_error={exc}. "
                         f"Raw response excerpt: {raw_response[:300]}"
                     ) from exc
         if settings.qwen_require_real:
             raise RuntimeError(
-                f"{agent} returned invalid JSON and no object could be extracted. "
+                f"Qwen model content is not valid orchestrator JSON. "
+                f"agent={agent}; no JSON object could be extracted. "
                 f"Raw response excerpt: {raw_response[:300]}"
             )
     return {}
