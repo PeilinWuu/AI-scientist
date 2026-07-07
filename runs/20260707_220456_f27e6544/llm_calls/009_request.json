@@ -1,0 +1,13 @@
+{
+  "agent": "DialogueOrchestratorRepair",
+  "provider": "qwen",
+  "transport": "curl",
+  "model": "qwen-turbo",
+  "is_mock": false,
+  "prompt": "SYSTEM:\nYou are a JSON repair assistant for FlowScientist. Convert the previous assistant text into valid DialogueOrchestrator JSON only.\n\nUSER:\n\nOriginal phase: current_info_lookup_decision\nClassified intent: current_info_lookup\nOriginal user message: 最近的世界杯比赛是哪一场\nPrevious non-JSON assistant content:\n根据最新的信息，最近的世界杯比赛是2026年7月6日进行的墨西哥对阵英格兰的1/8决赛，最终英格兰以3-2击败墨西哥，成功晋级八强。这场比赛是在墨西哥城阿兹特克体育场举行的。\n\nReturn strict JSON:\n{\n  \"assistant_message\": \"...\",\n  \"state_update\": {},\n  \"next_action\": \"ask_clarification|propose_plan|call_tool|analyze_result|generate_report\",\n  \"tool_call\": {}\n}\n",
+  "prompt_sha256": "4a5348faf827c22b3661dce5cb06fea7f1aeea83c08772eba5f3beead9097242",
+  "enable_search": false,
+  "search_options": {},
+  "search_trigger": "",
+  "timestamp": "2026-07-07T14:07:40.074139+00:00"
+}

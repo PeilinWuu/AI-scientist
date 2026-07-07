@@ -1,0 +1,16 @@
+{
+  "agent": "DialogueOrchestrator",
+  "provider": "qwen",
+  "transport": "curl",
+  "model": "qwen-turbo",
+  "is_mock": false,
+  "raw_response": "今天天气怎么样？我可以帮你查询某个特定地区的天气情况。请告诉我你所在的城市或地区，我将为你提供详细的天气信息。",
+  "response_sha256": "34553d8329820f05564f823544604e38c449984065140877c08d313cba92bf92",
+  "enable_search": true,
+  "search_options": {
+    "search_strategy": "turbo",
+    "forced_search": true
+  },
+  "search_trigger": "user_selected_always_on",
+  "timestamp": "2026-07-07T14:05:15.065494+00:00"
+}

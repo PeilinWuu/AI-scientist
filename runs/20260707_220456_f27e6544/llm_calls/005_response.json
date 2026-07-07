@@ -1,0 +1,16 @@
+{
+  "agent": "DialogueOrchestrator",
+  "provider": "qwen",
+  "transport": "curl",
+  "model": "qwen-turbo",
+  "is_mock": false,
+  "raw_response": "我已根据最新的天气信息为您整理了合肥市今天的天气情况：\n\n- **今天（2026年7月7日）**：多云，气温在30℃到20℃之间，东南风，微风。\n- **日出时间**：未提供具体时间。\n- **日落时间**：19:21。\n- **降水量**：2.8mm。\n- **风向**：东北风。\n- **风力**：微风。\n- **相对湿度**：99%。\n- **体感温度**：30.6℃。\n- **空气质量**：优。\n- **舒适度**：温暖，较舒适。\n\n如果您需要更详细的天气信息或未来几天的预报，请告诉我！",
+  "response_sha256": "92e68172453b772e63e7c1c3dafaf77ccefbd191508555e6eb1807bc2eb0919a",
+  "enable_search": true,
+  "search_options": {
+    "search_strategy": "turbo",
+    "forced_search": true
+  },
+  "search_trigger": "user_selected_always_on",
+  "timestamp": "2026-07-07T14:05:36.022842+00:00"
+}

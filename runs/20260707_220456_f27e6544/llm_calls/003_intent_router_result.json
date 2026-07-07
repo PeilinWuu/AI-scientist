@@ -1,0 +1,8 @@
+{
+  "intent": "current_info_lookup",
+  "qwen_intent": "current_info_lookup",
+  "confidence": 0.95,
+  "reason": "The user is asking about the most recent World Cup match, which requires up-to-date information. This aligns with the 'current_info_lookup' intent as it involves seeking the latest or current information.",
+  "rule_corrected": false,
+  "timestamp": "2026-07-07T14:07:37.061460+00:00"
+}

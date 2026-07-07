@@ -1,0 +1,13 @@
+{
+  "agent": "ResponseGuard",
+  "provider": "qwen",
+  "transport": "eval-dialogue",
+  "model": "dialogue-eval",
+  "is_mock": false,
+  "raw_response": "这是一个带流固耦合、运动控制和约束优化的低/中雷诺数推进问题。当前原型的 soft-swimmer lightweight tool 不能直接求解完整 Navier-Stokes/FSI/材料疲劳约束。下一步建议明确设计变量、目标函数、约束、边界条件，并准备 FreeFlow/CFD adapter。",
+  "response_sha256": "daf045e78ebc64e5dd6d469782c37dc64dfde6408a250dab9d8d84b11a151ad7",
+  "enable_search": false,
+  "search_options": {},
+  "search_trigger": "",
+  "timestamp": "2026-07-07T14:02:52.555840+00:00"
+}

@@ -33,6 +33,12 @@ def create_state() -> ConversationState:
     return ConversationState.create(run_id, run_dir, backend)
 
 
+def sync_web_search_mode() -> None:
+    """Copy the Streamlit widget value into the business search state."""
+
+    st.session_state.web_search_mode = st.session_state.web_search_mode_control
+
+
 def real_qwen_run(state: ConversationState) -> bool:
     return (
         state.llm_backend.get("llm_provider") == "qwen"
@@ -104,12 +110,21 @@ st.set_page_config(page_title="FlowScientist", layout="wide")
 
 if "conversation_state" not in st.session_state:
     st.session_state.conversation_state = create_state()
+if "web_search_mode_control" not in st.session_state:
+    st.session_state.web_search_mode_control = "off"
+if "web_search_mode" not in st.session_state:
+    st.session_state.web_search_mode = "off"
+if "reset_web_search_mode_control" not in st.session_state:
+    st.session_state.reset_web_search_mode_control = False
+if st.session_state.reset_web_search_mode_control:
+    st.session_state.web_search_mode_control = "off"
+    st.session_state.web_search_mode = "off"
+    st.session_state.reset_web_search_mode_control = False
 
 state: ConversationState = st.session_state.conversation_state
 llm_status = get_llm_status()
 queued_user_message = st.session_state.pop("queued_user_message", None)
-if "web_search_mode_control" not in st.session_state:
-    st.session_state.web_search_mode_control = state.web_search_mode
+state.web_search_mode = st.session_state.get("web_search_mode", "off")
 
 with st.sidebar:
     st.header("FlowScientist State")
@@ -138,10 +153,12 @@ with st.sidebar:
         }[value],
         horizontal=True,
         key="web_search_mode_control",
+        on_change=sync_web_search_mode,
     )
-    if search_mode != state.web_search_mode:
-        state.web_search_mode = search_mode
-        state.last_user_search_choice = search_mode
+    business_search_mode = st.session_state.get("web_search_mode", "off")
+    if business_search_mode != state.web_search_mode:
+        state.web_search_mode = business_search_mode
+        state.last_user_search_choice = business_search_mode
         state.save()
     search_capability = "enabled" if llm_status.get("qwen_enable_search", False) else "disabled"
     st.write(f"**Qwen Web Search Capability:** {search_capability}")
@@ -163,6 +180,8 @@ with st.sidebar:
         )
     if st.button("Start new conversation"):
         st.session_state.conversation_state = create_state()
+        st.session_state.web_search_mode = "off"
+        st.session_state.reset_web_search_mode_control = True
         st.rerun()
     if show_developer_debug and state.last_decision_trace:
         with st.expander("Decision trace", expanded=False):
@@ -214,14 +233,22 @@ user_message = st.chat_input(
 effective_user_message = queued_user_message or user_message
 if effective_user_message:
     orchestrator = DialogueOrchestrator(state)
+    web_search_mode = st.session_state.get("web_search_mode", "off")
     with st.spinner("FlowScientist is reasoning with Qwen and tools..."):
         try:
-            state = orchestrator.handle_user_message(effective_user_message)
+            state = orchestrator.handle_user_message(
+                effective_user_message,
+                web_search_mode=web_search_mode,
+            )
             st.session_state.conversation_state = state
-            st.session_state.web_search_mode_control = state.web_search_mode
+            if web_search_mode == "this_turn":
+                st.session_state.web_search_mode = "off"
+                st.session_state.reset_web_search_mode_control = True
             st.rerun()
         except Exception as exc:  # noqa: BLE001 - Streamlit should show actionable failure.
-            st.error(str(exc))
+            st.error("前端运行出错，请查看调试信息。")
+            if show_developer_debug:
+                st.exception(exc)
 
 st.divider()
 st.subheader("Quick Workflow")
@@ -231,11 +258,17 @@ quick_goal = st.text_input(
 )
 if st.button("Run 3 Qwen-guided rounds"):
     orchestrator = DialogueOrchestrator(state)
+    web_search_mode = st.session_state.get("web_search_mode", "off")
+    state.web_search_mode = web_search_mode
     with st.spinner("Running three Qwen-guided dialogue/tool rounds..."):
         try:
             state = orchestrator.run_three_rounds(quick_goal)
             st.session_state.conversation_state = state
-            st.session_state.web_search_mode_control = state.web_search_mode
+            if web_search_mode == "this_turn":
+                st.session_state.web_search_mode = "off"
+                st.session_state.reset_web_search_mode_control = True
             st.rerun()
         except Exception as exc:  # noqa: BLE001
-            st.error(str(exc))
+            st.error("前端运行出错，请查看调试信息。")
+            if show_developer_debug:
+                st.exception(exc)

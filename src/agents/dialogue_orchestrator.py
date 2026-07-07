@@ -68,10 +68,12 @@ class DialogueOrchestrator:
             "user_facing_message": "",
         }
 
-    def handle_user_message(self, message: str) -> ConversationState:
+    def handle_user_message(self, message: str, web_search_mode: str | None = None) -> ConversationState:
         """Route intent, ask Qwen, apply policy, and optionally execute a tool."""
 
         tool_calls_before = self.state.total_tool_calls
+        if web_search_mode in {"off", "this_turn", "always_on"}:
+            self.state.web_search_mode = web_search_mode
         self._latest_tool_permission = {
             "allowed": False,
             "requires_confirmation": False,

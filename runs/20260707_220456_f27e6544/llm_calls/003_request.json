@@ -1,0 +1,13 @@
+{
+  "agent": "DialogueOrchestratorRepair",
+  "provider": "qwen",
+  "transport": "curl",
+  "model": "qwen-turbo",
+  "is_mock": false,
+  "prompt": "SYSTEM:\nYou are a JSON repair assistant for FlowScientist. Convert the previous assistant text into valid DialogueOrchestrator JSON only.\n\nUSER:\n\nOriginal phase: casual_chat_decision\nClassified intent: casual_chat\nOriginal user message: 今天天气怎么样\nPrevious non-JSON assistant content:\n今天天气怎么样？我可以帮你查询某个特定地区的天气情况。请告诉我你所在的城市或地区，我将为你提供详细的天气信息。\n\nReturn strict JSON:\n{\n  \"assistant_message\": \"...\",\n  \"state_update\": {},\n  \"next_action\": \"ask_clarification|propose_plan|call_tool|analyze_result|generate_report\",\n  \"tool_call\": {}\n}\n",
+  "prompt_sha256": "366c379b270bf54465d925db40d950342a5248c015f20872d87b1bdf633d903b",
+  "enable_search": false,
+  "search_options": {},
+  "search_trigger": "",
+  "timestamp": "2026-07-07T14:05:15.068495+00:00"
+}

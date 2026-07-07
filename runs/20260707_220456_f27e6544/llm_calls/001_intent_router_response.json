@@ -1,0 +1,10 @@
+{
+  "agent": "IntentRouter",
+  "provider": "qwen",
+  "transport": "curl",
+  "model": "qwen-turbo",
+  "is_mock": false,
+  "raw_response": "{\"intent\":\"casual_chat\", \"confidence\":0.95, \"reason\":\"The user is asking about the weather, which is a common topic for small talk and does not relate to any specific research or tool execution.\"}",
+  "response_sha256": "0072b19b6a1c39cfd3df04b0a0657ae7cbc6c4a38b91f9583a3bbdb85b604127",
+  "timestamp": "2026-07-07T14:05:13.527885+00:00"
+}

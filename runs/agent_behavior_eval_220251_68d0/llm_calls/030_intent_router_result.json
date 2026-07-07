@@ -1,0 +1,8 @@
+{
+  "intent": "documentation_lookup",
+  "qwen_intent": "research_consultation",
+  "confidence": 0.3,
+  "reason": "eval default",
+  "rule_corrected": true,
+  "timestamp": "2026-07-07T14:02:52.082793+00:00"
+}
