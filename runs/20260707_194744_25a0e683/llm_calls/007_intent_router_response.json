@@ -1,0 +1,10 @@
+{
+  "agent": "IntentRouter",
+  "provider": "qwen",
+  "transport": "curl",
+  "model": "qwen-turbo",
+  "is_mock": false,
+  "raw_response": "{\"intent\":\"capability_question\", \"confidence\":0.95, \"reason\":\"The user is asking about the system's ability to access the internet, which falls under the category of capability questions.\"}",
+  "response_sha256": "e4a103aa049c0b4d8bd6d2d42daad6d1c980f1281273fff3ef30d51bdcb07bea",
+  "timestamp": "2026-07-07T11:48:27.952469+00:00"
+}

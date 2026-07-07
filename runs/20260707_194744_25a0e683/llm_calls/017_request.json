@@ -1,0 +1,10 @@
+{
+  "agent": "DialogueOrchestratorRepair",
+  "provider": "qwen",
+  "transport": "curl",
+  "model": "qwen-turbo",
+  "is_mock": false,
+  "prompt": "SYSTEM:\nYou are a JSON repair assistant for FlowScientist. Convert the previous assistant text into valid DialogueOrchestrator JSON only.\n\nUSER:\n\nOriginal phase: capability_question_decision\nClassified intent: capability_question\nOriginal user message: 我怎么把数据发送给你，你能支持读取文件吗？\nPrevious non-JSON assistant content:\n我可以支持读取文件，但需要你将数据以特定的格式提供。你可以将数据保存为结构化的文件（如 JSON、CSV 或 HDF5），然后上传给我。我会根据你提供的数据格式解析并处理这些数据。\n\n如果你有具体的文件格式要求或需要帮助生成示例数据，请告诉我，我可以进一步协助你。\n\nReturn strict JSON:\n{\n  \"assistant_message\": \"...\",\n  \"state_update\": {},\n  \"next_action\": \"ask_clarification|propose_plan|call_tool|analyze_result|generate_report\",\n  \"tool_call\": {}\n}\n",
+  "prompt_sha256": "f9a2374c68ae7ee1464b6d50ed0c2926e4436dce75812c6505575863ce7fb6ff",
+  "timestamp": "2026-07-07T11:50:39.966192+00:00"
+}

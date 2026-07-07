@@ -11,6 +11,12 @@ from typing import Any
 from src.agents.intent_router import IntentRouter
 from src.agents.response_composer import compose_user_response
 from src.config import settings
+from src.domain_knowledge import (
+    PrincipleSelector,
+    SelectedPrinciple,
+    build_internal_domain_context,
+    load_domain_principles,
+)
 from src.llm import get_llm_provider
 from src.llm.base import LLMProvider
 from src.policies.tool_use_policy import decide_tool_permission
@@ -46,6 +52,9 @@ class DialogueOrchestrator:
         if hasattr(self.llm, "set_debug_dir"):
             self.llm.set_debug_dir(self.llm_calls_dir)
         self.intent_router = IntentRouter(llm=self.llm, llm_calls_dir=self.llm_calls_dir)
+        self.domain_principles = load_domain_principles()
+        self.principle_selector = PrincipleSelector(self.domain_principles)
+        self._latest_selected_principles: list[SelectedPrinciple] = []
         self._latest_tool_permission: dict[str, Any] = {
             "allowed": False,
             "requires_confirmation": False,
@@ -118,7 +127,29 @@ class DialogueOrchestrator:
         metadata = self.llm.metadata()
         if settings.qwen_require_real and metadata.get("is_mock", True):
             raise RuntimeError("Real Qwen is required. Mock fallback is disabled.")
-        system_prompt = self._system_prompt(intent)
+        self._latest_selected_principles = self.principle_selector.select(
+            user_message=user_message,
+            intent=intent,
+            research_goal=self.state.research_goal,
+            constraints=self.state.constraints,
+            top_k=4,
+        )
+        user_requested_references = _user_requested_references(user_message)
+        domain_context = build_internal_domain_context(
+            self._latest_selected_principles,
+            user_requested_references=user_requested_references,
+        )
+        self.state.raw_data.append(
+            {
+                "source": "domain_knowledge",
+                "data": {
+                    "selected_principles": self._selected_principle_audit(),
+                    "user_requested_references": user_requested_references,
+                },
+                "timestamp": _timestamp(),
+            }
+        )
+        system_prompt = self._system_prompt(intent, domain_context)
         user_prompt = self._user_prompt(user_message, phase, intent)
         raw = self._record_llm_call(system_prompt, user_prompt, agent="DialogueOrchestrator")
         decision = self._parse_or_repair_decision(raw, user_message, phase, intent)
@@ -179,7 +210,7 @@ Return strict JSON:
             "raw_data": {"repair_note": raw_response[:300]},
         }
 
-    def _system_prompt(self, intent: str) -> str:
+    def _system_prompt(self, intent: str, domain_context: str = "") -> str:
         tool_specs = {
             name: {"description": tool.description, "schema": tool.schema}
             for name, tool in self.tools.items()
@@ -196,6 +227,8 @@ not all implemented tools.
 Current intent: {intent}
 Current skill:
 {get_skill_prompt(intent)}
+
+{domain_context}
 
 Tool policy:
 {TOOL_POLICY_SKILL}
@@ -550,6 +583,7 @@ with problem analysis and next-step recommendations. The latest user message has
                 f"tool_called={whether_tool_called}"
             ),
             "latest_llm_response_excerpt": self.state.last_qwen_response_excerpt,
+            "selected_principles": self._selected_principle_audit(),
         }
         self.state.last_decision_trace = trace
         self.state.last_tool_permission = self._latest_tool_permission
@@ -628,6 +662,17 @@ with problem analysis and next-step recommendations. The latest user message has
     def _next_index(self, directory: Path, pattern: str) -> int:
         return len(list(directory.glob(pattern))) + 1
 
+    def _selected_principle_audit(self) -> list[dict[str, Any]]:
+        return [
+            {
+                "principle_id": item.principle_id,
+                "domain": item.domain,
+                "source_ids": item.source_ids,
+                "confidence": item.confidence,
+            }
+            for item in self._latest_selected_principles
+        ]
+
 
 def _hash(text: str) -> str:
     return sha256(text.encode("utf-8")).hexdigest()
@@ -635,3 +680,9 @@ def _hash(text: str) -> str:
 
 def _timestamp() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _user_requested_references(user_message: str) -> bool:
+    text = (user_message or "").lower()
+    markers = ["论文", "文献", "参考", "references", "paper", "citation", "来源", "依据"]
+    return any(marker in text for marker in markers)

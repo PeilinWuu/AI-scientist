@@ -1,0 +1,8 @@
+{
+  "intent": "research_consultation",
+  "qwen_intent": "experiment_planning",
+  "confidence": 0.95,
+  "reason": "The user is asking for a plan to simulate a dam break model, which falls under experiment planning as it involves designing a simulation strategy without explicitly requesting execution.",
+  "rule_corrected": true,
+  "timestamp": "2026-07-07T10:36:06.066523+00:00"
+}

@@ -1,0 +1,10 @@
+{
+  "agent": "DialogueOrchestratorRepair",
+  "provider": "qwen",
+  "transport": "curl",
+  "model": "qwen-turbo",
+  "is_mock": false,
+  "prompt": "SYSTEM:\nYou are a JSON repair assistant for FlowScientist. Convert the previous assistant text into valid DialogueOrchestrator JSON only.\n\nUSER:\n\nOriginal phase: capability_question_decision\nClassified intent: capability_question\nOriginal user message: 你可以联网吗？\nPrevious non-JSON assistant content:\n我无法直接联网或访问实时互联网数据。我的功能主要集中在流体模拟、优化和实验设计等科学计算领域，通过已有的知识和工具提供帮助。如果你有相关问题，欢迎随时提问！\n\nReturn strict JSON:\n{\n  \"assistant_message\": \"...\",\n  \"state_update\": {},\n  \"next_action\": \"ask_clarification|propose_plan|call_tool|analyze_result|generate_report\",\n  \"tool_call\": {}\n}\n",
+  "prompt_sha256": "3188337f479fed615bba2635bb610d959963d6c4c3469ee740e617e806b79428",
+  "timestamp": "2026-07-07T11:48:28.674662+00:00"
+}

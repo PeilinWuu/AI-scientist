@@ -1,0 +1,10 @@
+{
+  "agent": "IntentRouter",
+  "provider": "qwen",
+  "transport": "curl",
+  "model": "qwen-turbo",
+  "is_mock": false,
+  "raw_response": "{\n  \"intent\": \"experiment_planning\",\n  \"confidence\": 0.95,\n  \"reason\": \"The user is asking for a plan to simulate a dam break model, which falls under experiment planning as it involves designing a simulation strategy without explicitly requesting execution.\"\n}",
+  "response_sha256": "962ce9a20b9a8d5f2355d322f9179213f215f5fdf403d6debec206c80f6d9bb4",
+  "timestamp": "2026-07-07T10:36:06.063251+00:00"
+}

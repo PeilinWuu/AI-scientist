@@ -1,0 +1,10 @@
+{
+  "agent": "DialogueOrchestrator",
+  "provider": "qwen",
+  "transport": "curl",
+  "model": "qwen-turbo",
+  "is_mock": false,
+  "raw_response": "我无法直接联网或访问实时互联网数据。我的功能主要集中在流体模拟、优化和实验设计等科学计算领域，通过已有的知识和工具提供帮助。如果你有相关问题，欢迎随时提问！",
+  "response_sha256": "331d6fabd5815673b4336419949373cfc72a6fd66d812ff2be5df38e847b68f5",
+  "timestamp": "2026-07-07T11:48:28.671659+00:00"
+}

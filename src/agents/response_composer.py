@@ -28,27 +28,43 @@ def compose_user_response(
     if isinstance(skill_output, dict):
         raw_debug["skill_output_keys"] = sorted(skill_output.keys())
     assistant_message = _extract_message(skill_output)
+    references_allowed = _user_requested_references(user_message)
 
     if tool_result:
-        return _compose_tool_response(intent, selected_skill, tool_result, raw_debug)
+        return _filter_user_facing_response(
+            _compose_tool_response(intent, selected_skill, tool_result, raw_debug),
+            references_allowed=references_allowed,
+        )
 
     if intent == "capability_question":
-        return _capability_response(assistant_message, raw_debug)
+        return _filter_user_facing_response(
+            _capability_response(assistant_message, raw_debug),
+            references_allowed=references_allowed,
+        )
     if intent == "research_consultation":
-        return _research_consultation_response(user_message, assistant_message, raw_debug)
+        return _filter_user_facing_response(
+            _research_consultation_response(user_message, assistant_message, raw_debug),
+            references_allowed=references_allowed,
+        )
     if intent == "experiment_planning":
-        return _experiment_planning_response(assistant_message, tool_permission, raw_debug)
+        return _filter_user_facing_response(
+            _experiment_planning_response(assistant_message, tool_permission, raw_debug),
+            references_allowed=references_allowed,
+        )
     if intent == "casual_chat":
-        return _casual_response(assistant_message, raw_debug)
+        return _filter_user_facing_response(
+            _casual_response(assistant_message, raw_debug),
+            references_allowed=references_allowed,
+        )
 
-    return {
+    return _filter_user_facing_response({
         "assistant_message": assistant_message or "我理解了。请继续补充你的目标、约束或希望我执行的下一步。",
         "sections": [],
         "tables": [],
         "figures": [],
         "suggested_actions": _default_actions(intent, state),
         "raw_debug": raw_debug,
-    }
+    }, references_allowed=references_allowed)
 
 
 def _compose_tool_response(
@@ -222,6 +238,53 @@ def _extract_message(skill_output: dict[str, Any] | str) -> str:
     if isinstance(text, str) and "repair_note" in text:
         return "我已经恢复了对话输出，将只展示用户可读的科研反馈。"
     return ensure_readable_assistant_message(text)
+
+
+REFERENCE_REQUEST_MARKERS = ["论文", "文献", "参考", "references", "paper", "citation", "来源", "依据"]
+
+SOURCE_STYLE_PHRASES = [
+    "根据 Purcell",
+    "Purcell 1977",
+    "根据 Taylor",
+    "Taylor 1951",
+    "论文指出",
+    "文献表明",
+    "根据文献",
+    "根据知识库",
+    "检索结果显示",
+    "according to the literature",
+    "the paper states",
+]
+
+
+def _filter_user_facing_response(
+    response: dict[str, Any],
+    references_allowed: bool,
+) -> dict[str, Any]:
+    if references_allowed:
+        return response
+    filtered = dict(response)
+    filtered["assistant_message"] = _suppress_source_style(str(filtered.get("assistant_message", "")))
+    sections = []
+    for section in filtered.get("sections", []) or []:
+        item = dict(section)
+        item["title"] = _suppress_source_style(str(item.get("title", "")))
+        item["content"] = _suppress_source_style(str(item.get("content", "")))
+        sections.append(item)
+    filtered["sections"] = sections
+    return filtered
+
+
+def _suppress_source_style(text: str) -> str:
+    output = text
+    for phrase in SOURCE_STYLE_PHRASES:
+        output = output.replace(phrase, "")
+    return " ".join(output.split())
+
+
+def _user_requested_references(user_message: str) -> bool:
+    text = (user_message or "").lower()
+    return any(marker in text for marker in REFERENCE_REQUEST_MARKERS)
 
 
 def _looks_complex_research_task(text: str) -> bool:

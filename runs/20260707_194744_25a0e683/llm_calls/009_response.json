@@ -1,0 +1,10 @@
+{
+  "agent": "DialogueOrchestratorRepair",
+  "provider": "qwen",
+  "transport": "curl",
+  "model": "qwen-turbo",
+  "is_mock": false,
+  "raw_response": "{\n  \"assistant_message\": \"我无法直接联网或访问实时互联网数据。我的功能主要集中在流体模拟、优化和实验设计等科学计算领域，通过已有的知识和工具提供帮助。如果你有相关问题，欢迎随时提问！\",\n  \"state_update\": {},\n  \"next_action\": \"ask_clarification\",\n  \"tool_call\": {}\n}",
+  "response_sha256": "1353b2fa3aec7e10e07eec238f37848a9c32a4b7c82024084991200f23536e7c",
+  "timestamp": "2026-07-07T11:48:29.679884+00:00"
+}

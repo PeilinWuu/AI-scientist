@@ -1,0 +1,10 @@
+{
+  "agent": "DialogueOrchestratorRepair",
+  "provider": "qwen",
+  "transport": "curl",
+  "model": "qwen-turbo",
+  "is_mock": false,
+  "raw_response": "{\n  \"assistant_message\": \"我可以支持读取文件，但需要你将数据以特定的格式提供。你可以将数据保存为结构化的文件（如 JSON、CSV 或 HDF5），然后上传给我。我会根据你提供的数据格式解析并处理这些数据。如果你有具体的文件格式要求或需要帮助生成示例数据，请告诉我，我可以进一步协助你。\",\n  \"state_update\": {},\n  \"next_action\": \"ask_clarification\",\n  \"tool_call\": {}\n}",
+  "response_sha256": "92bb92c047e16bdf67985c5b452b5e1d01f08c2f68beb0e4fb179b0168e75737",
+  "timestamp": "2026-07-07T11:50:41.055521+00:00"
+}

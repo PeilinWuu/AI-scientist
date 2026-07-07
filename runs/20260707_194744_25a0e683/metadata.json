@@ -1,0 +1,47 @@
+{
+  "llm_provider": "qwen",
+  "llm_transport": "curl",
+  "llm_model": "qwen-turbo",
+  "llm_base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+  "is_mock": false,
+  "total_llm_calls": 20,
+  "total_tool_calls": 0,
+  "current_intent": "capability_question",
+  "current_skill": "capability_skill",
+  "tool_execution_allowed": false,
+  "last_tool_permission": {
+    "allowed": false,
+    "requires_confirmation": false,
+    "reason": "No tool call proposed by the selected skill.",
+    "user_facing_message": ""
+  },
+  "last_decision_trace": {
+    "timestamp": "2026-07-07T11:51:59.774089+00:00",
+    "user_message": "我上传不了，你没有文件的接口吗",
+    "detected_intent": "capability_question",
+    "selected_skill": "capability_skill",
+    "tool_permission": {
+      "allowed": false,
+      "requires_confirmation": false,
+      "reason": "No tool call proposed by the selected skill.",
+      "user_facing_message": ""
+    },
+    "whether_tool_called": false,
+    "assistant_message": "我理解你的困扰。目前，我无法直接接收或处理你上传的文件，但你可以将文件内容以文本形式粘贴在这里，或者描述文件的结构和数据格式，我可以根据你提供的信息帮助设计数据接口或进行后续分析。如果你需要，也可以提供示例数据，我会尽力协助你。",
+    "reasoning_summary": "intent=capability_question; skill=capability_skill; tool_allowed=False; tool_called=False",
+    "latest_llm_response_excerpt": "{\n  \"assistant_message\": \"我理解你的困扰。目前，我无法直接接收或处理你上传的文件，但你可以将文件内容以文本形式粘贴在这里，或者描述文件的结构和数据格式，我可以根据你提供的信息帮助设计数据接口或进行后续分析。如果你需要，也可以提供示例数据，我会尽力协助你。\",\n  \"state_update\": {},\n  \"next_action\": \"ask_clarification\",\n  \"tool_call\": {}\n}",
+    "selected_principles": [
+      {
+        "principle_id": "cfd_result_schema_first",
+        "domain": "CFD result integration",
+        "source_ids": [
+          "cfd_adapter_schema_notes"
+        ],
+        "confidence": "high"
+      }
+    ]
+  },
+  "llm_calls_path": "runs\\20260707_194744_25a0e683\\llm_calls",
+  "tool_calls_path": "runs\\20260707_194744_25a0e683\\tool_calls",
+  "last_llm_response_excerpt": "{\n  \"assistant_message\": \"我理解你的困扰。目前，我无法直接接收或处理你上传的文件，但你可以将文件内容以文本形式粘贴在这里，或者描述文件的结构和数据格式，我可以根据你提供的信息帮助设计数据接口或进行后续分析。如果你需要，也可以提供示例数据，我会尽力协助你。\",\n  \"state_update\": {},\n  \"next_action\": \"ask_clarification\",\n  \"tool_call\": {}\n}"
+}

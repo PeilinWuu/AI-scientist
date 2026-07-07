@@ -1,0 +1,10 @@
+{
+  "agent": "IntentRouter",
+  "provider": "qwen",
+  "transport": "curl",
+  "model": "qwen-turbo",
+  "is_mock": false,
+  "raw_response": "{\n  \"intent\": \"capability_question\",\n  \"confidence\": 0.95,\n  \"reason\": \"用户询问如何发送数据以及系统是否支持读取文件，这属于对系统功能和能力的询问，符合 capability_question 的定义。\"\n}",
+  "response_sha256": "46e39c57d73addc3eb856f05d48e3e2a643c6c95d946fa8d2d8270476d2ab3aa",
+  "timestamp": "2026-07-07T11:50:38.809498+00:00"
+}

@@ -214,5 +214,52 @@
     "expected_tool": null,
     "should_show_raw_json": false,
     "expected_behavior": "Short greeting without full capability introduction."
+  },
+  {
+    "case_id": "internalized_low_re_no_literature_style",
+    "name": "internalized_low_re_no_literature_style",
+    "user_message": "Re=80 的微型游动器为什么不能只做对称往复摆动？",
+    "expected_intent": ["conceptual_explanation"],
+    "should_call_tool": false,
+    "expected_tool": null,
+    "should_show_raw_json": false,
+    "expected_behavior": "Explain low-Re nonreciprocal actuation without literature-style wording.",
+    "must_include": ["低雷诺数", "非互易", "推进"],
+    "must_not_include": ["Purcell", "Taylor", "论文", "文献", "根据", "知识库"]
+  },
+  {
+    "case_id": "internalized_soft_swimmer_design_variables",
+    "name": "internalized_soft_swimmer_design_variables",
+    "user_message": "我想优化软体游动器的推进效率和稳定性，第一轮应该扫哪些变量？",
+    "expected_intent": ["research_consultation"],
+    "should_call_tool": false,
+    "expected_tool": null,
+    "should_show_raw_json": false,
+    "expected_behavior": "Suggest waveform-level variables and trade-offs without citation wording.",
+    "must_include": ["振幅", "频率", "波长", "相位", "刚度", "能耗", "稳定性"],
+    "must_not_include": ["Purcell", "Taylor", "论文", "文献", "根据", "知识库"]
+  },
+  {
+    "case_id": "cfd_schema_not_soft_swimmer",
+    "name": "cfd_schema_not_soft_swimmer",
+    "user_message": "我有一份 FreeFlow 输出 CSV，想接入系统分析，应该保留哪些字段？",
+    "expected_intent": ["research_consultation"],
+    "should_call_tool": false,
+    "expected_tool": null,
+    "should_show_raw_json": false,
+    "expected_behavior": "Design a CFD/FreeFlow schema instead of suggesting a soft-swimmer demo.",
+    "must_include": ["candidate_id", "设计变量", "流场指标", "约束", "目标指标"],
+    "must_not_include": ["运行 soft-swimmer", "直接调用 soft-swimmer", "根据知识库"]
+  },
+  {
+    "case_id": "references_allowed_when_user_asks",
+    "name": "references_allowed_when_user_asks",
+    "user_message": "这些低雷诺数游动判断有什么论文依据？",
+    "expected_intent": ["research_consultation"],
+    "should_call_tool": false,
+    "expected_tool": null,
+    "should_show_raw_json": false,
+    "expected_behavior": "Allow references when the user explicitly asks for evidence.",
+    "may_include": ["Purcell", "Taylor", "低雷诺数"]
   }
 ]

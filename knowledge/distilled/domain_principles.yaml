@@ -1,0 +1,194 @@
+- principle_id: low_re_nonreciprocal_actuation
+  domain: low-Reynolds-number swimming
+  triggers:
+    keywords:
+      - Re
+      - Reynolds
+      - low Reynolds
+      - low-Re
+      - 雷诺数
+      - 低雷诺数
+      - 微型游动
+      - 微尺度游动
+      - reciprocal
+      - nonreciprocal
+      - 非互易
+      - 往复摆动
+      - 对称往复
+  internal_guidance:
+    - In low-Reynolds-number or micro-swimmer settings, purely reciprocal shape changes are a weak propulsion strategy because the stroke can largely retrace itself.
+    - Prefer reasoning in terms of nonreciprocal deformation cycles, phase differences, traveling waves, or other time-asymmetric actuation patterns.
+  design_implications:
+    - Do not recommend only symmetric back-and-forth actuation for low-Re swimmers.
+    - Suggest phase-shifted, traveling-wave, or multi-mode actuation when discussing propulsion design.
+    - Explain the idea as a physical design principle, not as a literature citation, unless references are requested.
+  forbidden_user_facing_phrases:
+    - 根据 Purcell
+    - Purcell 1977
+    - 论文指出
+    - 文献表明
+  source_ids:
+    - purcell_1977_life_at_low_reynolds_number
+    - low_re_swimming_principle_notes
+  confidence: high
+
+- principle_id: traveling_wave_swimmer_parameterization
+  domain: soft-swimmer parameterization
+  triggers:
+    keywords:
+      - soft swimmer
+      - soft-swimmer
+      - soft robotic swimmer
+      - robotic fish
+      - 软体游动
+      - 软体机器人
+      - 机器鱼
+      - 推进效率
+      - 游动效率
+      - 振幅
+      - 频率
+      - 波长
+      - 相位
+      - 刚度
+      - traveling wave
+      - 行波
+  internal_guidance:
+    - For soft swimmers, formulate first-round experiments with waveform-level variables rather than vague morphology labels.
+    - Useful first variables include amplitude, frequency, wavelength, phase offset, and body or actuator stiffness.
+  design_implications:
+    - When the user asks which variables to scan, name amplitude, frequency, wavelength, phase, and stiffness.
+    - Connect these variables to speed, energy cost, stability, and efficiency trade-offs.
+    - Keep the current soft-swimmer demo framed as low-fidelity unless the user only asks for a demo run.
+  forbidden_user_facing_phrases:
+    - 根据 Taylor
+    - Taylor 1951
+    - 根据文献
+    - 文献表明
+  source_ids:
+    - taylor_1951_swimming_sheet_principle
+    - soft_swimmer_parameterization_notes
+  confidence: high
+
+- principle_id: fsi_boundary_awareness
+  domain: fluid-structure interaction
+  triggers:
+    keywords:
+      - FSI
+      - fluid-structure
+      - fluid structure
+      - 流固耦合
+      - Navier-Stokes
+      - 边界条件
+      - 材料
+      - 疲劳
+      - 结构
+      - 弹性
+      - deformation
+      - 柔性
+  internal_guidance:
+    - For FSI tasks, separate fluid model, structural model, boundary conditions, material assumptions, actuation, and solver capability.
+    - Be explicit about current prototype boundaries when a full CFD/FSI/material-fatigue problem is beyond the lightweight demo tool.
+  design_implications:
+    - Ask for or define fluid domain, boundary conditions, body geometry, material parameters, actuation law, and measured outputs.
+    - Do not imply the current soft-swimmer virtual experiment solves full Navier-Stokes/FSI/material fatigue.
+  forbidden_user_facing_phrases:
+    - 根据文献
+    - 论文指出
+    - according to the literature
+  source_ids:
+    - fsi_modeling_checklist_notes
+  confidence: high
+
+- principle_id: cfd_result_schema_first
+  domain: CFD result integration
+  triggers:
+    keywords:
+      - CFD
+      - FreeFlow
+      - csv
+      - CSV
+      - adapter
+      - schema
+      - 数据接口
+      - 接入系统
+      - 外部结果
+      - 仿真结果
+      - 后处理
+      - 字段
+  internal_guidance:
+    - When the user has external CFD or FreeFlow output, prioritize data schema design and ingestion over running the soft-swimmer demo.
+    - Preserve candidate identifiers, design variables, solver metadata, flow metrics, objective metrics, and constraint flags.
+  design_implications:
+    - Recommend fields such as candidate_id, design variables, flow metrics, objective metric, constraints, feasibility, and provenance.
+    - Avoid suggesting a direct soft-swimmer demo run when the user asks about CFD/FreeFlow data integration.
+  forbidden_user_facing_phrases:
+    - 根据知识库
+    - 检索结果显示
+    - 运行 soft-swimmer
+    - 直接调用 soft-swimmer
+  source_ids:
+    - cfd_adapter_schema_notes
+  confidence: high
+
+- principle_id: flow_optimization_tradeoff
+  domain: flow-field optimization
+  triggers:
+    keywords:
+      - 优化
+      - trade-off
+      - tradeoff
+      - 多目标
+      - 速度
+      - 能耗
+      - 稳定性
+      - 阻力
+      - 压降
+      - efficiency
+      - energy
+      - stability
+      - drag
+      - pressure drop
+  internal_guidance:
+    - Flow optimization usually involves trade-offs among speed, energy cost, stability, drag, pressure drop, mixing, lift, or thermal performance.
+    - Avoid optimizing one metric in isolation unless the user explicitly sets single-objective priority.
+  design_implications:
+    - Name target metric and constraints separately.
+    - Suggest Pareto-style comparison, feasibility filtering, and local refinement around promising candidates.
+  forbidden_user_facing_phrases:
+    - 根据文献
+    - according to the literature
+  source_ids:
+    - flow_optimization_tradeoff_notes
+  confidence: medium
+
+- principle_id: active_flow_control_formulation
+  domain: active flow control
+  triggers:
+    keywords:
+      - 闭环控制
+      - 闭环
+      - active flow control
+      - flow control
+      - 控制律
+      - observation
+      - action
+      - reward
+      - constraint
+      - actuator
+      - sensor
+      - 观测
+      - 动作
+      - 奖励
+      - 约束
+  internal_guidance:
+    - Closed-loop flow control should be decomposed into observation, action, reward or objective, constraints, and update cadence.
+    - Treat the controller and simulator interface as part of the experiment design.
+  design_implications:
+    - Ask what is observed, what can be actuated, what the reward/target metric is, and what safety or physical constraints apply.
+    - Avoid jumping directly to a simulator run before the control formulation is clarified.
+  forbidden_user_facing_phrases:
+    - 论文指出
+    - 根据知识库
+  source_ids:
+    - active_flow_control_formulation_notes
+  confidence: medium

@@ -49,6 +49,46 @@ class EvalDialogueProvider(LLMProvider):
                 {"intent": "research_consultation", "confidence": 0.2, "reason": "eval default"},
                 ensure_ascii=False,
             )
+        if "Re=80" in user_prompt:
+            return json.dumps(
+                {
+                    "assistant_message": "在 Re=80 这类低雷诺数微型游动问题里，只做完全对称的往复摆动通常会让形变路径前后抵消，净推进很弱。更合理的是设计非互易的形变循环，例如相位错开的摆动或行波式驱动，让一个周期内的身体形状变化不简单倒放。",
+                    "state_update": {},
+                    "next_action": "ask_clarification",
+                    "tool_call": {},
+                },
+                ensure_ascii=False,
+            )
+        if "软体游动器的推进效率" in user_prompt:
+            return json.dumps(
+                {
+                    "assistant_message": "第一轮建议扫波形级设计变量：振幅、频率、波长、相位和刚度。评价时不要只看推进效率，还要同时记录能耗、稳定性和约束是否满足；这样才能判断速度收益是否被能耗或不稳定摆动抵消。",
+                    "state_update": {"planning_preference": "balanced_efficiency", "target_metric": "efficiency"},
+                    "next_action": "propose_plan",
+                    "tool_call": {},
+                },
+                ensure_ascii=False,
+            )
+        if "FreeFlow 输出 CSV" in user_prompt:
+            return json.dumps(
+                {
+                    "assistant_message": "这类 FreeFlow 输出应先设计数据 schema，而不是转成 soft-swimmer demo。建议保留 candidate_id、设计变量、流场指标、目标指标、约束、可行性标记和仿真元数据，后续再统一转成分析表。",
+                    "state_update": {},
+                    "next_action": "ask_clarification",
+                    "tool_call": {},
+                },
+                ensure_ascii=False,
+            )
+        if "论文依据" in user_prompt or "文献依据" in user_prompt:
+            return json.dumps(
+                {
+                    "assistant_message": "可以参考低雷诺数游动的经典判断，例如 Purcell 关于低雷诺数生命的讨论，以及 Taylor 关于行波式游动片的早期模型。这里的核心结论是：低雷诺数下推进更依赖非互易形变和相位结构。",
+                    "state_update": {},
+                    "next_action": "ask_clarification",
+                    "tool_call": {},
+                },
+                ensure_ascii=False,
+            )
         if "response repair module" in system_prompt:
             return (
                 "这是一个带流固耦合、运动控制和约束优化的低/中雷诺数推进问题。"
@@ -295,6 +335,40 @@ def _run_dialogue_regression() -> list[str]:
         failures.append("case4 greeting should be short")
     failures.extend(_forbidden_token_failures("case4", reply, forbidden_main_tokens))
 
+    failures.extend(_run_domain_knowledge_regression(forbidden_main_tokens))
+    return failures
+
+
+def _run_domain_knowledge_regression(forbidden_main_tokens: list[str]) -> list[str]:
+    failures: list[str] = []
+    cases = json.loads((PROJECT_ROOT / "evals" / "dialogue_behavior_cases.yaml").read_text(encoding="utf-8"))
+    selected_cases = [case for case in cases if case.get("must_include") or case.get("may_include")]
+    for case in selected_cases:
+        state = _new_dialogue_state()
+        orchestrator = DialogueOrchestrator(state, llm=EvalDialogueProvider())
+        state = orchestrator.handle_user_message(case["user_message"])
+        reply = _last_assistant_user_facing_text(state)
+        expected_intents = case["expected_intent"]
+        if state.current_intent not in expected_intents:
+            failures.append(f"{case['case_id']} intent={state.current_intent}")
+        if bool(state.total_tool_calls) != bool(case.get("should_call_tool")):
+            failures.append(f"{case['case_id']} wrong tool call count: {state.total_tool_calls}")
+        for text in case.get("must_include", []):
+            if text not in reply:
+                failures.append(f"{case['case_id']} missing required text: {text}")
+        for text in case.get("must_not_include", []):
+            if text in reply:
+                failures.append(f"{case['case_id']} leaked forbidden text: {text}")
+        failures.extend(_forbidden_token_failures(case["case_id"], reply, forbidden_main_tokens))
+        if case.get("must_include"):
+            selected = state.last_decision_trace.get("selected_principles", [])
+            if not selected:
+                failures.append(f"{case['case_id']} did not audit selected principles")
+            audit_text = json.dumps(selected, ensure_ascii=False)
+            if "source_ids" not in audit_text:
+                failures.append(f"{case['case_id']} missing source_ids in decision trace")
+            if any(source in reply for source in ["source_ids", "principle_id"]):
+                failures.append(f"{case['case_id']} leaked principle audit data")
     return failures
 
 

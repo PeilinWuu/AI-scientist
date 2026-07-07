@@ -1,0 +1,10 @@
+{
+  "agent": "DialogueOrchestrator",
+  "provider": "qwen",
+  "transport": "curl",
+  "model": "qwen-turbo",
+  "is_mock": false,
+  "raw_response": "你好！有什么我可以帮助你的吗？如果你有任何关于流体模拟、优化或者实验设计的问题，随时告诉我！",
+  "response_sha256": "20ffbb40ae6b5f99eae1e1de3b8c16aa74c431079cf5fabad18618ca50f2dfdb",
+  "timestamp": "2026-07-07T11:47:56.911211+00:00"
+}

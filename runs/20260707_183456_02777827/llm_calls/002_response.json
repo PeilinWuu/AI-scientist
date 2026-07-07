@@ -1,0 +1,10 @@
+{
+  "agent": "DialogueOrchestrator",
+  "provider": "qwen",
+  "transport": "curl",
+  "model": "qwen-turbo",
+  "is_mock": false,
+  "raw_response": "你好！我是FlowScientist，一个专注于流体模拟和流动场优化的对话式AI科学家。我可以帮助你理解流体问题、设计实验、分析结果，以及规划下一步的研究方向。如果你有任何关于流体动力学、软体机器人游泳器或其他相关主题的问题，欢迎随时问我！今天有什么我可以帮你的吗？",
+  "response_sha256": "6a10d2b7cde1a2b2ed77fd63ea43dcf47ef1a6636e8fe7df4946c5d3f164e2da",
+  "timestamp": "2026-07-07T10:35:09.528477+00:00"
+}

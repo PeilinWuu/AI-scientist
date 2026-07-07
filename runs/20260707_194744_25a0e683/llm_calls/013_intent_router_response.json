@@ -1,0 +1,10 @@
+{
+  "agent": "IntentRouter",
+  "provider": "qwen",
+  "transport": "curl",
+  "model": "qwen-turbo",
+  "is_mock": false,
+  "raw_response": "{\n  \"intent\": \"experiment_planning\",\n  \"confidence\": 0.95,\n  \"reason\": \"用户请求设计 CFD/FreeFlow adapter 的数据接口，这属于实验规划的一部分，涉及具体的技术实现方案，但未明确要求执行工具或提供结果分析。\"\n}",
+  "response_sha256": "28d3d7fc3ae815c79e2f484d205b804b3cf93381a9930d78b972285d45060b34",
+  "timestamp": "2026-07-07T11:50:05.939008+00:00"
+}
