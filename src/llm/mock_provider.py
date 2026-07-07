@@ -10,7 +10,7 @@ from .base import LLMProvider
 class MockLLMProvider(LLMProvider):
     """Returns compact, deterministic text so the project runs without API keys."""
 
-    def generate(self, system_prompt: str, user_prompt: str) -> str:
+    def generate(self, system_prompt: str, user_prompt: str, **kwargs) -> str:
         return (
             "MockLLM: use constraint-aware local search, compare each iteration "
             "against previous results, and update the next plan from measured failures."

@@ -1,0 +1,13 @@
+{
+  "agent": "DialogueOrchestrator",
+  "provider": "qwen",
+  "transport": "curl",
+  "model": "qwen-turbo",
+  "is_mock": false,
+  "raw_response": "我无法直接访问互联网或外部数据源。我的知识和能力基于已有的训练数据，这些数据在2024年10月之前就已经确定。如果你有任何问题或需要帮助，我会尽力在现有知识范围内提供支持。",
+  "response_sha256": "2a7ceb6a781d55b14e7dc60bd947bc08a4722e168c739f4a03f206543e68ecb0",
+  "enable_search": false,
+  "search_options": {},
+  "search_trigger": "qwen_search_disabled",
+  "timestamp": "2026-07-07T12:22:20.299232+00:00"
+}

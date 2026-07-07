@@ -1,0 +1,85 @@
+{
+  "tool_name": "run_soft_swimmer_experiment",
+  "result": {
+    "tool_name": "run_soft_swimmer_experiment",
+    "results": [
+      {
+        "candidate_id": "C001",
+        "amplitude": 0.22,
+        "frequency": 1.1,
+        "wavelength": 1.0,
+        "stiffness": 0.55,
+        "phase": 0.2,
+        "mean_speed": 0.96264,
+        "energy_cost": 0.41162,
+        "efficiency": 2.21401,
+        "stability_score": 0.95901,
+        "vortex_loss": 0.11291,
+        "constraint_violation": false
+      },
+      {
+        "candidate_id": "C002",
+        "amplitude": 0.26,
+        "frequency": 1.4,
+        "wavelength": 1.2,
+        "stiffness": 0.6,
+        "phase": 0.35,
+        "mean_speed": 1.1198,
+        "energy_cost": 0.54308,
+        "efficiency": 1.94939,
+        "stability_score": 0.95153,
+        "vortex_loss": 0.10934,
+        "constraint_violation": false
+      },
+      {
+        "candidate_id": "C003",
+        "amplitude": 0.3,
+        "frequency": 1.7,
+        "wavelength": 1.4,
+        "stiffness": 0.5,
+        "phase": 0.5,
+        "mean_speed": 1.14325,
+        "energy_cost": 0.75363,
+        "efficiency": 1.39824,
+        "stability_score": 0.96055,
+        "vortex_loss": 0.18678,
+        "constraint_violation": false
+      },
+      {
+        "candidate_id": "C004",
+        "amplitude": 0.34,
+        "frequency": 2.0,
+        "wavelength": 1.6,
+        "stiffness": 0.65,
+        "phase": 0.65,
+        "mean_speed": 0.88065,
+        "energy_cost": 1.23192,
+        "efficiency": 0.63966,
+        "stability_score": 0.93061,
+        "vortex_loss": 0.23691,
+        "constraint_violation": false
+      }
+    ],
+    "best_candidate": {
+      "candidate_id": "C001",
+      "amplitude": 0.22,
+      "frequency": 1.1,
+      "wavelength": 1.0,
+      "stiffness": 0.55,
+      "phase": 0.2,
+      "mean_speed": 0.96264,
+      "energy_cost": 0.41162,
+      "efficiency": 2.21401,
+      "stability_score": 0.95901,
+      "vortex_loss": 0.11291,
+      "constraint_violation": false
+    },
+    "summary": {
+      "num_candidates": 4,
+      "feasible_count": 4,
+      "best_efficiency": 2.21401
+    }
+  },
+  "result_sha256": "e3c3281a3c35b037c470824f99b4f54bb830d73eb7a47264ec26c8b3ec1998cd",
+  "timestamp": "2026-07-07T13:47:07.665896+00:00"
+}

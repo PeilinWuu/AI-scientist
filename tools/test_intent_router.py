@@ -21,7 +21,7 @@ from src.state.conversation_state import ConversationState
 class GuardTestProvider(LLMProvider):
     """Provider that deliberately over-calls tools so code guards are tested."""
 
-    def generate(self, system_prompt: str, user_prompt: str) -> str:
+    def generate(self, system_prompt: str, user_prompt: str, **kwargs) -> str:
         if "classified_intent=visualization_request" in user_prompt:
             return json.dumps(
                 {

@@ -1,0 +1,13 @@
+{
+  "agent": "DialogueOrchestratorRepair",
+  "provider": "qwen",
+  "transport": "curl",
+  "model": "qwen-turbo",
+  "is_mock": false,
+  "raw_response": "{\n  \"assistant_message\": \"你好！今天天气晴朗，气温在18到32摄氏度之间，湿度为69%，风力为1级。需要我为你提供更详细的天气信息吗？\",\n  \"state_update\": {},\n  \"next_action\": \"ask_clarification\",\n  \"tool_call\": {}\n}",
+  "response_sha256": "63c56c63d8d2ac10c9b9caddba9ebe2498d9ce14025c5bad5196238b8d827fde",
+  "enable_search": false,
+  "search_options": {},
+  "search_trigger": "",
+  "timestamp": "2026-07-07T13:50:43.741730+00:00"
+}

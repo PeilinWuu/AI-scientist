@@ -1,0 +1,40 @@
+{
+  "tool_name": "run_soft_swimmer_experiment",
+  "arguments": {
+    "candidates": [
+      {
+        "candidate_id": "C001",
+        "amplitude": 0.22,
+        "frequency": 1.1,
+        "wavelength": 1.0,
+        "stiffness": 0.55,
+        "phase": 0.2
+      },
+      {
+        "candidate_id": "C002",
+        "amplitude": 0.26,
+        "frequency": 1.4,
+        "wavelength": 1.2,
+        "stiffness": 0.6,
+        "phase": 0.35
+      },
+      {
+        "candidate_id": "C003",
+        "amplitude": 0.3,
+        "frequency": 1.7,
+        "wavelength": 1.4,
+        "stiffness": 0.5,
+        "phase": 0.5
+      },
+      {
+        "candidate_id": "C004",
+        "amplitude": 0.34,
+        "frequency": 2.0,
+        "wavelength": 1.6,
+        "stiffness": 0.65,
+        "phase": 0.65
+      }
+    ]
+  },
+  "timestamp": "2026-07-07T13:47:07.663896+00:00"
+}

@@ -1,0 +1,10 @@
+{
+  "agent": "IntentRouter",
+  "provider": "qwen",
+  "transport": "curl",
+  "model": "qwen-turbo",
+  "is_mock": false,
+  "raw_response": "{\n  \"intent\": \"capability_question\",\n  \"confidence\": 0.95,\n  \"reason\": \"The user is asking about the network access capability of the Qwen model, which directly relates to the system's limitations and functionalities.\"\n}",
+  "response_sha256": "4729eddc64961fca589ad2923f8e09273439ba6fb0dcdac33acb9598bdb6b945",
+  "timestamp": "2026-07-07T13:19:20.404582+00:00"
+}

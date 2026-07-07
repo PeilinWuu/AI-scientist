@@ -22,7 +22,7 @@ from src.utils.readable_response import ensure_user_readable_response
 class JsonDumpProvider(LLMProvider):
     """Provider that emits raw-looking JSON as assistant content."""
 
-    def generate(self, system_prompt: str, user_prompt: str) -> str:
+    def generate(self, system_prompt: str, user_prompt: str, **kwargs) -> str:
         raw_message = json.dumps(
             {
                 "results": [

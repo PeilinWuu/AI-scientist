@@ -16,7 +16,7 @@ from src.agents.intent_router import IntentRouter
 from src.agents.dialogue_orchestrator import DialogueOrchestrator
 from src.config import settings
 from src.llm.base import LLMProvider
-from src.policies.tool_use_policy import decide_tool_permission
+from src.policies.tool_use_policy import decide_tool_permission, resolve_user_controlled_search
 from src.state.conversation_state import ConversationState
 from src.utils.readable_response import ensure_readable_assistant_message
 
@@ -24,7 +24,7 @@ from src.utils.readable_response import ensure_readable_assistant_message
 class EvalRouterProvider(LLMProvider):
     """Small deterministic provider; IntentRouter still exercises Qwen-style JSON path."""
 
-    def generate(self, system_prompt: str, user_prompt: str) -> str:
+    def generate(self, system_prompt: str, user_prompt: str, **kwargs) -> str:
         return json.dumps(
             {"intent": "research_consultation", "confidence": 0.3, "reason": "eval default"},
             ensure_ascii=False,
@@ -43,7 +43,7 @@ class EvalRouterProvider(LLMProvider):
 class EvalDialogueProvider(LLMProvider):
     """Deterministic dialogue provider for response-routing regression checks."""
 
-    def generate(self, system_prompt: str, user_prompt: str) -> str:
+    def generate(self, system_prompt: str, user_prompt: str, **kwargs) -> str:
         if "IntentRouter" in system_prompt:
             return json.dumps(
                 {"intent": "research_consultation", "confidence": 0.2, "reason": "eval default"},
@@ -157,12 +157,14 @@ class EvalDialogueProvider(LLMProvider):
 
 def main() -> int:
     cases = json.loads((PROJECT_ROOT / "evals" / "dialogue_behavior_cases.yaml").read_text(encoding="utf-8"))
+    original_search_setting = settings.qwen_enable_search
     state = _new_state()
     router = IntentRouter(EvalRouterProvider(), Path(state.run_dir) / "llm_calls")
     rows = []
     failures = []
 
     for case in cases:
+        settings.qwen_enable_search = bool(case.get("qwen_enable_search", True))
         if case["expected_tool"] == "generate_experiment_plot":
             _seed_experiment_history(state)
         expected_intents = case["expected_intent"]
@@ -170,6 +172,13 @@ def main() -> int:
         proposed = _proposed_tool_for_case(case, actual_intent)
         permission = decide_tool_permission(actual_intent, case["user_message"], state, proposed)
         actual_tool = proposed.get("tool_name") if permission["allowed"] else None
+        search_permission = resolve_user_controlled_search(
+            case.get("web_search_mode", "off"),
+            case["user_message"],
+        )
+        actual_search = bool(search_permission.get("enable_search"))
+        actual_trigger = search_permission.get("search_trigger")
+        expected_search = case.get("expected_search_used", case.get("expected_search"))
         readable = ensure_readable_assistant_message(
             '{"candidate_id":"C001","amplitude":0.2,"frequency":1.1,"results":[]}'
         )
@@ -180,6 +189,8 @@ def main() -> int:
             and bool(actual_tool) == bool(case["should_call_tool"])
             and (case["expected_tool"] is None or actual_tool == case["expected_tool"])
             and shows_raw_json == bool(case["should_show_raw_json"])
+            and (expected_search is None or actual_search == bool(expected_search))
+            and (case.get("expected_search_trigger") is None or actual_trigger == case["expected_search_trigger"])
         )
         row = {
             "case_id": case["case_id"],
@@ -187,6 +198,10 @@ def main() -> int:
             "actual_intent": actual_intent,
             "expected_tool": case["expected_tool"],
             "actual_tool": actual_tool,
+            "expected_search": expected_search,
+            "actual_search": actual_search,
+            "expected_search_trigger": case.get("expected_search_trigger"),
+            "actual_search_trigger": actual_trigger,
             "pass": passed,
         }
         rows.append(row)
@@ -197,16 +212,19 @@ def main() -> int:
 
     _print_rows(rows)
     if failures:
+        settings.qwen_enable_search = original_search_setting
         print("\nAgent behavior eval failed:")
         _print_rows(failures)
         return 1
     dialogue_failures = _run_dialogue_regression()
     if dialogue_failures:
+        settings.qwen_enable_search = original_search_setting
         print("\nDialogue response regression failed:")
         for item in dialogue_failures:
             print(item)
         return 1
     print("\nAgent behavior eval passed.")
+    settings.qwen_enable_search = original_search_setting
     return 0
 
 
@@ -267,11 +285,12 @@ def _proposed_tool_for_case(case: dict, actual_intent: str) -> dict:
 
 
 def _print_rows(rows: list[dict]) -> None:
-    print("case_id expected_intent actual_intent expected_tool actual_tool pass")
+    print("case_id expected_intent actual_intent expected_tool actual_tool actual_search actual_search_trigger pass")
     for row in rows:
         print(
             f"{row['case_id']} {row['expected_intent']} {row['actual_intent']} "
-            f"{row['expected_tool']} {row['actual_tool']} {row['pass']}"
+            f"{row['expected_tool']} {row['actual_tool']} "
+            f"{row.get('actual_search')} {row.get('actual_search_trigger')} {row['pass']}"
         )
 
 
@@ -336,6 +355,7 @@ def _run_dialogue_regression() -> list[str]:
     failures.extend(_forbidden_token_failures("case4", reply, forbidden_main_tokens))
 
     failures.extend(_run_domain_knowledge_regression(forbidden_main_tokens))
+    failures.extend(_run_user_controlled_search_regression(forbidden_main_tokens))
     return failures
 
 
@@ -369,6 +389,52 @@ def _run_domain_knowledge_regression(forbidden_main_tokens: list[str]) -> list[s
                 failures.append(f"{case['case_id']} missing source_ids in decision trace")
             if any(source in reply for source in ["source_ids", "principle_id"]):
                 failures.append(f"{case['case_id']} leaked principle audit data")
+    return failures
+
+
+def _run_user_controlled_search_regression(forbidden_main_tokens: list[str]) -> list[str]:
+    failures: list[str] = []
+    cases = json.loads((PROJECT_ROOT / "evals" / "dialogue_behavior_cases.yaml").read_text(encoding="utf-8"))
+    selected_cases = [
+        case
+        for case in cases
+        if case["case_id"].startswith("user_controlled_search_")
+        or case["case_id"] in {"qwen_search_latest_papers", "qwen_search_freeflow_docs", "qwen_search_disabled_by_user"}
+    ]
+    original_search_setting = settings.qwen_enable_search
+    try:
+        for case in selected_cases:
+            settings.qwen_enable_search = bool(case.get("qwen_enable_search", True))
+            state = _new_dialogue_state()
+            state.web_search_mode = case.get("web_search_mode", "off")
+            initial_mode = state.web_search_mode
+            orchestrator = DialogueOrchestrator(state, llm=EvalDialogueProvider())
+            state = orchestrator.handle_user_message(case["user_message"])
+            reply = _last_assistant_user_facing_text(state)
+
+            expected_search = case.get("expected_search_used", case.get("expected_search"))
+            if expected_search is not None and state.last_qwen_search_used != bool(expected_search):
+                failures.append(
+                    f"{case['case_id']} search_used={state.last_qwen_search_used}, expected={expected_search}"
+                )
+            expected_trigger = case.get("expected_search_trigger")
+            if expected_trigger and state.last_search_trigger != expected_trigger:
+                failures.append(
+                    f"{case['case_id']} search_trigger={state.last_search_trigger}, expected={expected_trigger}"
+                )
+            for text in case.get("expected_contains", []):
+                if text not in reply:
+                    failures.append(f"{case['case_id']} missing expected text: {text}")
+            for text in case.get("forbidden_contains", []):
+                if text in reply:
+                    failures.append(f"{case['case_id']} leaked forbidden text: {text}")
+            failures.extend(_forbidden_token_failures(case["case_id"], reply, forbidden_main_tokens))
+            if initial_mode == "this_turn" and state.web_search_mode != "off":
+                failures.append(f"{case['case_id']} did not reset this_turn mode")
+            if state.total_tool_calls:
+                failures.append(f"{case['case_id']} should not call simulator tool")
+    finally:
+        settings.qwen_enable_search = original_search_setting
     return failures
 
 

@@ -1,0 +1,16 @@
+{
+  "agent": "DialogueOrchestrator",
+  "provider": "qwen",
+  "transport": "eval-dialogue",
+  "model": "dialogue-eval",
+  "is_mock": false,
+  "raw_response": "{\"assistant_message\": \"你好。\", \"state_update\": {}, \"next_action\": \"ask_clarification\", \"tool_call\": {}}",
+  "response_sha256": "dbca0ea95fe240a80113ae10731bc02a4920a7e3a3dca4af3a4ea705279d959b",
+  "enable_search": true,
+  "search_options": {
+    "search_strategy": "turbo",
+    "forced_search": true
+  },
+  "search_trigger": "user_selected_this_turn",
+  "timestamp": "2026-07-07T13:46:06.722999+00:00"
+}

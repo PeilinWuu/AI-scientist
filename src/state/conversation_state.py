@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from src.utils.io import ensure_dir, read_json, write_json
 
@@ -36,6 +36,12 @@ class ConversationState:
     total_tool_calls: int = 0
     last_qwen_response_excerpt: str = ""
     last_tool_result: dict[str, Any] = field(default_factory=dict)
+    qwen_web_search_enabled: bool = False
+    web_search_mode: Literal["off", "this_turn", "always_on"] = "off"
+    last_user_search_choice: str = "off"
+    last_qwen_search_used: bool = False
+    last_search_trigger: str = "user_search_off"
+    last_search_options: dict[str, Any] = field(default_factory=dict)
 
     @property
     def path(self) -> Path:
@@ -70,6 +76,12 @@ class ConversationState:
             "llm_calls_path": str(Path(self.run_dir) / "llm_calls"),
             "tool_calls_path": str(Path(self.run_dir) / "tool_calls"),
             "last_llm_response_excerpt": self.last_qwen_response_excerpt,
+            "qwen_web_search_enabled": self.qwen_web_search_enabled,
+            "web_search_mode": self.web_search_mode,
+            "last_user_search_choice": self.last_user_search_choice,
+            "last_qwen_search_used": self.last_qwen_search_used,
+            "last_search_trigger": self.last_search_trigger,
+            "last_search_options": self.last_search_options,
             "is_mock": bool(self.llm_backend.get("is_mock", True)),
         }
         write_json(Path(self.run_dir) / "metadata.json", metadata)

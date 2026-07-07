@@ -120,10 +120,34 @@ def correct_intent_with_rules(user_message: str, qwen_intent: str) -> str:
     text = (user_message or "").strip().lower()
     compact = text.replace(" ", "")
 
+    if _has_any(
+        compact,
+        [
+            "你能联网吗",
+            "可以联网吗",
+            "会联网吗",
+            "能不能联网",
+            "你能上网吗",
+            "可以上网吗",
+            "支持联网吗",
+            "支持联网搜索吗",
+        ],
+    ) or _has_any(text, ["can you browse", "can you search the web", "internet access", "web search capability"]):
+        return "capability_question"
+
     if _has_any(compact, ["画图", "可视化", "图表", "曲线", "散点", "柱状", "对比"]) or _has_any(
         text, ["show plot", "chart", "curve", "scatter", "visualize", "visualization", "compare"]
     ):
         return "visualization_request"
+    if _forbids_web_search(user_message):
+        if _has_any(compact, ["什么是", "为什么", "原理", "概念", "如何理解", "解释一下"]) or _has_any(
+            text, ["what is", "why", "principle", "concept", "explain", "how to understand"]
+        ):
+            return "conceptual_explanation"
+        return qwen_intent if qwen_intent in INTENTS else "research_consultation"
+    search_intent = _search_intent(user_message)
+    if search_intent:
+        return search_intent
     if _has_any(compact, ["报告", "总结", "ppt", "研究计划", "技术路线"]) or _has_any(
         text, ["report", "summary", "ppt", "research plan", "technical route"]
     ):
@@ -135,7 +159,7 @@ def correct_intent_with_rules(user_message: str, qwen_intent: str) -> str:
         or _has_any(compact, ["cfdadapter", "数据接口", "接入系统", "适配器"])
     ):
         return "research_consultation"
-    if _has_any(compact, ["设计实验", "设计一轮", "实验方案", "规划参数", "实验计划", "下一步仿真任务", "下一步实验"]) or _has_any(
+    if _has_any(compact, ["设计实验", "设计一轮", "实验方案", "规划参数", "实验计划", "规划下一轮", "下一步仿真任务", "下一步实验"]) or _has_any(
         text, ["design an experiment", "experiment plan", "plan parameters", "next simulation task", "next experiment"]
     ):
         return "experiment_planning"
@@ -195,6 +219,42 @@ def has_explicit_execution_request(user_message: str) -> bool:
             "execute",
             "continue the next round",
         ],
+    )
+
+
+def has_explicit_web_search_request(user_message: str) -> bool:
+    """Detect explicit requests for external web/native Qwen search."""
+
+    return _search_intent(user_message) is not None and not _forbids_web_search(user_message)
+
+
+def _search_intent(user_message: str) -> str | None:
+    text = (user_message or "").lower()
+    compact = text.replace(" ", "")
+    if _has_any(compact, ["最近的论文", "找文献", "找论文", "论文依据", "文献依据", "参考文献"]) or _has_any(
+        text, ["recent paper", "latest paper", "find papers", "literature search", "citation", "references"]
+    ):
+        return "literature_search"
+    if _has_any(compact, ["官方文档", "查文档", "api文档", "接口文档"]) or _has_any(
+        text, ["official docs", "official documentation", "api docs", "documentation"]
+    ):
+        return "documentation_lookup"
+    if _has_any(compact, ["查最新", "最新版本", "核实一下", "最新资料", "最近", "2025", "2026"]) or _has_any(
+        text, ["latest", "current", "recent", "verify", "fact-check", "up to date", "2025", "2026"]
+    ):
+        return "current_info_lookup"
+    if _has_any(compact, ["联网搜", "联网搜索", "上网查", "网上有没有", "网上查", "在线搜索"]) or _has_any(
+        text, ["web search", "search online", "browse web", "look online", "online sources"]
+    ):
+        return "web_research"
+    return None
+
+
+def _forbids_web_search(user_message: str) -> bool:
+    text = (user_message or "").lower()
+    compact = text.replace(" ", "")
+    return _has_any(compact, ["不要联网", "别联网", "不用联网", "只根据已有知识", "不要上网"]) or _has_any(
+        text, ["do not search", "don't search", "no web", "without web", "only existing knowledge"]
     )
 
 

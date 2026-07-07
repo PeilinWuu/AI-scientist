@@ -1,0 +1,13 @@
+{
+  "agent": "DialogueOrchestrator",
+  "provider": "qwen",
+  "transport": "eval-dialogue",
+  "model": "dialogue-eval",
+  "is_mock": false,
+  "raw_response": "{\"assistant_message\": \"我的优势在于把科研目标澄清、实验规划、工具调用和结果解释串起来；当前工具是 soft-swimmer 轻量示例，边界是不能替代真实 CFD/FSI。\", \"state_update\": {}, \"next_action\": \"ask_clarification\", \"tool_call\": {}}",
+  "response_sha256": "b860a9a664562df3b548398e3588c1179f1ef874e34396968cee3acf7e7183ab",
+  "enable_search": false,
+  "search_options": {},
+  "search_trigger": "user_search_off",
+  "timestamp": "2026-07-07T13:46:06.639754+00:00"
+}

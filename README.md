@@ -209,6 +209,46 @@ python tools/check_qwen.py
 
 The script prints the model name, success status, and the first 200 characters of the response. It does not print the full API key.
 
+### Optional Qwen Native Web Search
+
+Qwen native web search is disabled by default so ordinary dialogue, experiment planning, and simulator execution stay offline and deterministic:
+
+```env
+QWEN_ENABLE_SEARCH=false
+QWEN_SEARCH_STRATEGY=turbo
+QWEN_SEARCH_FORCE=false
+QWEN_SEARCH_FRESHNESS=
+QWEN_SEARCH_ASSIGNED_SITES=
+```
+
+To make Qwen native search available in the app, set:
+
+```env
+QWEN_ENABLE_SEARCH=true
+```
+
+Qwen native web search is controlled by the user through the Streamlit UI. The user can choose:
+
+- no web search;
+- web search for this turn only;
+- always-on web search until manually disabled.
+
+Intent Router no longer decides whether web search is enabled. It may still classify the message as a literature, documentation, or current-information request, but the final `enable_search` flag is controlled by user interaction plus `QWEN_ENABLE_SEARCH`.
+
+If the user selects "this turn" or "always on", the Qwen request includes:
+
+```json
+{
+  "enable_search": true,
+  "search_options": {
+    "search_strategy": "turbo",
+    "forced_search": true
+  }
+}
+```
+
+If the user writes instructions such as "不要联网", "不用联网", "只根据已有知识", "只根据当前项目", or "只看本地文件", that text overrides the UI and disables search for the current turn. The request audit records `enable_search`, `search_options`, and `search_trigger` under `runs/{run_id}/llm_calls/` and `decision_trace.jsonl`; API keys are never saved.
+
 Directly test the curl-based provider used by the workflow:
 
 ```bash

@@ -1,0 +1,10 @@
+{
+  "agent": "IntentRouter",
+  "provider": "qwen",
+  "transport": "curl",
+  "model": "qwen-turbo",
+  "is_mock": false,
+  "raw_response": "{\n  \"intent\": \"web_research\",\n  \"confidence\": 0.9,\n  \"reason\": \"The user's message explicitly asks to search online for the current weather, which aligns with the 'web_research' intent.\"\n}",
+  "response_sha256": "9cfb650c63dec42638325cd7b8c87381b611ad415743f1e80623aba69968210d",
+  "timestamp": "2026-07-07T13:50:23.678328+00:00"
+}

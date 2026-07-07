@@ -9,7 +9,7 @@ class LLMProvider(ABC):
     """Minimal abstraction so Mock and Qwen can be swapped cleanly."""
 
     @abstractmethod
-    def generate(self, system_prompt: str, user_prompt: str) -> str:
+    def generate(self, system_prompt: str, user_prompt: str, **kwargs) -> str:
         """Return a text completion for an agent prompt."""
 
     def metadata(self) -> dict:

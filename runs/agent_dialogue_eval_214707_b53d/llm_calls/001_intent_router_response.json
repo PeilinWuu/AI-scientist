@@ -1,0 +1,10 @@
+{
+  "agent": "IntentRouter",
+  "provider": "qwen",
+  "transport": "eval-dialogue",
+  "model": "dialogue-eval",
+  "is_mock": false,
+  "raw_response": "{\"intent\": \"research_consultation\", \"confidence\": 0.2, \"reason\": \"eval default\"}",
+  "response_sha256": "ef7ea1c4724bfd153c43a1c21425aa5a44c6d0d1d538366a5db51d5dca3e70f7",
+  "timestamp": "2026-07-07T13:47:07.867917+00:00"
+}

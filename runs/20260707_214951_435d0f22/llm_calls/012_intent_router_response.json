@@ -1,0 +1,10 @@
+{
+  "agent": "IntentRouter",
+  "provider": "qwen",
+  "transport": "curl",
+  "model": "qwen-turbo",
+  "is_mock": false,
+  "raw_response": "{\n  \"intent\": \"conceptual_explanation\",\n  \"confidence\": 0.9,\n  \"reason\": \"The user is asking about the reason behind a specific error message related to modifying a session state variable after a widget is instantiated, which indicates a request for an explanation of a technical concept or principle.\"\n}",
+  "response_sha256": "6b939d87c65b14b84ed376ca2590d623bee13b70436727a48c4cff1f29149f58",
+  "timestamp": "2026-07-07T13:51:27.168741+00:00"
+}

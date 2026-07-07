@@ -108,6 +108,8 @@ if "conversation_state" not in st.session_state:
 state: ConversationState = st.session_state.conversation_state
 llm_status = get_llm_status()
 queued_user_message = st.session_state.pop("queued_user_message", None)
+if "web_search_mode_control" not in st.session_state:
+    st.session_state.web_search_mode_control = state.web_search_mode
 
 with st.sidebar:
     st.header("FlowScientist State")
@@ -126,6 +128,27 @@ with st.sidebar:
     st.write(f"**Target metric:** {state.target_metric or 'unknown'}")
     st.metric("Tool calls", state.total_tool_calls)
     st.metric("LLM calls", state.total_llm_calls)
+    search_mode = st.radio(
+        "联网搜索",
+        options=["off", "this_turn", "always_on"],
+        format_func=lambda value: {
+            "off": "不联网",
+            "this_turn": "仅本轮联网",
+            "always_on": "始终联网，直到关闭",
+        }[value],
+        horizontal=True,
+        key="web_search_mode_control",
+    )
+    if search_mode != state.web_search_mode:
+        state.web_search_mode = search_mode
+        state.last_user_search_choice = search_mode
+        state.save()
+    search_capability = "enabled" if llm_status.get("qwen_enable_search", False) else "disabled"
+    st.write(f"**Qwen Web Search Capability:** {search_capability}")
+    st.write(f"**User Search Mode:** {state.web_search_mode}")
+    st.write(f"**Last Qwen Search Used:** {str(state.last_qwen_search_used).lower()}")
+    st.write(f"**Last Search Trigger:** {state.last_search_trigger or 'user_search_off'}")
+    st.write(f"**Search Strategy:** {llm_status.get('qwen_search_strategy') or 'none'}")
     show_developer_debug = st.checkbox("Show developer debug panels", value=False)
     st.divider()
     st.write(f"**LLM Provider:** {llm_status['llm_provider']}")
@@ -181,6 +204,8 @@ for message_index, message in enumerate(state.messages):
     with st.chat_message(chat_role):
         if role == "tool":
             st.markdown(f"**Tool called:** `{message.get('tool_name', 'unknown')}`")
+        if message.get("search_used"):
+            st.info("已启用 Qwen 联网搜索")
         render_message_payload(message, show_developer_debug, message_index)
 
 user_message = st.chat_input(
@@ -193,6 +218,7 @@ if effective_user_message:
         try:
             state = orchestrator.handle_user_message(effective_user_message)
             st.session_state.conversation_state = state
+            st.session_state.web_search_mode_control = state.web_search_mode
             st.rerun()
         except Exception as exc:  # noqa: BLE001 - Streamlit should show actionable failure.
             st.error(str(exc))
@@ -209,6 +235,7 @@ if st.button("Run 3 Qwen-guided rounds"):
         try:
             state = orchestrator.run_three_rounds(quick_goal)
             st.session_state.conversation_state = state
+            st.session_state.web_search_mode_control = state.web_search_mode
             st.rerun()
         except Exception as exc:  # noqa: BLE001
             st.error(str(exc))

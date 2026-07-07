@@ -1,0 +1,8 @@
+{
+  "intent": "capability_question",
+  "qwen_intent": "capability_question",
+  "confidence": 0.95,
+  "reason": "The user is asking about the system's ability to connect to the internet, which falls under capability questions.",
+  "rule_corrected": false,
+  "timestamp": "2026-07-07T12:22:19.502377+00:00"
+}

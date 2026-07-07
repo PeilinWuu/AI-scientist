@@ -24,6 +24,10 @@ SKILL_BY_INTENT = {
     "result_analysis": RESULT_ANALYSIS_SKILL,
     "visualization_request": VISUALIZATION_SKILL,
     "report_generation": REPORT_SKILL,
+    "web_research": RESEARCH_CONSULTATION_SKILL,
+    "literature_search": RESEARCH_CONSULTATION_SKILL,
+    "documentation_lookup": RESEARCH_CONSULTATION_SKILL,
+    "current_info_lookup": RESEARCH_CONSULTATION_SKILL,
 }
 
 

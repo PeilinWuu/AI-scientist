@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from src.config import settings
 from src.skills.tool_result_summarizer import summarize_soft_swimmer_result
 from src.utils.readable_response import ensure_readable_assistant_message
 
@@ -27,44 +28,59 @@ def compose_user_response(
     }
     if isinstance(skill_output, dict):
         raw_debug["skill_output_keys"] = sorted(skill_output.keys())
+    search_control = _search_control_metadata(skill_output)
+    search_metadata = search_control if search_control.get("enable_search") else {}
+    if search_control:
+        raw_debug["qwen_search"] = search_control
     assistant_message = _extract_message(skill_output)
     references_allowed = _user_requested_references(user_message)
 
     if tool_result:
         return _filter_user_facing_response(
-            _compose_tool_response(intent, selected_skill, tool_result, raw_debug),
+            _with_search_notice(_compose_tool_response(intent, selected_skill, tool_result, raw_debug), search_metadata),
             references_allowed=references_allowed,
         )
 
     if intent == "capability_question":
         return _filter_user_facing_response(
-            _capability_response(assistant_message, raw_debug),
+            _with_search_notice(
+                _capability_response(assistant_message, raw_debug, state=state, user_message=user_message),
+                search_metadata,
+            ),
             references_allowed=references_allowed,
         )
     if intent == "research_consultation":
         return _filter_user_facing_response(
-            _research_consultation_response(user_message, assistant_message, raw_debug),
+            _with_search_notice(
+                _research_consultation_response(user_message, assistant_message, raw_debug),
+                search_metadata,
+            ),
             references_allowed=references_allowed,
         )
     if intent == "experiment_planning":
         return _filter_user_facing_response(
-            _experiment_planning_response(assistant_message, tool_permission, raw_debug),
+            _with_search_notice(_experiment_planning_response(assistant_message, tool_permission, raw_debug), search_metadata),
             references_allowed=references_allowed,
         )
     if intent == "casual_chat":
         return _filter_user_facing_response(
-            _casual_response(assistant_message, raw_debug),
+            _with_search_notice(_casual_response(assistant_message, raw_debug), search_metadata),
+            references_allowed=references_allowed,
+        )
+    if intent in {"web_research", "literature_search", "documentation_lookup", "current_info_lookup"} and not search_metadata:
+        return _filter_user_facing_response(
+            _search_not_enabled_response(raw_debug, search_control),
             references_allowed=references_allowed,
         )
 
-    return _filter_user_facing_response({
+    return _filter_user_facing_response(_with_search_notice({
         "assistant_message": assistant_message or "我理解了。请继续补充你的目标、约束或希望我执行的下一步。",
         "sections": [],
         "tables": [],
         "figures": [],
         "suggested_actions": _default_actions(intent, state),
         "raw_debug": raw_debug,
-    }, references_allowed=references_allowed)
+    }, search_metadata), references_allowed=references_allowed)
 
 
 def _compose_tool_response(
@@ -109,12 +125,62 @@ def _compose_tool_response(
     }
 
 
-def _capability_response(message: str, raw_debug: dict[str, Any]) -> dict[str, Any]:
-    text = message or (
+def _capability_response(
+    message: str,
+    raw_debug: dict[str, Any],
+    state: Any | None = None,
+    user_message: str = "",
+) -> dict[str, Any]:
+    if _asks_web_capability(user_message):
+        mode = getattr(state, "web_search_mode", "off") or "off"
+        if settings.qwen_enable_search:
+            mode_text = {
+                "off": "当前系统支持联网搜索，但本轮未启用。你可以在界面中选择“仅本轮联网”或“始终联网”。",
+                "this_turn": "当前系统支持联网搜索，你已选择“仅本轮联网”，本轮 Qwen 请求会启用联网搜索，处理完成后会自动恢复为“不联网”。",
+                "always_on": "当前系统支持联网搜索，你已选择“始终联网”，后续每轮都会启用联网搜索，直到你在界面中关闭。",
+            }.get(mode, "当前系统支持联网搜索，但是否启用由用户控制。")
+            text = (
+                f"{mode_text} 如果选择“不联网”，我会基于已有知识和当前项目上下文回答；"
+                "如果选择“仅本轮联网”或“始终联网”，我会在对应 Qwen 请求中传入 enable_search。"
+            )
+        else:
+            text = (
+                "当前项目没有启用联网搜索配置。如果需要启用，请在 .env 中设置 "
+                "QWEN_ENABLE_SEARCH=true，并确保 QwenProvider/CurlQwenProvider 会传入 enable_search 参数。"
+            )
+        return {
+            "assistant_message": text,
+            "sections": [
+                {"title": "联网搜索状态", "content": text},
+            ],
+            "tables": [],
+            "figures": [],
+            "suggested_actions": [],
+            "raw_debug": raw_debug,
+        }
+    if _asks_web_capability(user_message):
+        mode = getattr(state, "web_search_mode", "off") or "off"
+        if settings.qwen_enable_search:
+            mode_text = {
+                "off": "当前系统支持联网搜索，但本轮未启用。你可以在界面中选择“仅本轮联网”或“始终联网”。",
+                "this_turn": "当前系统支持联网搜索，且你已选择“仅本轮联网”。本轮 Qwen 请求会启用搜索，处理完成后会自动恢复为不联网。",
+                "always_on": "当前系统支持联网搜索，且你已选择“始终联网”。后续每轮都会启用搜索，直到你在界面中关闭。",
+            }.get(mode, "当前系统支持联网搜索，但是否启用由你在界面中控制。")
+            text = (
+                f"{mode_text} 如果选择“不联网”，我会基于已有知识和本地项目上下文回答；"
+                "如果选择“仅本轮联网”或“始终联网”，我会在对应 Qwen 请求中传入 enable_search。"
+            )
+        else:
+            text = (
+                "当前项目没有启用联网搜索配置。如果需要启用，请在 .env 中设置 "
+                "QWEN_ENABLE_SEARCH=true，并确保 QwenProvider/CurlQwenProvider 会传入 enable_search 参数。"
+            )
+    else:
+        text = message or (
         "我的优势在于把科研目标澄清、实验任务规划、工具调用、结果解释和下一轮迭代建议串起来。"
         "当前已实现的可执行工具是 lightweight soft-swimmer virtual experiment；它可以扩展到 "
         "FreeFlow、CFD solver、实验仪器 API 或后处理脚本，但不能假装已经具备完整 CFD/FSI 求解能力。"
-    )
+        )
     return {
         "assistant_message": text,
         "sections": [
@@ -240,6 +306,91 @@ def _extract_message(skill_output: dict[str, Any] | str) -> str:
     return ensure_readable_assistant_message(text)
 
 
+def _search_control_metadata(skill_output: dict[str, Any] | str) -> dict[str, Any]:
+    if not isinstance(skill_output, dict):
+        return {}
+    options = dict(skill_output.get("llm_call_options") or {})
+    return {
+        "enable_search": bool(options.get("enable_search")),
+        "search_options": dict(options.get("search_options") or {}),
+        "search_trigger": str(options.get("search_trigger") or ""),
+        "reason": str(options.get("reason") or ""),
+    }
+
+
+def _with_search_notice(response: dict[str, Any], search_metadata: dict[str, Any]) -> dict[str, Any]:
+    if not search_metadata.get("enable_search"):
+        return response
+    updated = dict(response)
+    message = str(updated.get("assistant_message", "")).strip()
+    prefix = "我已基于联网搜索结果整理如下。"
+    updated["assistant_message"] = f"{prefix}\n\n{message}" if message else prefix
+    sections = list(updated.get("sections", []) or [])
+    sections.insert(
+        0,
+        {
+            "title": "联网搜索说明",
+            "content": (
+                "当前通过 Qwen 原生搜索获得信息，但 OpenAI-compatible Chat Completions "
+                "对搜索来源结构化返回支持有限。如需严格引用和审计，建议后续切换 DashScope "
+                "协议或封装独立 qwen_web_search_tool。"
+            ),
+        },
+    )
+    updated["sections"] = sections
+    updated["search_used"] = True
+    return updated
+
+
+def _search_not_enabled_response(raw_debug: dict[str, Any], search_control: dict[str, Any]) -> dict[str, Any]:
+    trigger = search_control.get("search_trigger") or "user_search_off"
+    if trigger == "qwen_search_disabled" or not settings.qwen_enable_search:
+        message = (
+            "当前项目没有启用联网搜索配置。如果需要查在线资料，请在 .env 中设置 "
+            "QWEN_ENABLE_SEARCH=true，然后重启前端。"
+        )
+    elif trigger == "user_text_disabled_search":
+        message = "你已在文字中明确要求不要联网，本轮会只根据已有知识和当前项目上下文回答。"
+    else:
+        message = (
+            "当前系统支持联网搜索，但本轮未启用联网搜索。"
+            "如果你希望我查最新论文、官方文档或在线资料，可以在界面中打开“仅本轮联网”或“始终联网”。"
+        )
+    return {
+        "assistant_message": message,
+        "sections": [{"title": "联网搜索状态", "content": message}],
+        "tables": [],
+        "figures": [],
+        "suggested_actions": [],
+        "raw_debug": raw_debug,
+    }
+    if trigger == "qwen_search_disabled" or not settings.qwen_enable_search:
+        message = (
+            "当前项目没有启用联网搜索配置。如果需要联网查资料，请在 .env 中设置 "
+            "QWEN_ENABLE_SEARCH=true，并重启前端。"
+        )
+    elif trigger == "user_text_disabled_search":
+        message = "你已在文字中明确要求不要联网，所以我会只基于已有知识和当前项目上下文回答。"
+    else:
+        message = (
+            "当前系统支持联网搜索，但本轮未启用联网搜索。"
+            "如果你希望我查最新论文、官方文档或在线资料，可以在界面中打开“仅本轮联网”或“始终联网”。"
+        )
+    return {
+        "assistant_message": message,
+        "sections": [
+            {
+                "title": "联网搜索状态",
+                "content": f"Last Search Trigger: {trigger}",
+            }
+        ],
+        "tables": [],
+        "figures": [],
+        "suggested_actions": [],
+        "raw_debug": raw_debug,
+    }
+
+
 REFERENCE_REQUEST_MARKERS = ["论文", "文献", "参考", "references", "paper", "citation", "来源", "依据"]
 
 SOURCE_STYLE_PHRASES = [
@@ -279,12 +430,31 @@ def _suppress_source_style(text: str) -> str:
     output = text
     for phrase in SOURCE_STYLE_PHRASES:
         output = output.replace(phrase, "")
+    if settings.qwen_enable_search:
+        for phrase in [
+            "我无法直接访问互联网",
+            "我无法访问互联网",
+            "我不能联网",
+            "不能联网",
+            "我无法直接访问外部数据源",
+        ]:
+            output = output.replace(phrase, "当前系统支持联网搜索，但是否启用由用户控制")
+        for phrase in ["我无法直接访问互联网", "我无法访问互联网", "我不能联网", "不能联网", "我无法直接访问外部数据源"]:
+            output = output.replace(phrase, "当前系统支持联网搜索，但是否启用由用户控制")
     return " ".join(output.split())
 
 
 def _user_requested_references(user_message: str) -> bool:
     text = (user_message or "").lower()
     return any(marker in text for marker in REFERENCE_REQUEST_MARKERS)
+
+
+def _asks_web_capability(user_message: str) -> bool:
+    text = (user_message or "").lower().replace(" ", "")
+    return any(marker in text for marker in ["能联网吗", "可以联网吗", "会联网吗", "能不能联网", "能上网吗", "可以上网吗"]) or any(
+        marker in (user_message or "").lower()
+        for marker in ["can you browse", "can you search the web", "internet access", "web search"]
+    )
 
 
 def _looks_complex_research_task(text: str) -> bool:

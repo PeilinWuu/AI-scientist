@@ -20,11 +20,11 @@ class AutoQwenProvider(LLMProvider):
         self.actual_transport = "auto"
         self._last_provider: LLMProvider | None = None
 
-    def generate(self, system_prompt: str, user_prompt: str) -> str:
+    def generate(self, system_prompt: str, user_prompt: str, **kwargs) -> str:
         errors: list[str] = []
         try:
             provider = QwenProvider()
-            text = provider.generate(system_prompt, user_prompt)
+            text = provider.generate(system_prompt, user_prompt, **kwargs)
             self.actual_transport = "openai_sdk"
             self._last_provider = provider
             return text
@@ -32,7 +32,7 @@ class AutoQwenProvider(LLMProvider):
             errors.append(f"openai_sdk: {type(exc).__name__}: {exc}")
 
         try:
-            text = self._generate_with_requests(system_prompt, user_prompt)
+            text = self._generate_with_requests(system_prompt, user_prompt, **kwargs)
             self.actual_transport = "requests"
             self._last_provider = None
             return text
@@ -41,7 +41,7 @@ class AutoQwenProvider(LLMProvider):
 
         try:
             provider = CurlQwenProvider()
-            text = provider.generate(system_prompt, user_prompt)
+            text = provider.generate(system_prompt, user_prompt, **kwargs)
             self.actual_transport = "curl"
             self._last_provider = provider
             return text
@@ -61,19 +61,35 @@ class AutoQwenProvider(LLMProvider):
             "is_mock": False,
         }
 
-    def _generate_with_requests(self, system_prompt: str, user_prompt: str) -> str:
+    def _generate_with_requests(self, system_prompt: str, user_prompt: str, **kwargs) -> str:
         if not settings.dashscope_api_key:
             raise ValueError("DASHSCOPE_API_KEY is required when LLM_PROVIDER=qwen.")
+        body = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            "temperature": 0.2,
+        }
+        if kwargs.get("enable_search"):
+            body["enable_search"] = True
+            search_options = dict(kwargs.get("search_options") or {})
+            if settings.qwen_search_strategy and "search_strategy" not in search_options:
+                search_options["search_strategy"] = settings.qwen_search_strategy
+            if "forced_search" not in search_options:
+                search_options["forced_search"] = True
+            elif settings.qwen_search_force:
+                search_options["forced_search"] = True
+            if settings.qwen_search_freshness is not None and "freshness" not in search_options:
+                search_options["freshness"] = settings.qwen_search_freshness
+            if settings.qwen_search_assigned_sites and "assigned_site_list" not in search_options:
+                search_options["assigned_site_list"] = settings.qwen_search_assigned_sites
+            if search_options:
+                body["search_options"] = search_options
         response = requests.post(
             f"{self.base_url}/chat/completions",
-            json={
-                "model": self.model,
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-                "temperature": 0.2,
-            },
+            json=body,
             headers={
                 "Authorization": f"Bearer {settings.dashscope_api_key}",
                 "Content-Type": "application/json",
@@ -127,6 +143,8 @@ def get_llm_status() -> dict:
             "llm_base_url": metadata.get("base_url", settings.llm_base_url),
             "mock_mode": bool(metadata.get("is_mock", True)),
             "qwen_require_real": settings.qwen_require_real,
+            "qwen_enable_search": settings.qwen_enable_search,
+            "qwen_search_strategy": settings.qwen_search_strategy,
             "status_error": None,
         }
     except Exception as exc:  # noqa: BLE001 - status should explain configuration errors.
@@ -137,5 +155,7 @@ def get_llm_status() -> dict:
             "llm_base_url": settings.llm_base_url,
             "mock_mode": settings.llm_provider != "qwen",
             "qwen_require_real": settings.qwen_require_real,
+            "qwen_enable_search": settings.qwen_enable_search,
+            "qwen_search_strategy": settings.qwen_search_strategy,
             "status_error": str(exc),
         }

@@ -51,7 +51,7 @@ class CurlQwenProvider(LLMProvider):
         self.debug_dir = Path(debug_dir)
         ensure_dir(self.debug_dir)
 
-    def generate(self, system_prompt: str, user_prompt: str) -> str:
+    def generate(self, system_prompt: str, user_prompt: str, **kwargs) -> str:
         """Call Qwen through curl and return choices[0].message.content."""
 
         body = {
@@ -62,6 +62,21 @@ class CurlQwenProvider(LLMProvider):
             ],
             "temperature": 0.2,
         }
+        if kwargs.get("enable_search"):
+            body["enable_search"] = True
+            search_options = dict(kwargs.get("search_options") or {})
+            if settings.qwen_search_strategy and "search_strategy" not in search_options:
+                search_options["search_strategy"] = settings.qwen_search_strategy
+            if "forced_search" not in search_options:
+                search_options["forced_search"] = True
+            elif settings.qwen_search_force:
+                search_options["forced_search"] = True
+            if settings.qwen_search_freshness is not None and "freshness" not in search_options:
+                search_options["freshness"] = settings.qwen_search_freshness
+            if settings.qwen_search_assigned_sites and "assigned_site_list" not in search_options:
+                search_options["assigned_site_list"] = settings.qwen_search_assigned_sites
+            if search_options:
+                body["search_options"] = search_options
         temp_path: str | None = None
         try:
             with tempfile.NamedTemporaryFile(

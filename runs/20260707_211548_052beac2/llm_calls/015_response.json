@@ -1,0 +1,13 @@
+{
+  "agent": "DialogueOrchestratorRepair",
+  "provider": "qwen",
+  "transport": "curl",
+  "model": "qwen-turbo",
+  "is_mock": false,
+  "raw_response": "{\n  \"assistant_message\": \"我无法直接访问互联网或外部数据源，因此无法提供实时的年份信息。不过，根据当前时间戳，今天是2026年7月7日，星期二。如果你有其他具体问题或需要帮助，请随时告诉我！\",\n  \"state_update\": {},\n  \"next_action\": \"generate_report\",\n  \"tool_call\": {}\n}",
+  "response_sha256": "4785e8160eeafc207f2cbf01a00d72d3760aa37a52e212d18262b6d12087820c",
+  "enable_search": false,
+  "search_options": {},
+  "search_trigger": "",
+  "timestamp": "2026-07-07T13:26:55.937080+00:00"
+}

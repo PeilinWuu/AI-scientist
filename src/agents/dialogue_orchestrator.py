@@ -19,7 +19,7 @@ from src.domain_knowledge import (
 )
 from src.llm import get_llm_provider
 from src.llm.base import LLMProvider
-from src.policies.tool_use_policy import decide_tool_permission
+from src.policies.tool_use_policy import decide_tool_permission, resolve_user_controlled_search
 from src.skills import READABLE_RESPONSE_SKILL, TOOL_POLICY_SKILL, get_skill_prompt
 from src.state.conversation_state import ConversationState
 from src.tools import get_default_tools
@@ -55,6 +55,12 @@ class DialogueOrchestrator:
         self.domain_principles = load_domain_principles()
         self.principle_selector = PrincipleSelector(self.domain_principles)
         self._latest_selected_principles: list[SelectedPrinciple] = []
+        self._latest_qwen_search: dict[str, Any] = {
+            "enable_search": False,
+            "search_options": {},
+            "search_trigger": "",
+            "reason": "No search decision yet.",
+        }
         self._latest_tool_permission: dict[str, Any] = {
             "allowed": False,
             "requires_confirmation": False,
@@ -71,6 +77,12 @@ class DialogueOrchestrator:
             "requires_confirmation": False,
             "reason": "No tool call proposed.",
             "user_facing_message": "",
+        }
+        self._latest_qwen_search = {
+            "enable_search": False,
+            "search_options": {},
+            "search_trigger": "",
+            "reason": "No search decision yet.",
         }
         self.state.append_message("user", message)
         router_result = self.intent_router.classify(message, self._state_snapshot())
@@ -102,6 +114,8 @@ class DialogueOrchestrator:
 
         self._refresh_audit_counts()
         self._record_decision_trace(message, tool_calls_before)
+        if self.state.web_search_mode == "this_turn":
+            self.state.web_search_mode = "off"
         self.state.save()
         return self.state
 
@@ -149,10 +163,32 @@ class DialogueOrchestrator:
                 "timestamp": _timestamp(),
             }
         )
+        search_permission = resolve_user_controlled_search(
+            web_search_mode=self.state.web_search_mode,
+            user_message=user_message,
+        )
+        self._latest_qwen_search = {
+            "enable_search": bool(search_permission.get("enable_search")),
+            "search_options": dict(search_permission.get("search_options") or {}),
+            "search_trigger": str(search_permission.get("search_trigger") or ""),
+            "reason": str(search_permission.get("reason") or ""),
+            "provider": metadata.get("provider"),
+        }
+        self.state.qwen_web_search_enabled = settings.qwen_enable_search
+        self.state.last_user_search_choice = self.state.web_search_mode
+        self.state.last_qwen_search_used = bool(self._latest_qwen_search["enable_search"])
+        self.state.last_search_trigger = self._latest_qwen_search["search_trigger"]
+        self.state.last_search_options = self._latest_qwen_search["search_options"]
         system_prompt = self._system_prompt(intent, domain_context)
         user_prompt = self._user_prompt(user_message, phase, intent)
-        raw = self._record_llm_call(system_prompt, user_prompt, agent="DialogueOrchestrator")
+        raw = self._record_llm_call(
+            system_prompt,
+            user_prompt,
+            agent="DialogueOrchestrator",
+            llm_call_options=self._latest_qwen_search,
+        )
         decision = self._parse_or_repair_decision(raw, user_message, phase, intent)
+        decision["llm_call_options"] = self._latest_qwen_search
         return self._normalize_decision(decision)
 
     def _parse_or_repair_decision(
@@ -275,9 +311,20 @@ with problem analysis and next-step recommendations. The latest user message has
             f"current_state={json.dumps(self._state_snapshot(), ensure_ascii=False)}"
         )
 
-    def _record_llm_call(self, system_prompt: str, user_prompt: str, agent: str) -> str:
+    def _record_llm_call(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        agent: str,
+        llm_call_options: dict[str, Any] | None = None,
+    ) -> str:
         index = self._next_index(self.llm_calls_dir, "*_request.json")
         metadata = self.llm.metadata()
+        llm_call_options = llm_call_options or {
+            "enable_search": False,
+            "search_options": {},
+            "search_trigger": "",
+        }
         prompt = f"SYSTEM:\n{system_prompt}\n\nUSER:\n{user_prompt}"
         write_json(
             self.llm_calls_dir / f"{index:03d}_request.json",
@@ -289,10 +336,19 @@ with problem analysis and next-step recommendations. The latest user message has
                 "is_mock": bool(metadata.get("is_mock", True)),
                 "prompt": prompt,
                 "prompt_sha256": _hash(prompt),
+                "enable_search": bool(llm_call_options.get("enable_search")),
+                "search_options": dict(llm_call_options.get("search_options") or {}),
+                "search_trigger": str(llm_call_options.get("search_trigger") or ""),
                 "timestamp": _timestamp(),
             },
         )
-        raw = self.llm.generate(system_prompt, user_prompt) or ""
+        raw = self.llm.generate(
+            system_prompt,
+            user_prompt,
+            enable_search=bool(llm_call_options.get("enable_search")),
+            search_options=dict(llm_call_options.get("search_options") or {}),
+            search_trigger=str(llm_call_options.get("search_trigger") or ""),
+        ) or ""
         if settings.qwen_require_real and not raw.strip():
             raise RuntimeError("Qwen returned an empty dialogue response.")
         write_json(
@@ -305,6 +361,9 @@ with problem analysis and next-step recommendations. The latest user message has
                 "is_mock": bool(metadata.get("is_mock", True)),
                 "raw_response": raw,
                 "response_sha256": _hash(raw),
+                "enable_search": bool(llm_call_options.get("enable_search")),
+                "search_options": dict(llm_call_options.get("search_options") or {}),
+                "search_trigger": str(llm_call_options.get("search_trigger") or ""),
                 "timestamp": _timestamp(),
             },
         )
@@ -380,6 +439,7 @@ with problem analysis and next-step recommendations. The latest user message has
                 tables=composed.get("tables", []),
                 figures=composed.get("figures", []),
                 suggested_actions=composed.get("suggested_actions", []),
+                search_used=bool(composed.get("search_used")),
                 raw_debug=composed.get("raw_debug", {}),
                 intent=self.state.current_intent,
                 skill=self.state.current_skill,
@@ -575,6 +635,7 @@ with problem analysis and next-step recommendations. The latest user message has
             "detected_intent": self.state.current_intent,
             "selected_skill": self.state.current_skill,
             "tool_permission": self._latest_tool_permission,
+            "qwen_search": self._latest_qwen_search,
             "whether_tool_called": whether_tool_called,
             "assistant_message": assistant_message,
             "reasoning_summary": (
@@ -600,6 +661,10 @@ with problem analysis and next-step recommendations. The latest user message has
             "llm_model": self.llm.metadata().get("model"),
             "llm_base_url": self.llm.metadata().get("base_url"),
             "is_mock": bool(self.llm.metadata().get("is_mock", True)),
+            "qwen_web_search_enabled": settings.qwen_enable_search,
+            "last_qwen_search_used": self.state.last_qwen_search_used,
+            "last_search_trigger": self.state.last_search_trigger,
+            "last_search_options": self.state.last_search_options,
         }
         self._write_current_report()
 
@@ -656,6 +721,10 @@ with problem analysis and next-step recommendations. The latest user message has
             "result_analysis": "result_analysis_skill",
             "visualization_request": "visualization_skill",
             "report_generation": "report_skill",
+            "web_research": "research_consultation_skill",
+            "literature_search": "research_consultation_skill",
+            "documentation_lookup": "research_consultation_skill",
+            "current_info_lookup": "research_consultation_skill",
         }
         return mapping.get(intent, "base_dialogue_skill")
 
