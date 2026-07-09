@@ -250,25 +250,3 @@ if effective_user_message:
             if show_developer_debug:
                 st.exception(exc)
 
-st.divider()
-st.subheader("Quick Workflow")
-quick_goal = st.text_input(
-    "One-click 3-round goal",
-    value="Optimize soft swimmer efficiency while keeping energy cost and unstable motion constrained.",
-)
-if st.button("Run 3 Qwen-guided rounds"):
-    orchestrator = DialogueOrchestrator(state)
-    web_search_mode = st.session_state.get("web_search_mode", "off")
-    state.web_search_mode = web_search_mode
-    with st.spinner("Running three Qwen-guided dialogue/tool rounds..."):
-        try:
-            state = orchestrator.run_three_rounds(quick_goal)
-            st.session_state.conversation_state = state
-            if web_search_mode == "this_turn":
-                st.session_state.web_search_mode = "off"
-                st.session_state.reset_web_search_mode_control = True
-            st.rerun()
-        except Exception as exc:  # noqa: BLE001
-            st.error("前端运行出错，请查看调试信息。")
-            if show_developer_debug:
-                st.exception(exc)

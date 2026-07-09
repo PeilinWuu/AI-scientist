@@ -1,0 +1,13 @@
+{
+  "agent": "DialogueOrchestratorRepair",
+  "provider": "qwen",
+  "transport": "curl",
+  "model": "qwen-turbo",
+  "is_mock": false,
+  "raw_response": "{\n  \"assistant_message\": \"“罗罗”在不同的语境中有不同的含义。根据你的问题，如果是指“罗罗”作为一个地名，它可能指的是中国四川省西昌地区及大凉山一带的古代名称“罗罗斯”。元代在此设立了“罗罗斯宣慰司”，用于管理该地区。此外，“罗罗”也可能是彝族的旧称，彝语中“罗”意为虎，“罗罗”是叠称，自称为“虎族”。如果你是在其他上下文中提到“罗罗”，请提供更多背景信息，以便我更准确地回答。\",\n  \"state_update\": {},\n  \"next_action\": \"ask_clarification\",\n  \"tool_call\": {}\n}",
+  "response_sha256": "279b4ddbd75cd1f12969532a7a8efe765efd275f6bddab1156364c2d98a6e16c",
+  "enable_search": false,
+  "search_options": {},
+  "search_trigger": "",
+  "timestamp": "2026-07-08T11:55:48.013924+00:00"
+}

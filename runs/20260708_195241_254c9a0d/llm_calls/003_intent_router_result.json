@@ -1,0 +1,8 @@
+{
+  "intent": "web_research",
+  "qwen_intent": "web_research",
+  "confidence": 0.9,
+  "reason": "The user is asking for current information about the weather, which falls under the 'web_research' intent as it involves seeking real-time or up-to-date data from online sources.",
+  "rule_corrected": false,
+  "timestamp": "2026-07-08T11:54:12.413854+00:00"
+}

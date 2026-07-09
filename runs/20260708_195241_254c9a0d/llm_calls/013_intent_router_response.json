@@ -1,0 +1,10 @@
+{
+  "agent": "IntentRouter",
+  "provider": "qwen",
+  "transport": "curl",
+  "model": "qwen-turbo",
+  "is_mock": false,
+  "raw_response": "{\n  \"intent\": \"current_info_lookup\",\n  \"confidence\": 0.95,\n  \"reason\": \"The user is asking for the current weather in Hefei, which is a request for up-to-date information. This matches the 'current_info_lookup' intent.\"\n}",
+  "response_sha256": "822f60356a541740371e456afc1b88e9b48570f903a90fdd462a3fcf9f4191e7",
+  "timestamp": "2026-07-08T11:56:33.086156+00:00"
+}

@@ -121,15 +121,6 @@ class DialogueOrchestrator:
         self.state.save()
         return self.state
 
-    def run_three_rounds(self, initial_goal: str) -> ConversationState:
-        """Convenience workflow with explicit execution authorization."""
-
-        self.handle_user_message(initial_goal)
-        self.handle_user_message("请运行一次实验，测试你建议的参数。")
-        for _ in range(2):
-            self.handle_user_message("请根据刚才结果继续下一轮实验。")
-        return self.state
-
     def _set_intent_state(self, intent: str, router_result: dict[str, Any]) -> None:
         self.state.current_intent = intent
         self.state.current_skill = self._skill_name_for_intent(intent)

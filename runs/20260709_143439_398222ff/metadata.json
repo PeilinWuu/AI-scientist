@@ -1,0 +1,51 @@
+{
+  "llm_provider": "qwen",
+  "llm_transport": "curl",
+  "llm_model": "qwen-turbo",
+  "llm_base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+  "is_mock": false,
+  "qwen_web_search_enabled": true,
+  "last_qwen_search_used": false,
+  "last_search_trigger": "user_search_off",
+  "last_search_options": {},
+  "total_llm_calls": 3,
+  "total_tool_calls": 0,
+  "current_intent": "casual_chat",
+  "current_skill": "base_dialogue_skill",
+  "tool_execution_allowed": false,
+  "last_tool_permission": {
+    "allowed": false,
+    "requires_confirmation": false,
+    "reason": "No tool call proposed by the selected skill.",
+    "user_facing_message": ""
+  },
+  "last_decision_trace": {
+    "timestamp": "2026-07-09T06:34:50.664240+00:00",
+    "user_message": "你好",
+    "detected_intent": "casual_chat",
+    "selected_skill": "base_dialogue_skill",
+    "tool_permission": {
+      "allowed": false,
+      "requires_confirmation": false,
+      "reason": "No tool call proposed by the selected skill.",
+      "user_facing_message": ""
+    },
+    "qwen_search": {
+      "enable_search": false,
+      "search_options": {},
+      "search_trigger": "user_search_off",
+      "reason": "User search mode is off.",
+      "provider": "qwen"
+    },
+    "whether_tool_called": false,
+    "assistant_message": "你好！有什么我可以帮助你的吗？如果你有任何关于流体模拟、优化或者实验设计的问题，随时告诉我！",
+    "reasoning_summary": "intent=casual_chat; skill=base_dialogue_skill; tool_allowed=False; tool_called=False",
+    "latest_llm_response_excerpt": "{\n  \"assistant_message\": \"你好！有什么我可以帮助你的吗？如果你有任何关于流体模拟、优化或者实验设计的问题，随时告诉我！\",\n  \"state_update\": {},\n  \"next_action\": \"ask_clarification\",\n  \"tool_call\": {}\n}",
+    "selected_principles": []
+  },
+  "llm_calls_path": "runs\\20260709_143439_398222ff\\llm_calls",
+  "tool_calls_path": "runs\\20260709_143439_398222ff\\tool_calls",
+  "last_llm_response_excerpt": "{\n  \"assistant_message\": \"你好！有什么我可以帮助你的吗？如果你有任何关于流体模拟、优化或者实验设计的问题，随时告诉我！\",\n  \"state_update\": {},\n  \"next_action\": \"ask_clarification\",\n  \"tool_call\": {}\n}",
+  "web_search_mode": "off",
+  "last_user_search_choice": "off"
+}
