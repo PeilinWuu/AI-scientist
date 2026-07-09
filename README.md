@@ -1,33 +1,21 @@
 # Pure Qwen Shell
 
-This repository currently runs in **Pure Qwen Shell** mode.
+This project is a clean **Pure Qwen Shell**.
 
-The active frontend and backend are intentionally minimal. They pass visible user/assistant chat messages to Qwen through the Alibaba Cloud Model Studio / Bailian OpenAI-compatible API.
+It provides a small FastAPI backend and a Streamlit chat UI. The backend sends only visible `user` and `assistant` chat messages to Qwen through the Alibaba Cloud Model Studio / Bailian OpenAI-compatible API.
 
-## What Pure Mode Does Not Do
+## What It Does Not Do
 
 Pure Qwen Shell does not:
 
 - inject a system prompt;
-- load skills;
+- load skill modules;
 - call tools;
 - enable web search;
-- classify intent;
-- run RAG or domain-knowledge injection;
-- rewrite or repair model responses;
-- run experiment loops;
-- call the legacy FlowScientist agent chain.
-
-The legacy directories are kept for future reference, but the current main entry points do not import or call them:
-
-- `src/agents/`
-- `src/skills/`
-- `src/tools/`
-- `src/domain_knowledge/`
-- `src/workflow/`
-- `src/policies/`
-
-If a future version reintroduces a `skill_agent` or experiment-planning mode, it should be added as a separate mode and must not contaminate `pure_qwen` mode.
+- run RAG;
+- classify user intent;
+- plan experiments;
+- rewrite or repair model responses.
 
 ## Configuration
 
@@ -41,7 +29,7 @@ LLM_TIMEOUT=60
 RUNS_DIR=runs
 ```
 
-`DASHSCOPE_API_KEY` is required for `/api/chat` and `/api/qwen_ping`. The app never stores or prints the key.
+`DASHSCOPE_API_KEY` is required for `/api/chat` and `/api/qwen_ping`. The key is never printed by the app.
 
 ## Install
 
@@ -55,29 +43,7 @@ pip install -r requirements.txt
 python -m uvicorn src.main_api:app --reload --host 127.0.0.1 --port 8000
 ```
 
-After changing `src/pure_qwen_client.py` or `.env`, restart uvicorn so the running backend uses the new code and environment.
-
-Useful endpoints:
-
-- API docs: <http://localhost:8000/docs>
-- Health: <http://localhost:8000/health>
-- Qwen ping: `GET /api/qwen_ping`
-- Payload preview: `POST /api/debug_payload`
-- Chat: `POST /api/chat`
-
-## Qwen Connectivity
-
-`curl.exe` and the standalone `test_qwen_openai.py` script have verified that Qwen works with:
-
-```python
-OpenAI(
-    api_key=api_key,
-    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
-    http_client=httpx.Client(timeout=60, trust_env=False),
-)
-```
-
-`PureQwenClient` uses the same transport style. If `GET /api/qwen_ping` returns `status=ok`, then `/api/chat` should use the same Qwen path and should also succeed.
+Restart uvicorn after changing `.env` or `src/pure_qwen_client.py`.
 
 ## Run Frontend
 
@@ -85,24 +51,16 @@ OpenAI(
 streamlit run app_streamlit.py
 ```
 
-The Streamlit app only sends this payload shape:
+## Verify
 
-```json
-{
-  "message": "user input",
-  "history": [
-    {"role": "user", "content": "previous user message"},
-    {"role": "assistant", "content": "previous assistant reply"}
-  ],
-  "model": "qwen-turbo"
-}
+Open:
+
+```text
+http://localhost:8000/health
+http://localhost:8000/api/qwen_ping
 ```
 
-It does not send `system_prompt`, `skill`, `agent_type`, `task_type`, `use_web_search`, `tools_enabled`, `temperature`, `top_p`, or output-format instructions.
-
-## Verify There Is No Hidden Prompt
-
-Call:
+Payload preview:
 
 ```bash
 curl -X POST http://localhost:8000/api/debug_payload ^
@@ -110,7 +68,7 @@ curl -X POST http://localhost:8000/api/debug_payload ^
   -d "{\"message\":\"你是谁？\",\"history\":[],\"model\":\"qwen-turbo\"}"
 ```
 
-Expected response shape:
+Expected response:
 
 ```json
 {
@@ -122,18 +80,37 @@ Expected response shape:
 }
 ```
 
-There should be no `system` role and no hidden FlowScientist, soft-swimmer, experiment-planning, strict-JSON, tool, or skill prompt unless the user typed those words.
+Chat:
+
+```bash
+curl -X POST http://localhost:8000/api/chat ^
+  -H "Content-Type: application/json" ^
+  -d "{\"message\":\"你好\",\"history\":[],\"model\":\"qwen-turbo\"}"
+```
+
+## Qwen Transport
+
+`PureQwenClient` uses the same style as the standalone successful Qwen test:
+
+```python
+OpenAI(
+    api_key=api_key,
+    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+    http_client=httpx.Client(timeout=60, trust_env=False),
+)
+```
+
+The Qwen call sends only:
+
+```python
+client.chat.completions.create(
+    model=resolved_model,
+    messages=messages,
+)
+```
 
 ## Tests
 
 ```bash
 pytest -q
 ```
-
-Pure mode tests live in:
-
-```text
-tests/test_pure_qwen_payload.py
-```
-
-They verify that payload construction stays free of hidden system prompts and legacy agent imports.

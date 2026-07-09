@@ -10,7 +10,7 @@ from src.pure_schemas import DebugPayloadResponse, PureChatRequest, PureChatResp
 
 app = FastAPI(
     title="Pure Qwen Shell API",
-    description="A minimal Qwen pass-through API with no hidden agent, tools, search, or system prompt.",
+    description="A minimal Qwen pass-through API with no hidden agent, search, or system prompt.",
     version="0.1.0",
 )
 

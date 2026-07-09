@@ -1,4 +1,0 @@
-iteration,strategy,best_candidate_id,best_efficiency,best_mean_speed,best_energy_cost,best_stability_score,feedback
-1,"Structured first pass over balanced, speed, flexibility, and stability regimes.",iter1_cand1,2.51211,0.86121,0.32601,0.95061,continue local search around the best measured candidate
-2,Feedback-aware local search around the best feasible design. Main adjustment: continue local search around the best measured candidate.,iter2_cand1,2.35629,0.80117,0.32147,0.93968,broaden local search because the last move did not improve the target
-3,Feedback-aware local search around the best feasible design. Main adjustment: broaden local search because the last move did not improve the target.,iter3_cand4,2.13708,0.74287,0.32932,0.9465,increase frequency or amplitude to recover propulsion speed

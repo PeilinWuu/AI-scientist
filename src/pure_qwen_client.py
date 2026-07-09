@@ -19,7 +19,7 @@ DEFAULT_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 
 
 class PureQwenClient:
-    """Call Qwen without hidden system prompts, tools, search, or response shaping."""
+    """Call Qwen without hidden system prompts, search, or response shaping."""
 
     def __init__(self) -> None:
         api_key = os.getenv("DASHSCOPE_API_KEY", "")

@@ -1,9 +1,0 @@
-﻿{
-  "model": "qwen-turbo",
-  "messages": [
-    {
-      "role": "user",
-      "content": "ping"
-    }
-  ]
-}
