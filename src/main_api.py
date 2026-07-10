@@ -6,11 +6,13 @@ from fastapi import FastAPI, HTTPException
 
 from src.pure_qwen_client import PureQwenClient, pure_qwen_metadata
 from src.pure_schemas import DebugPayloadResponse, PureChatRequest, PureChatResponse
+from src.search_qwen_client import SearchQwenClient, build_search_messages, search_extra_body, search_qwen_metadata
+from src.search_schemas import SearchChatRequest, SearchChatResponse, SearchDebugPayloadResponse
 
 
 app = FastAPI(
     title="Pure Qwen Shell API",
-    description="A minimal Qwen pass-through API with no hidden agent, search, or system prompt.",
+    description="A minimal Qwen pass-through API with pure chat and optional native Qwen search.",
     version="0.1.0",
 )
 
@@ -55,6 +57,51 @@ def qwen_ping() -> dict:
         }
 
 
+@app.get("/api/search_ping")
+def search_ping() -> dict:
+    """Direct Qwen search-mode connectivity check."""
+
+    try:
+        client = SearchQwenClient()
+        model = client.model
+        result = client.chat_search(
+            messages=client.build_messages("请联网搜索合肥市今天的天气，并说明信息是否来自实时搜索。", []),
+            model=model,
+        )
+        metadata = search_qwen_metadata()
+        return {
+            "status": "ok",
+            "mode": "qwen_search",
+            "model": model,
+            "search_enabled": True,
+            "search_forced": True,
+            "search_strategy": metadata["search_strategy"],
+            "search_method": metadata["search_method"],
+            "search_effective": result["search_effective"],
+            "source_metadata_available": result["source_metadata_available"],
+            "sources": result["sources"],
+            "warning": result["warning"],
+            "request_id": result["request_id"],
+            "reply": result["reply"],
+        }
+    except Exception as exc:  # noqa: BLE001 - endpoint is diagnostic by design.
+        model = str(search_qwen_metadata()["model"])
+        return {
+            "status": "error",
+            "mode": "qwen_search",
+            "model": model,
+            "search_enabled": True,
+            "search_forced": True,
+            "search_strategy": search_qwen_metadata()["search_strategy"],
+            "search_method": search_qwen_metadata()["search_method"],
+            **_error_payload(exc),
+            "hint": (
+                "Search mode failed. Check whether the selected model supports forced enable_search, "
+                "the region/base_url, and account permissions."
+            ),
+        }
+
+
 @app.post("/api/chat", response_model=PureChatResponse)
 def chat(request: PureChatRequest) -> PureChatResponse:
     """Send a pure user/assistant message list to Qwen."""
@@ -78,12 +125,62 @@ def chat(request: PureChatRequest) -> PureChatResponse:
     return PureChatResponse(reply=reply, model=model)
 
 
+@app.post("/api/debug_search_payload", response_model=SearchDebugPayloadResponse)
+def debug_search_payload(request: SearchChatRequest) -> SearchDebugPayloadResponse:
+    """Return the exact search-mode messages and extra_body without calling Qwen."""
+
+    messages = _build_search_messages_without_client(request)
+    return SearchDebugPayloadResponse(
+        messages=messages,
+        model=request.model or str(search_qwen_metadata()["model"]),
+        extra_body=search_extra_body(),
+    )
+
+
+@app.post("/api/chat_search", response_model=SearchChatResponse)
+def chat_search(request: SearchChatRequest) -> SearchChatResponse:
+    """Send a user/assistant message list to Qwen with search enabled."""
+
+    try:
+        client = SearchQwenClient()
+        messages = client.build_messages(request.message, request.history)
+        model = request.model or client.model
+        result = client.chat_search(messages, model=model)
+    except Exception as exc:  # noqa: BLE001 - API should return an actionable error.
+        detail = {
+            **_error_payload(exc),
+            "hint": (
+                "Search mode failed. Check whether the selected model supports forced enable_search, "
+                "the region/base_url, and account permissions."
+            ),
+        }
+        status_code = 500 if isinstance(exc, ValueError) else 502
+        raise HTTPException(status_code=status_code, detail=detail) from exc
+    metadata = search_qwen_metadata()
+    return SearchChatResponse(
+        reply=str(result["reply"]),
+        model=model,
+        search_forced=True,
+        search_strategy=str(metadata["search_strategy"]),
+        search_method=str(metadata["search_method"]),
+        search_effective=result["search_effective"],  # type: ignore[arg-type]
+        source_metadata_available=bool(result["source_metadata_available"]),
+        sources=result["sources"],  # type: ignore[arg-type]
+        warning=result["warning"],  # type: ignore[arg-type]
+        request_id=result["request_id"],  # type: ignore[arg-type]
+    )
+
+
 def _build_messages_without_client(request: PureChatRequest) -> list[dict[str, str]]:
     return [
         {"role": item.role, "content": item.content}
         for item in request.history
         if item.role in {"user", "assistant"}
     ] + [{"role": "user", "content": request.message}]
+
+
+def _build_search_messages_without_client(request: SearchChatRequest) -> list[dict[str, str]]:
+    return build_search_messages(request.message, request.history)
 
 
 def _error_payload(exc: Exception) -> dict[str, str]:
