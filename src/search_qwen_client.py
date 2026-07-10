@@ -1,9 +1,8 @@
-"""OpenAI-compatible Qwen client for optional search mode."""
+"""Qwen Responses API client with built-in web tools."""
 
 from __future__ import annotations
 
 import os
-import re
 from pathlib import Path
 from typing import Any
 
@@ -11,103 +10,32 @@ import httpx
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from src.search_schemas import ChatMessage
-
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 load_dotenv(ROOT_DIR / ".env")
 
 DEFAULT_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
-SEARCH_SYSTEM_MESSAGE = (
-    "当前应用层已经为本次请求启用了互联网搜索。请基于搜索结果回答用户问题。"
-    "不要声称自己无法联网、无法实时搜索或只能根据知识库回答。"
-    "如果搜索结果不足或未返回来源，请明确说明搜索结果不足，而不是编造实时信息。"
-)
-SEARCH_METHOD = "chat_completions_enable_search_forced"
-SEARCH_FAILURE_PHRASES = [
-    "无法联网",
-    "不能联网",
-    "无法实时搜索",
-    "无法实时获取",
-    "无法直接访问互联网",
-    "根据我现有的知识库",
-    "根据我的知识库",
-    "无法访问互联网",
-    "不能访问互联网",
+SEARCH_TOOLS = [
+    {"type": "web_search"},
+    {"type": "web_extractor"},
 ]
 
 
-def search_strategy() -> str:
-    """Return the configured Qwen search strategy."""
-
-    strategy = os.getenv("QWEN_SEARCH_STRATEGY", "turbo").strip() or "turbo"
-    return strategy if strategy in {"turbo", "max"} else "turbo"
-
-
-def search_extra_body() -> dict:
-    """Return the search extra_body sent to Qwen."""
-
-    return {
-        "enable_search": True,
-        "search_options": {
-            "forced_search": True,
-            "enable_source": True,
-            "enable_citation": True,
-            "citation_format": "[<number>]",
-            "search_strategy": search_strategy(),
-        },
-    }
-
-
-def build_search_messages(message: str, history: list[ChatMessage]) -> list[dict[str, str]]:
-    """Build search-mode messages with a minimal search-only system instruction."""
-
-    messages: list[dict[str, str]] = [{"role": "system", "content": SEARCH_SYSTEM_MESSAGE}]
-    messages.extend(
-        {"role": item.role, "content": item.content}
-        for item in history
-        if item.role in {"user", "assistant"}
-    )
-    messages.append({"role": "user", "content": message})
-    return messages
-
-
-def detect_search_effective(reply: str, sources: list[dict[str, object]]) -> tuple[bool | None, str | None]:
-    """Judge whether forced search appears effective without trusting model self-claims."""
-
-    if sources:
-        return True, None
-    if _contains_failure_phrase(reply):
-        return False, "Search was requested, but the response indicates that web search was not effectively used."
-    return None, "Search was requested, but no source metadata was returned. The answer may not be verifiable."
-
-
-def remove_bad_leading_disclaimer(reply: str, sources: list[dict[str, object]]) -> str:
-    """Remove contradictory leading disclaimers only when real source metadata exists."""
-
-    if not sources:
-        return reply
-    text = reply.lstrip()
-    for _ in range(3):
-        stripped = _strip_one_bad_leading_sentence(text)
-        if stripped == text:
-            break
-        text = stripped.lstrip()
-    return text or reply
-
-
 class SearchQwenClient:
-    """Call Qwen with native search enabled, without adding hidden prompts."""
+    """Call Qwen's Responses API with built-in web tools."""
 
     def __init__(self) -> None:
         api_key = os.getenv("DASHSCOPE_API_KEY", "")
         if not api_key:
-            raise ValueError("DASHSCOPE_API_KEY is missing. Please set it in .env.")
+            raise RuntimeError("DASHSCOPE_API_KEY is missing. Please set it in .env.")
 
-        self.api_key = api_key
-        self.model = os.getenv("LLM_SEARCH_MODEL", "qwen-plus-latest")
-        self.base_url = os.getenv("LLM_BASE_URL", DEFAULT_BASE_URL).rstrip("/")
-        self.timeout = float(os.getenv("LLM_TIMEOUT", "60"))
+        self.default_model = os.getenv("LLM_SEARCH_MODEL", "qwen3.7-plus")
+        self.model = self.default_model
+        self.base_url = (
+            os.getenv("RESPONSES_BASE_URL")
+            or os.getenv("LLM_BASE_URL", DEFAULT_BASE_URL)
+        ).rstrip("/")
+        self.timeout = float(os.getenv("LLM_TIMEOUT", "120"))
         self.http_client = httpx.Client(
             timeout=self.timeout,
             trust_env=False,
@@ -118,147 +46,173 @@ class SearchQwenClient:
             http_client=self.http_client,
         )
 
-    def build_messages(self, message: str, history: list[ChatMessage]) -> list[dict[str, str]]:
-        """Build the exact Qwen search-mode message list."""
+    def search(
+        self,
+        message: str,
+        model: str | None = None,
+        previous_response_id: str | None = None,
+    ) -> dict[str, object]:
+        """Send the current user text and optionally continue a Responses conversation."""
 
-        return build_search_messages(message, history)
+        resolved_model = model or self.default_model
+        kwargs: dict[str, object] = {
+            "model": resolved_model,
+            "input": message,
+            "tools": SEARCH_TOOLS,
+        }
+        if previous_response_id:
+            kwargs["previous_response_id"] = previous_response_id
 
-    def chat_search(self, messages: list[dict[str, str]], model: str | None = None) -> dict[str, object]:
-        """Send model, messages, and forced search settings to Qwen."""
+        response = self.client.responses.create(**kwargs)
+        return self.parse_response(response)
 
-        resolved_model = model or self.model
-        extra_body = search_extra_body()
-        response = self.client.chat.completions.create(
-            model=resolved_model,
-            messages=messages,
-            extra_body=extra_body,
-        )
-        raw_response = _to_plain_data(response)
-        reply = response.choices[0].message.content or ""
-        sources = extract_sources(raw_response)
-        cleaned_reply = remove_bad_leading_disclaimer(reply, sources)
-        search_effective, warning = detect_search_effective(cleaned_reply, sources)
+    def parse_response(self, response: Any) -> dict[str, object]:
+        """Separate final assistant text from citations and tool status."""
+
+        reply = extract_final_text(response)
+        if not reply:
+            raise RuntimeError("Qwen Responses API returned no final assistant output_text.")
+
+        sources = extract_sources(response)
+        tool_usage = extract_tool_usage(response)
         return {
-            "reply": cleaned_reply,
+            "reply": reply,
+            "response_id": _text_value(response, "id"),
+            "request_id": extract_request_id(response),
+            "search_used": tool_usage["web_search"] > 0 or bool(sources),
             "sources": sources,
-            "search_effective": search_effective,
-            "source_metadata_available": bool(sources),
-            "warning": warning,
-            "request_id": _extract_request_id(raw_response),
-            "raw_response": raw_response,
+            "tool_usage": tool_usage,
         }
 
 
-def search_qwen_metadata() -> dict[str, object]:
-    """Return public search-mode metadata without exposing secrets."""
+def extract_final_text(response: Any) -> str:
+    """Return only final assistant output text from a Responses API result."""
 
+    output_text = _value(response, "output_text")
+    if isinstance(output_text, str) and output_text.strip():
+        return output_text.strip()
+
+    texts: list[str] = []
+    for item in _items(_value(response, "output")):
+        if _value(item, "type") != "message":
+            continue
+        if _value(item, "role") not in (None, "assistant"):
+            continue
+        for content in _items(_value(item, "content")):
+            if _value(content, "type") != "output_text":
+                continue
+            text = _value(content, "text")
+            if isinstance(text, str) and text:
+                texts.append(text)
+    return "\n".join(texts).strip()
+
+
+def extract_sources(response: Any) -> list[dict[str, object]]:
+    """Extract explicit URL citations attached to assistant output text."""
+
+    sources: list[dict[str, object]] = []
+    seen: set[tuple[str, str]] = set()
+    for content in _assistant_output_text_items(response):
+        for annotation in _items(_value(content, "annotations")):
+            citation = _value(annotation, "url_citation") or annotation
+            url = _first_text(citation, ["url", "source_url", "link"])
+            title = _first_text(citation, ["title", "name"])
+            if not url:
+                continue
+            key = (url, title)
+            if key in seen:
+                continue
+            seen.add(key)
+            sources.append(
+                {
+                    "site_name": _first_text(citation, ["site_name", "site", "domain"]),
+                    "title": title,
+                    "url": url,
+                    "snippet": _first_text(citation, ["snippet", "summary"]),
+                    "index": len(sources) + 1,
+                }
+            )
+    return sources
+
+
+def extract_tool_usage(response: Any) -> dict[str, int]:
+    """Count built-in tool calls without exposing their intermediate payloads."""
+
+    counts = {"web_search": 0, "web_extractor": 0}
+    for item in _items(_value(response, "output")):
+        item_type = _value(item, "type")
+        if item_type == "web_search_call":
+            counts["web_search"] += 1
+        elif item_type == "web_extractor_call":
+            counts["web_extractor"] += 1
+
+    x_tools = _value(_value(response, "usage"), "x_tools")
+    for tool_name in counts:
+        provider_count = _value(_value(x_tools, tool_name), "count")
+        if isinstance(provider_count, int):
+            counts[tool_name] = max(counts[tool_name], provider_count)
+    return counts
+
+
+def extract_request_id(response: Any) -> str | None:
+    """Read an explicit provider request identifier when one is available."""
+
+    for name in ("request_id", "_request_id"):
+        value = _value(response, name)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    model_extra = _value(response, "model_extra")
+    value = _value(model_extra, "request_id")
+    return value.strip() if isinstance(value, str) and value.strip() else None
+
+
+def search_qwen_metadata() -> dict[str, object]:
+    """Return public Responses API configuration without secrets."""
+
+    base_url = os.getenv("RESPONSES_BASE_URL") or os.getenv("LLM_BASE_URL", DEFAULT_BASE_URL)
     return {
         "mode": "qwen_search",
-        "model": os.getenv("LLM_SEARCH_MODEL", "qwen-plus-latest"),
-        "base_url": os.getenv("LLM_BASE_URL", DEFAULT_BASE_URL).rstrip("/"),
+        "model": os.getenv("LLM_SEARCH_MODEL", "qwen3.7-plus"),
+        "base_url": base_url.rstrip("/"),
         "api_key_configured": bool(os.getenv("DASHSCOPE_API_KEY", "")),
-        "search_enabled": True,
-        "search_forced": True,
-        "search_strategy": search_strategy(),
-        "search_method": SEARCH_METHOD,
+        "search_method": "responses_api_builtin_tools",
+        "tools": [tool.copy() for tool in SEARCH_TOOLS],
     }
 
 
-def extract_sources(raw_response: Any) -> list[dict[str, object]]:
-    """Extract source metadata from known DashScope/OpenAI-compatible response fields."""
-
-    raw_sources: list[Any] = []
-    for key in ["search_info", "search_results", "citations", "references", "source", "sources"]:
-        raw_sources.extend(_find_values_by_key(raw_response, key))
-
-    normalized: list[dict[str, object]] = []
-    seen: set[tuple[str, str, str]] = set()
-    for item in raw_sources:
-        candidates = item if isinstance(item, list) else [item]
-        for candidate in candidates:
-            source = _normalize_source(candidate, len(normalized) + 1)
-            if source is None:
-                continue
-            dedupe_key = (
-                str(source.get("url", "")),
-                str(source.get("title", "")),
-                str(source.get("snippet", ""))[:80],
-            )
-            if dedupe_key in seen:
-                continue
-            seen.add(dedupe_key)
-            normalized.append(source)
-    return normalized
+def _assistant_output_text_items(response: Any) -> list[Any]:
+    items: list[Any] = []
+    for output_item in _items(_value(response, "output")):
+        if _value(output_item, "type") != "message":
+            continue
+        if _value(output_item, "role") not in (None, "assistant"):
+            continue
+        for content in _items(_value(output_item, "content")):
+            if _value(content, "type") == "output_text":
+                items.append(content)
+    return items
 
 
-def _normalize_source(item: Any, index: int) -> dict[str, object] | None:
-    if not isinstance(item, dict):
+def _value(data: Any, name: str) -> Any:
+    if data is None:
         return None
-    title = _first_text(item, ["title", "name", "text_title"])
-    url = _first_text(item, ["url", "link", "source_url", "href"])
-    snippet = _first_text(item, ["snippet", "summary", "content", "text", "description"])
-    site_name = _first_text(item, ["site_name", "site", "source", "hostname", "domain"])
-    if not any([title, url, snippet, site_name]):
-        return None
-    return {
-        "site_name": site_name,
-        "title": title,
-        "url": url,
-        "snippet": snippet,
-        "index": index,
-    }
-
-
-def _first_text(data: dict[str, Any], keys: list[str]) -> str:
-    for key in keys:
-        value = data.get(key)
-        if isinstance(value, str) and value.strip():
-            return value.strip()
-        if isinstance(value, (int, float)):
-            return str(value)
-    return ""
-
-
-def _find_values_by_key(data: Any, key: str) -> list[Any]:
-    values: list[Any] = []
     if isinstance(data, dict):
-        for item_key, item_value in data.items():
-            if item_key == key:
-                values.append(item_value)
-            values.extend(_find_values_by_key(item_value, key))
-    elif isinstance(data, list):
-        for item in data:
-            values.extend(_find_values_by_key(item, key))
-    return values
+        return data.get(name)
+    return getattr(data, name, None)
 
 
-def _to_plain_data(response: Any) -> dict[str, Any]:
-    if hasattr(response, "model_dump"):
-        return response.model_dump()
-    if hasattr(response, "dict"):
-        return response.dict()
-    return dict(response)
+def _text_value(data: Any, name: str) -> str | None:
+    value = _value(data, name)
+    return value.strip() if isinstance(value, str) and value.strip() else None
 
 
-def _extract_request_id(raw_response: dict[str, Any]) -> str | None:
-    for key in ["request_id", "requestId", "id"]:
-        value = raw_response.get(key)
+def _items(value: Any) -> list[Any]:
+    return list(value) if isinstance(value, (list, tuple)) else []
+
+
+def _first_text(data: Any, names: list[str]) -> str:
+    for name in names:
+        value = _value(data, name)
         if isinstance(value, str) and value.strip():
             return value.strip()
-    return None
-
-
-def _contains_failure_phrase(reply: str) -> bool:
-    return any(phrase in reply for phrase in SEARCH_FAILURE_PHRASES)
-
-
-def _strip_one_bad_leading_sentence(reply: str) -> str:
-    if not _contains_failure_phrase(reply[:120]):
-        return reply
-    match = re.match(r"^(.{0,160}?[。！？!?\n])", reply, flags=re.DOTALL)
-    if match and _contains_failure_phrase(match.group(1)):
-        return reply[match.end() :]
-    for phrase in SEARCH_FAILURE_PHRASES:
-        if reply.startswith(phrase):
-            return reply[len(phrase) :].lstrip("，,。:： \n")
-    return reply
+    return ""

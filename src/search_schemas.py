@@ -1,33 +1,22 @@
-"""Schemas for optional Qwen search mode."""
+"""Schemas for optional Qwen Responses API search mode."""
 
 from __future__ import annotations
-
-from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class ChatMessage(BaseModel):
-    """One visible chat message. Hidden/system/tool roles are intentionally forbidden."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    role: Literal["user", "assistant"]
-    content: str
-
-
 class SearchChatRequest(BaseModel):
-    """Request accepted by optional Qwen search endpoints."""
+    """One search turn, optionally linked to the preceding Responses result."""
 
     model_config = ConfigDict(extra="forbid")
 
     message: str
-    history: list[ChatMessage] = Field(default_factory=list)
     model: str | None = None
+    previous_response_id: str | None = None
 
 
 class SearchSource(BaseModel):
-    """One search source returned by the provider, if available."""
+    """One explicit source citation returned by the provider."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -38,31 +27,37 @@ class SearchSource(BaseModel):
     index: int
 
 
+class SearchToolUsage(BaseModel):
+    """Counts of built-in tools observed in the provider response."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    web_search: int = 0
+    web_extractor: int = 0
+
+
 class SearchChatResponse(BaseModel):
-    """Qwen search response."""
+    """Public search response with final text and separate audit metadata."""
 
     model_config = ConfigDict(extra="forbid")
 
     reply: str
     model: str
     mode: str = "qwen_search"
-    search_enabled: bool = True
-    search_forced: bool = True
-    search_strategy: str = "turbo"
-    search_method: str = "chat_completions_enable_search_forced"
-    search_effective: bool | None = None
-    source_metadata_available: bool = False
-    sources: list[SearchSource] = Field(default_factory=list)
-    warning: str | None = None
+    response_id: str | None = None
     request_id: str | None = None
+    search_used: bool
+    sources: list[SearchSource] = Field(default_factory=list)
+    tool_usage: SearchToolUsage = Field(default_factory=SearchToolUsage)
 
 
 class SearchDebugPayloadResponse(BaseModel):
-    """Payload preview for the exact search-mode request body additions."""
+    """Exact safe preview of a Responses API search request."""
 
     model_config = ConfigDict(extra="forbid")
 
-    messages: list[dict[str, str]]
     model: str
     mode: str = "qwen_search"
-    extra_body: dict
+    input: str
+    previous_response_id: str | None = None
+    tools: list[dict[str, str]]

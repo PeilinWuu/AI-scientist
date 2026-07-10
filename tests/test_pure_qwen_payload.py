@@ -1,8 +1,9 @@
-"""Tests for Pure Qwen Shell payload construction."""
+"""Regression tests for the isolated Pure Qwen and Responses search paths."""
 
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
@@ -11,8 +12,14 @@ from pydantic import ValidationError
 from src.main_api import app
 from src.pure_qwen_client import PureQwenClient
 from src.pure_schemas import ChatMessage
-from src.search_qwen_client import SearchQwenClient, detect_search_effective, extract_sources, search_extra_body
-from src.search_schemas import ChatMessage as SearchChatMessage
+from src.search_qwen_client import (
+    SEARCH_TOOLS,
+    SearchQwenClient,
+    extract_final_text,
+    extract_sources,
+    extract_tool_usage,
+)
+from src.search_schemas import SearchChatRequest
 
 
 def test_build_messages_has_no_system_role(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -61,34 +68,21 @@ def test_history_allows_only_user_and_assistant() -> None:
 
 def test_debug_payload_has_only_visible_messages() -> None:
     client = TestClient(app)
-
     response = client.post(
         "/api/debug_payload",
         json={"message": "你是谁？", "history": [], "model": "qwen-turbo"},
     )
 
     assert response.status_code == 200
-    payload = response.json()
-    assert payload["mode"] == "pure_qwen"
-    assert payload["model"] == "qwen-turbo"
-    assert payload["messages"] == [{"role": "user", "content": "你是谁？"}]
-
-    payload_text = str(payload["messages"])
-    forbidden_terms = [
-        "Flow" + "Scientist",
-        "soft" + "-swimmer",
-        "实验规划",
-        "strict JSON",
-        "to" + "ol",
-        "ski" + "ll",
-    ]
-    for forbidden in forbidden_terms:
-        assert forbidden not in payload_text
+    assert response.json() == {
+        "messages": [{"role": "user", "content": "你是谁？"}],
+        "model": "qwen-turbo",
+        "mode": "pure_qwen",
+    }
 
 
 def test_debug_payload_rejects_system_history() -> None:
     client = TestClient(app)
-
     response = client.post(
         "/api/debug_payload",
         json={
@@ -101,116 +95,164 @@ def test_debug_payload_rejects_system_history() -> None:
     assert response.status_code == 422
 
 
-def test_debug_search_payload_has_enable_search() -> None:
+def test_debug_search_payload_is_clean_responses_request() -> None:
     client = TestClient(app)
-
     response = client.post(
         "/api/debug_search_payload",
-        json={"message": "今天杭州天气怎么样？", "history": [], "model": "qwen-turbo"},
+        json={
+            "message": "今天杭州天气怎么样？",
+            "model": "qwen3.7-plus",
+            "previous_response_id": "resp_previous",
+        },
     )
 
     assert response.status_code == 200
-    payload = response.json()
-    assert payload["mode"] == "qwen_search"
-    assert payload["model"] == "qwen-turbo"
-    assert payload["messages"][0]["role"] == "system"
-    assert "互联网搜索" in payload["messages"][0]["content"]
-    assert payload["messages"][-1] == {"role": "user", "content": "今天杭州天气怎么样？"}
-    assert payload["extra_body"] == {
-        "enable_search": True,
-        "search_options": {
-            "forced_search": True,
-            "enable_source": True,
-            "enable_citation": True,
-            "citation_format": "[<number>]",
-            "search_strategy": "turbo",
-        },
+    assert response.json() == {
+        "model": "qwen3.7-plus",
+        "mode": "qwen_search",
+        "input": "今天杭州天气怎么样？",
+        "previous_response_id": "resp_previous",
+        "tools": SEARCH_TOOLS,
     }
 
 
-def test_search_history_allows_only_user_and_assistant() -> None:
+def test_search_request_rejects_visible_history() -> None:
     with pytest.raises(ValidationError):
-        SearchChatMessage(role="system", content="hidden")  # type: ignore[arg-type]
-    with pytest.raises(ValidationError):
-        SearchChatMessage(role="tool", content="hidden")  # type: ignore[arg-type]
+        SearchChatRequest(message="hello", history=[])  # type: ignore[call-arg]
 
 
-def test_search_client_build_messages_preserves_user_text(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_search_sends_original_input_and_previous_id(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("DASHSCOPE_API_KEY", "test-key")
-    monkeypatch.setenv("QWEN_SEARCH_STRATEGY", "turbo")
     client = SearchQwenClient()
-    text = "今天合肥天气怎么样？"
+    captured: dict[str, object] = {}
 
-    messages = client.build_messages(text, [])
+    class FakeResponses:
+        def create(self, **kwargs: object) -> object:
+            captured.update(kwargs)
+            return SimpleNamespace(
+                id="resp_123",
+                request_id="request_123",
+                output_text="干净的最终回答",
+                output=[SimpleNamespace(type="web_search_call")],
+                usage=None,
+            )
 
-    assert messages[0]["role"] == "system"
-    assert messages[-1] == {"role": "user", "content": text}
-    assert search_extra_body() == {
-        "enable_search": True,
-        "search_options": {
-            "forced_search": True,
-            "enable_source": True,
-            "enable_citation": True,
-            "citation_format": "[<number>]",
-            "search_strategy": "turbo",
-        },
+    client.client = SimpleNamespace(responses=FakeResponses())
+    user_text = "搜索世界杯最新一场比赛结果。"
+    result = client.search(user_text, model="qwen3.7-plus", previous_response_id="resp_previous")
+
+    assert captured == {
+        "model": "qwen3.7-plus",
+        "input": user_text,
+        "tools": SEARCH_TOOLS,
+        "previous_response_id": "resp_previous",
     }
+    assert result["reply"] == "干净的最终回答"
+    assert "raw_response" not in result
 
 
-def test_search_chat_response_metadata() -> None:
-    client = TestClient(app)
-
-    response = client.post(
-        "/api/debug_search_payload",
-        json={"message": "weather", "history": [], "model": "qwen-turbo"},
+def test_output_text_has_priority_over_all_output_items() -> None:
+    response = SimpleNamespace(
+        output_text="最终回答",
+        output=[
+            SimpleNamespace(type="reasoning", content="internal reasoning"),
+            SimpleNamespace(type="web_search_call", action=SimpleNamespace(query="private query")),
+            SimpleNamespace(
+                type="message",
+                role="assistant",
+                content=[SimpleNamespace(type="output_text", text="fallback text")],
+            ),
+        ],
     )
-    payload = response.json()
 
-    assert payload["mode"] == "qwen_search"
-    assert payload["extra_body"]["search_options"]["forced_search"] is True
-    assert payload["extra_body"]["search_options"]["enable_source"] is True
-    assert payload["extra_body"]["search_options"]["enable_citation"] is True
+    assert extract_final_text(response) == "最终回答"
 
 
-def test_extract_sources_and_detect_search_effective() -> None:
-    raw_response = {
-        "id": "request-123",
-        "search_info": {
-            "search_results": [
-                {
-                    "site_name": "Example",
-                    "title": "Weather result",
-                    "url": "https://example.com/weather",
-                    "snippet": "Current weather.",
-                }
-            ]
-        },
-    }
+def test_fallback_extracts_only_assistant_output_text() -> None:
+    response = SimpleNamespace(
+        output_text=None,
+        output=[
+            SimpleNamespace(type="reasoning", content="must stay hidden"),
+            SimpleNamespace(type="web_search_call", result="raw retrieved text"),
+            SimpleNamespace(
+                type="message",
+                role="user",
+                content=[SimpleNamespace(type="output_text", text="user text")],
+            ),
+            SimpleNamespace(
+                type="message",
+                role="assistant",
+                content=[
+                    SimpleNamespace(type="input_text", text="hidden input"),
+                    SimpleNamespace(type="output_text", text="assistant answer"),
+                ],
+            ),
+        ],
+    )
 
-    sources = extract_sources(raw_response)
+    assert extract_final_text(response) == "assistant answer"
 
-    assert sources == [
+
+def test_sources_and_tool_usage_are_separate_from_reply() -> None:
+    annotation = SimpleNamespace(
+        type="url_citation",
+        url="https://example.com/result",
+        title="Example result",
+    )
+    response = SimpleNamespace(
+        output_text="Answer [1]",
+        output=[
+            SimpleNamespace(type="web_search_call"),
+            SimpleNamespace(type="web_extractor_call"),
+            SimpleNamespace(
+                type="message",
+                role="assistant",
+                content=[
+                    SimpleNamespace(type="output_text", text="Answer [1]", annotations=[annotation])
+                ],
+            ),
+        ],
+        usage=None,
+    )
+
+    assert extract_sources(response) == [
         {
-            "site_name": "Example",
-            "title": "Weather result",
-            "url": "https://example.com/weather",
-            "snippet": "Current weather.",
+            "site_name": "",
+            "title": "Example result",
+            "url": "https://example.com/result",
+            "snippet": "",
             "index": 1,
         }
     ]
-    assert detect_search_effective("answer", sources) == (True, None)
+    assert extract_tool_usage(response) == {"web_search": 1, "web_extractor": 1}
+    assert extract_final_text(response) == "Answer [1]"
 
 
-def test_detect_search_failure_without_sources() -> None:
-    effective, warning = detect_search_effective("根据我现有的知识库，我无法联网。", [])
+def test_production_source_has_no_manual_search_prompt_fragments() -> None:
+    production_files = [Path("app_streamlit.py"), *Path("src").rglob("*.py")]
+    source = "\n".join(path.read_text(encoding="utf-8") for path in production_files)
+    forbidden = [
+        "当前应用层已经为本次请求启用了互联网搜索",
+        "来自你的知识库的内容",
+        "来自系统的内容",
+        "请在回答时引用上述内容",
+        "{" + "system_time" + "}",
+    ]
+    for fragment in forbidden:
+        assert fragment not in source
 
-    assert effective is False
-    assert warning == "Search was requested, but the response indicates that web search was not effectively used."
+
+def test_frontend_history_stores_only_visible_role_and_content() -> None:
+    source = Path("app_streamlit.py").read_text(encoding="utf-8")
+
+    assert 'assistant_record = {"role": "assistant", "content": reply}' in source
+    assert "assistant_record.update" not in source
+    assert "st.session_state.search_previous_response_id = None" in source
+    assert "st.session_state.search_previous_response_id = response.get(\"response_id\")" in source
 
 
 def test_main_api_does_not_import_removed_chain() -> None:
     source = Path("src/main_api.py").read_text(encoding="utf-8")
-
     forbidden_imports = [
         "Dialogue" + "Orchestrator",
         "Intent" + "Router",
@@ -232,14 +274,13 @@ def test_pure_client_does_not_use_search_parameters() -> None:
         assert forbidden not in source
 
 
-def test_search_client_uses_search_extra_body_only() -> None:
+def test_search_client_uses_responses_tools_without_messages() -> None:
     source = Path("src/search_qwen_client.py").read_text(encoding="utf-8")
 
-    assert "extra_body" in source
-    assert "enable_search" in source
-    assert "forced_search" in source
-    assert "enable_source" in source
-    assert "enable_citation" in source
-    assert "search_strategy" in source
-    for forbidden in ["temperature", "top_p", "response_format"]:
-        assert forbidden not in source
+    assert "client.responses.create" in source
+    assert '"input": message' in source
+    assert '"previous_response_id"' in source
+    assert '"type": "web_search"' in source
+    assert '"type": "web_extractor"' in source
+    assert '"role": "system"' not in source
+    assert "chat.completions.create" not in source

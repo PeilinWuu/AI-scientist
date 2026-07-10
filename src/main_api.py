@@ -6,7 +6,7 @@ from fastapi import FastAPI, HTTPException
 
 from src.pure_qwen_client import PureQwenClient, pure_qwen_metadata
 from src.pure_schemas import DebugPayloadResponse, PureChatRequest, PureChatResponse
-from src.search_qwen_client import SearchQwenClient, build_search_messages, search_extra_body, search_qwen_metadata
+from src.search_qwen_client import SEARCH_TOOLS, SearchQwenClient, search_qwen_metadata
 from src.search_schemas import SearchChatRequest, SearchChatResponse, SearchDebugPayloadResponse
 
 
@@ -64,24 +64,19 @@ def search_ping() -> dict:
     try:
         client = SearchQwenClient()
         model = client.model
-        result = client.chat_search(
-            messages=client.build_messages("请联网搜索合肥市今天的天气，并说明信息是否来自实时搜索。", []),
+        result = client.search(
+            message="请联网搜索合肥市今天的天气，并说明信息是否来自实时搜索。",
             model=model,
         )
-        metadata = search_qwen_metadata()
         return {
             "status": "ok",
             "mode": "qwen_search",
             "model": model,
-            "search_enabled": True,
-            "search_forced": True,
-            "search_strategy": metadata["search_strategy"],
-            "search_method": metadata["search_method"],
-            "search_effective": result["search_effective"],
-            "source_metadata_available": result["source_metadata_available"],
-            "sources": result["sources"],
-            "warning": result["warning"],
+            "response_id": result["response_id"],
             "request_id": result["request_id"],
+            "search_used": result["search_used"],
+            "sources": result["sources"],
+            "tool_usage": result["tool_usage"],
             "reply": result["reply"],
         }
     except Exception as exc:  # noqa: BLE001 - endpoint is diagnostic by design.
@@ -90,14 +85,10 @@ def search_ping() -> dict:
             "status": "error",
             "mode": "qwen_search",
             "model": model,
-            "search_enabled": True,
-            "search_forced": True,
-            "search_strategy": search_qwen_metadata()["search_strategy"],
-            "search_method": search_qwen_metadata()["search_method"],
             **_error_payload(exc),
             "hint": (
-                "Search mode failed. Check whether the selected model supports forced enable_search, "
-                "the region/base_url, and account permissions."
+                "Responses API search failed. Check whether the selected model supports the "
+                "web_search and web_extractor tools, the region/base_url, and account permissions."
             ),
         }
 
@@ -127,47 +118,46 @@ def chat(request: PureChatRequest) -> PureChatResponse:
 
 @app.post("/api/debug_search_payload", response_model=SearchDebugPayloadResponse)
 def debug_search_payload(request: SearchChatRequest) -> SearchDebugPayloadResponse:
-    """Return the exact search-mode messages and extra_body without calling Qwen."""
+    """Return the exact safe Responses API search payload without calling Qwen."""
 
-    messages = _build_search_messages_without_client(request)
     return SearchDebugPayloadResponse(
-        messages=messages,
         model=request.model or str(search_qwen_metadata()["model"]),
-        extra_body=search_extra_body(),
+        input=request.message,
+        previous_response_id=request.previous_response_id,
+        tools=[tool.copy() for tool in SEARCH_TOOLS],
     )
 
 
 @app.post("/api/chat_search", response_model=SearchChatResponse)
 def chat_search(request: SearchChatRequest) -> SearchChatResponse:
-    """Send a user/assistant message list to Qwen with search enabled."""
+    """Send one user turn through Qwen's Responses API web tools."""
 
     try:
         client = SearchQwenClient()
-        messages = client.build_messages(request.message, request.history)
         model = request.model or client.model
-        result = client.chat_search(messages, model=model)
+        result = client.search(
+            message=request.message,
+            model=model,
+            previous_response_id=request.previous_response_id,
+        )
     except Exception as exc:  # noqa: BLE001 - API should return an actionable error.
         detail = {
             **_error_payload(exc),
             "hint": (
-                "Search mode failed. Check whether the selected model supports forced enable_search, "
-                "the region/base_url, and account permissions."
+                "Responses API search failed. Check whether the selected model supports the "
+                "web_search and web_extractor tools, the region/base_url, and account permissions."
             ),
         }
         status_code = 500 if isinstance(exc, ValueError) else 502
         raise HTTPException(status_code=status_code, detail=detail) from exc
-    metadata = search_qwen_metadata()
     return SearchChatResponse(
         reply=str(result["reply"]),
         model=model,
-        search_forced=True,
-        search_strategy=str(metadata["search_strategy"]),
-        search_method=str(metadata["search_method"]),
-        search_effective=result["search_effective"],  # type: ignore[arg-type]
-        source_metadata_available=bool(result["source_metadata_available"]),
-        sources=result["sources"],  # type: ignore[arg-type]
-        warning=result["warning"],  # type: ignore[arg-type]
+        response_id=result["response_id"],  # type: ignore[arg-type]
         request_id=result["request_id"],  # type: ignore[arg-type]
+        search_used=bool(result["search_used"]),
+        sources=result["sources"],  # type: ignore[arg-type]
+        tool_usage=result["tool_usage"],  # type: ignore[arg-type]
     )
 
 
@@ -177,10 +167,6 @@ def _build_messages_without_client(request: PureChatRequest) -> list[dict[str, s
         for item in request.history
         if item.role in {"user", "assistant"}
     ] + [{"role": "user", "content": request.message}]
-
-
-def _build_search_messages_without_client(request: SearchChatRequest) -> list[dict[str, str]]:
-    return build_search_messages(request.message, request.history)
 
 
 def _error_payload(exc: Exception) -> dict[str, str]:

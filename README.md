@@ -1,33 +1,11 @@
 # Pure Qwen Shell
 
-This project is a clean **Pure Qwen Shell** with an optional **Qwen Search** mode.
+This project provides two deliberately separate Qwen paths:
 
-The default path sends only visible `user` and `assistant` chat messages to Qwen through the Alibaba Cloud Model Studio / Bailian OpenAI-compatible API.
+- **Pure Qwen** uses Chat Completions and sends only `model` and visible `user`/`assistant` messages.
+- **Qwen Search** uses the Responses API with the built-in `web_search` and `web_extractor` tools.
 
-## Modes
-
-`POST /api/chat` is **Pure Qwen**:
-
-- no system prompt;
-- no skill modules;
-- no tools;
-- no web search;
-- no RAG;
-- no intent router;
-- no experiment planning;
-- Qwen call sends only `model` and `messages`.
-
-`POST /api/chat_search` is **Qwen Search**:
-
-- one minimal search-only system message that tells Qwen the application layer has enabled web search;
-- no skill modules;
-- no tools;
-- no RAG or intent router;
-- Qwen call sends `model`, `messages`, and forced search settings.
-
-The search-mode system message is used only by `/api/chat_search`. It does not affect `/api/chat` and does not restore any old agent, skill, tool, or experiment-planning behavior.
-
-The Streamlit sidebar switch `启用联网搜索` selects the endpoint. It does not add `use_web_search` or any mode flag to the request payload.
+The project does not load an Agent framework, skills, RAG, an intent router, or experiment-planning logic.
 
 ## Configuration
 
@@ -36,14 +14,14 @@ Create `.env` from `.env.example`:
 ```env
 DASHSCOPE_API_KEY=
 LLM_MODEL=qwen-turbo
-LLM_SEARCH_MODEL=qwen-plus-latest
+LLM_SEARCH_MODEL=qwen3.7-plus
 LLM_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
-LLM_TIMEOUT=60
-QWEN_SEARCH_STRATEGY=turbo
+RESPONSES_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+LLM_TIMEOUT=120
 RUNS_DIR=runs
 ```
 
-`DASHSCOPE_API_KEY` is required for chat and ping endpoints. The key is never printed by the app.
+`DASHSCOPE_API_KEY` is required and is never printed by the application. If the selected search model is not enabled for the current account or region, the API returns an explicit error and does not fall back to the legacy search path.
 
 ## Install
 
@@ -51,30 +29,34 @@ RUNS_DIR=runs
 pip install -r requirements.txt
 ```
 
-## Run Backend
+## Run
+
+Backend:
 
 ```bash
 python -m uvicorn src.main_api:app --reload --host 127.0.0.1 --port 8000
 ```
 
-Restart uvicorn after changing `.env`, `src/pure_qwen_client.py`, or `src/search_qwen_client.py`.
-
-## Run Frontend
+Frontend:
 
 ```bash
 streamlit run app_streamlit.py
 ```
 
-## Verify Pure Qwen
+Restart uvicorn after changing `.env` or either Qwen client.
 
-Open:
+## Pure Qwen
 
-```text
-http://localhost:8000/health
-http://localhost:8000/api/qwen_ping
+`POST /api/chat` remains a direct Chat Completions pass-through. Its request contains the current message, visible chat history, and an optional model. The Qwen call itself receives only:
+
+```python
+response = client.chat.completions.create(
+    model=resolved_model,
+    messages=messages,
+)
 ```
 
-Payload preview:
+Verify the payload:
 
 ```bash
 curl -X POST http://localhost:8000/api/debug_payload ^
@@ -82,114 +64,88 @@ curl -X POST http://localhost:8000/api/debug_payload ^
   -d "{\"message\":\"你是谁？\",\"history\":[],\"model\":\"qwen-turbo\"}"
 ```
 
-Expected:
+The result must contain only the visible user message and `mode: pure_qwen`.
+
+## Qwen Search
+
+`POST /api/chat_search` uses the OpenAI-compatible Responses API. It sends the current user input unchanged:
+
+```python
+response = client.responses.create(
+    model="qwen3.7-plus",
+    input="用户本轮原始输入",
+    tools=[
+        {"type": "web_search"},
+        {"type": "web_extractor"},
+    ],
+    previous_response_id="可选的上一轮响应 ID",
+)
+```
+
+No custom system or developer message is added. Search results and tool output are not concatenated into the assistant reply. Multi-turn search uses `previous_response_id` instead of resending the visible conversation.
+
+Request example:
 
 ```json
 {
-  "messages": [
-    {"role": "user", "content": "你是谁？"}
-  ],
-  "model": "qwen-turbo",
-  "mode": "pure_qwen"
+  "message": "搜索世界杯最新一场比赛结果。",
+  "model": "qwen3.7-plus",
+  "previous_response_id": null
 }
 ```
 
-There must be no `system` message in `/api/debug_payload`.
-
-## Verify Qwen Search
-
-Open:
-
-```text
-http://localhost:8000/api/search_ping
-```
-
-Payload preview:
-
-```bash
-curl -X POST http://localhost:8000/api/debug_search_payload ^
-  -H "Content-Type: application/json" ^
-  -d "{\"message\":\"世界杯最近的比赛结果如何？\",\"history\":[],\"model\":\"qwen-plus-latest\"}"
-```
-
-Expected:
+Response shape:
 
 ```json
 {
-  "messages": [
-    {
-      "role": "system",
-      "content": "当前应用层已经为本次请求启用了互联网搜索..."
-    },
-    {
-      "role": "user",
-      "content": "世界杯最近的比赛结果如何？"
-    }
-  ],
-  "model": "qwen-plus-latest",
+  "reply": "最终回答文本",
+  "model": "qwen3.7-plus",
   "mode": "qwen_search",
-  "extra_body": {
-    "enable_search": true,
-    "search_options": {
-      "forced_search": true,
-      "enable_source": true,
-      "enable_citation": true,
-      "citation_format": "[<number>]",
-      "search_strategy": "turbo"
-    }
+  "response_id": "resp_...",
+  "request_id": "...",
+  "search_used": true,
+  "sources": [],
+  "tool_usage": {
+    "web_search": 1,
+    "web_extractor": 0
   }
 }
 ```
 
-`/api/chat` is Pure Qwen and does not search. `/api/chat_search` enables Qwen search with:
+Only `reply` is written to the visible assistant history. Source citations and tool counts remain separate diagnostic fields.
 
-```python
-extra_body = {
-    "enable_search": True,
-    "search_options": {
-        "forced_search": True,
-        "enable_source": True,
-        "enable_citation": True,
-        "citation_format": "[<number>]",
-        "search_strategy": "turbo",
-    },
-}
+Verify the exact search payload without calling Qwen:
+
+```bash
+curl -X POST http://localhost:8000/api/debug_search_payload ^
+  -H "Content-Type: application/json" ^
+  -d "{\"message\":\"搜索世界杯最新一场比赛结果。\",\"model\":\"qwen3.7-plus\",\"previous_response_id\":null}"
 ```
 
-If only `enable_search=true` is set, the model may decide by itself whether to search. For real-time questions such as weather, news, or stocks, `forced_search=true` is required.
+Expected fields are `model`, `mode`, `input`, `previous_response_id`, and `tools`. There are no messages or manually assembled retrieval text in this debug payload.
 
-## Search Effectiveness
+## Frontend State
 
-Search effectiveness is judged by structured fields, not by whether the model claims it searched:
+`st.session_state.messages` contains only:
 
-- `search_effective`
-- `sources`
-- `source_metadata_available`
-- `warning`
-- `request_id`
+```json
+{"role": "user | assistant", "content": "visible text"}
+```
 
-If the provider returns source metadata, `/api/chat_search` sets `search_effective=true` and the Streamlit UI shows the source list.
+Search continuity is stored separately in `st.session_state.search_previous_response_id`. It is cleared when search is disabled, the search model changes, or the conversation is cleared.
 
-If no sources are returned, the system does not pretend search succeeded. It returns:
+Developer debug can display the endpoint, safe request preview, response ID, request ID, citations, and tool counts outside the assistant message. With Developer debug disabled, the page displays only the conversation.
 
-- `source_metadata_available=false`
-- `sources=[]`
-- a `warning`
+## Verification Endpoints
 
-If the model still says it cannot access the internet and no sources are available, `search_effective=false`.
-
-If search still fails, first check that the frontend is calling `/api/chat_search`, then call `/api/debug_search_payload` and verify the full `extra_body` above. Different models or regions may support search differently; try `qwen-plus`, `qwen-max`, `qwen-plus-latest`, or `qwen-max-latest` if search mode fails. If forced search still fails, the next implementation path is a separate Responses API plus web-search tool mode.
-
-## Qwen Transport
-
-Both clients use:
-
-```python
-OpenAI(
-    api_key=api_key,
-    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
-    http_client=httpx.Client(timeout=60, trust_env=False),
-)
+```text
+GET  /health
+GET  /api/qwen_ping
+GET  /api/search_ping
+POST /api/debug_payload
+POST /api/chat
+POST /api/debug_search_payload
+POST /api/chat_search
 ```
 
 ## Tests

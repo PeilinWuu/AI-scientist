@@ -14,7 +14,8 @@ ROOT_DIR = Path(__file__).resolve().parent
 load_dotenv(ROOT_DIR / ".env")
 
 DEFAULT_BACKEND_URL = "http://localhost:8000"
-MODEL_OPTIONS = ["qwen-turbo", "qwen-plus", "qwen-max", "qwen-plus-latest", "qwen-max-latest"]
+PURE_MODEL_OPTIONS = ["qwen-turbo", "qwen-plus", "qwen-plus-latest"]
+SEARCH_MODEL_OPTIONS = ["qwen3.7-plus", "qwen3.7-max", "qwen3.6-plus", "qwen3.5-plus"]
 
 
 def chat_history() -> list[dict[str, str]]:
@@ -37,15 +38,11 @@ def post_json(backend_url: str, path: str, payload: dict) -> dict:
     return response.json()
 
 
-def render_search_details(message: dict) -> None:
-    """Render optional search audit fields stored on an assistant message."""
+def render_search_debug(metadata: dict) -> None:
+    """Render search diagnostics outside the assistant chat message."""
 
-    if message.get("warning"):
-        st.warning(message["warning"])
-    if "search_metadata" not in message and "sources" not in message:
-        return
-    with st.expander("搜索来源", expanded=bool(message.get("sources"))):
-        sources = message.get("sources") or []
+    with st.expander("搜索来源", expanded=bool(metadata.get("sources"))):
+        sources = metadata.get("sources") or []
         if sources:
             for source in sources:
                 index = source.get("index", "")
@@ -61,9 +58,8 @@ def render_search_details(message: dict) -> None:
                     st.caption(snippet)
         else:
             st.info("当前接口未返回可验证搜索来源。")
-    if message.get("search_metadata"):
-        with st.expander("Response metadata", expanded=False):
-            st.json(message["search_metadata"])
+    with st.expander("Response metadata", expanded=False):
+        st.json(metadata)
 
 
 class BackendAPIError(RuntimeError):
@@ -95,18 +91,33 @@ if "last_chat_endpoint" not in st.session_state:
     st.session_state.last_chat_endpoint = None
 if "last_response_metadata" not in st.session_state:
     st.session_state.last_response_metadata = None
+if "search_previous_response_id" not in st.session_state:
+    st.session_state.search_previous_response_id = None
+if "last_search_model" not in st.session_state:
+    st.session_state.last_search_model = None
 
 with st.sidebar:
     st.header("Pure Qwen Shell")
     backend_url = st.text_input("Backend URL", value=DEFAULT_BACKEND_URL)
     search_enabled = st.toggle("启用联网搜索", value=False)
-    default_model = os.getenv("LLM_SEARCH_MODEL" if search_enabled else "LLM_MODEL", "qwen-turbo")
-    default_index = MODEL_OPTIONS.index(default_model) if default_model in MODEL_OPTIONS else 0
-    model = st.selectbox("Model", MODEL_OPTIONS, index=default_index)
+    if search_enabled:
+        default_model = os.getenv("LLM_SEARCH_MODEL", "qwen3.7-plus")
+        default_index = (
+            SEARCH_MODEL_OPTIONS.index(default_model) if default_model in SEARCH_MODEL_OPTIONS else 0
+        )
+        model = st.selectbox(
+            "Model", SEARCH_MODEL_OPTIONS, index=default_index, key="search_model_control"
+        )
+    else:
+        default_model = os.getenv("LLM_MODEL", "qwen-turbo")
+        default_index = PURE_MODEL_OPTIONS.index(default_model) if default_model in PURE_MODEL_OPTIONS else 0
+        model = st.selectbox("Model", PURE_MODEL_OPTIONS, index=default_index, key="pure_model_control")
     st.write(f"**Current mode:** {'Qwen Search' if search_enabled else 'Pure Qwen'}")
     show_debug = st.checkbox("Developer debug", value=False)
     if st.button("Clear conversation"):
         st.session_state.messages = []
+        st.session_state.search_previous_response_id = None
+        st.session_state.last_search_model = None
         st.session_state.last_debug_payload = None
         st.session_state.last_endpoint = None
         st.session_state.last_chat_endpoint = None
@@ -123,23 +134,36 @@ with st.sidebar:
                 st.write("**Last response metadata:**")
                 st.json(st.session_state.last_response_metadata)
 
+if not search_enabled:
+    st.session_state.search_previous_response_id = None
+    st.session_state.last_search_model = None
+elif st.session_state.last_search_model not in (None, model):
+    st.session_state.search_previous_response_id = None
+if search_enabled:
+    st.session_state.last_search_model = model
+
 st.title("Pure Qwen Shell")
-st.caption("关闭联网时使用 /api/chat；启用联网搜索时使用 /api/chat_search。")
+st.caption("与 Qwen 对话，可在侧边栏选择是否启用联网搜索。")
 
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.write(message["content"])
-        if message["role"] == "assistant":
-            render_search_details(message)
 
 user_input = st.chat_input("请输入消息")
 if user_input:
     history = chat_history()
-    payload = {
-        "message": user_input,
-        "history": history,
-        "model": model,
-    }
+    if search_enabled:
+        payload = {
+            "message": user_input,
+            "model": model,
+            "previous_response_id": st.session_state.search_previous_response_id,
+        }
+    else:
+        payload = {
+            "message": user_input,
+            "history": history,
+            "model": model,
+        }
     chat_endpoint = "/api/chat_search" if search_enabled else "/api/chat"
     debug_endpoint = "/api/debug_search_payload" if search_enabled else "/api/debug_payload"
 
@@ -148,9 +172,11 @@ if user_input:
         st.write(user_input)
 
     try:
-        debug_payload = post_json(backend_url, debug_endpoint, payload)
+        debug_payload = None
+        if show_debug:
+            debug_payload = post_json(backend_url, debug_endpoint, payload)
         st.session_state.last_debug_payload = debug_payload
-        st.session_state.last_endpoint = debug_endpoint
+        st.session_state.last_endpoint = debug_endpoint if show_debug else None
         st.session_state.last_chat_endpoint = chat_endpoint
 
         with st.spinner("Qwen is replying..."):
@@ -160,31 +186,21 @@ if user_input:
             for key in [
                 "mode",
                 "model",
-                "search_enabled",
-                "search_forced",
-                "search_strategy",
-                "search_method",
-                "search_effective",
-                "source_metadata_available",
-                "warning",
+                "response_id",
                 "request_id",
+                "search_used",
+                "sources",
+                "tool_usage",
             ]
             if key in response
         }
+        if search_enabled:
+            st.session_state.search_previous_response_id = response.get("response_id")
         reply = response.get("reply", "")
         assistant_record = {"role": "assistant", "content": reply}
-        if response.get("mode") == "qwen_search":
-            assistant_record.update(
-                {
-                    "search_metadata": st.session_state.last_response_metadata,
-                    "sources": response.get("sources") or [],
-                    "warning": response.get("warning"),
-                }
-            )
         st.session_state.messages.append(assistant_record)
         with st.chat_message("assistant"):
             st.write(reply)
-            render_search_details(assistant_record)
         if show_debug:
             with st.expander("Debug payload sent to Qwen", expanded=False):
                 st.write(f"**Chat endpoint:** `{chat_endpoint}`")
@@ -193,6 +209,8 @@ if user_input:
                 if st.session_state.last_response_metadata:
                     st.write("**Response metadata:**")
                     st.json(st.session_state.last_response_metadata)
+            if response.get("mode") == "qwen_search":
+                render_search_debug(st.session_state.last_response_metadata or {})
     except BackendAPIError as exc:
         st.error("后端 Qwen 调用失败，错误详情如下。")
         if isinstance(exc.detail, dict):
