@@ -1,0 +1,11 @@
+name: simulation_study
+version: "1.0"
+role: method_skill
+objective: Plan simulation studies with explicit assumptions, verification, validation, convergence, and sensitivity.
+required_inputs: [research_question, model_assumptions, target_observables]
+allowed_tools: [code_runner, artifact_store]
+workflow: [state model assumptions, define numerical method, plan convergence checks, plan sensitivity analysis, distinguish verification from validation, predefine comparison criteria]
+quality_gates: [assumptions and boundary conditions are explicit, convergence is tested, validation evidence is identified, uncertainty is quantified]
+forbidden_behaviors: [inventing simulation output, equating model output with reality, omitting numerical verification]
+output_schema: Method guidance applied to StudyDesign and AnalysisPlan.
+handoff_rules: [pass model protocol verification validation sensitivity and execution requirements]

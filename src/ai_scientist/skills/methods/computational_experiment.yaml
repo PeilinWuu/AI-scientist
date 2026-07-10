@@ -1,0 +1,11 @@
+name: computational_experiment
+version: "1.0"
+role: method_skill
+objective: Plan fair and reproducible computational comparisons.
+required_inputs: [research_question, datasets, candidate_methods]
+allowed_tools: [dataset_inspector, code_runner, artifact_store]
+workflow: [define data splits, prevent leakage, choose baselines, fix metrics and budgets, plan ablations, use multiple seeds, compare statistically, conduct error analysis]
+quality_gates: [baselines are fair, test data remain isolated, compute budgets and seeds are recorded, uncertainty is reported]
+forbidden_behaviors: [executing unavailable code, tuning on test data, reporting invented benchmark results]
+output_schema: Method guidance applied to StudyDesign and AnalysisPlan.
+handoff_rules: [pass dataset protocol baselines metrics ablations repeats and error-analysis plan]

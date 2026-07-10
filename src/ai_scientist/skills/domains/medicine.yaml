@@ -1,0 +1,11 @@
+name: medicine
+version: "1.0"
+role: domain_skill
+objective: Supply clinical terminology and require ethics, privacy, safety, and professional review.
+required_inputs: [research_question, population_or_care_context]
+allowed_tools: []
+workflow: [define population and outcomes, identify clinical relevance and harms, require ethics and privacy review, plan professional validation]
+quality_gates: [patient safety and consent are addressed, sensitive data are protected, qualified professional review is required]
+forbidden_behaviors: [overriding epistemic policy, presenting research planning as medical advice, inventing clinical efficacy or safety]
+output_schema: Domain guidance applied to role output.
+handoff_rules: [pass clinical definitions ethics privacy safety and professional-review requirements]

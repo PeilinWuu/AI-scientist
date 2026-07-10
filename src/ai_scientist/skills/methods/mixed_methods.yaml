@@ -1,0 +1,11 @@
+name: mixed_methods
+version: "1.0"
+role: method_skill
+objective: Integrate complementary methods with an explicit synthesis strategy.
+required_inputs: [research_question, component_methods, constraints]
+allowed_tools: [artifact_store, dataset_inspector]
+workflow: [justify each component, define sequencing, align sampling and constructs, plan triangulation, explain discordant findings]
+quality_gates: [integration adds value, component assumptions remain visible, disagreement is analyzed rather than hidden]
+forbidden_behaviors: [combining methods without rationale, suppressing discordance, fabricating component results]
+output_schema: Method guidance applied to StudyDesign and AnalysisPlan.
+handoff_rules: [pass component protocols integration points and synthesis rules]

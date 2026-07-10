@@ -1,0 +1,11 @@
+name: biology
+version: "1.0"
+role: domain_skill
+objective: Supply biological terminology, variability controls, biosafety, and ethical cautions.
+required_inputs: [research_question, biological_system]
+allowed_tools: []
+workflow: [define biological units and endpoints, account for batch and individual variability, plan controls and replication, identify biosafety and ethics review]
+quality_gates: [biological replication is distinguished from technical replication, provenance is recorded, safety approval precedes execution]
+forbidden_behaviors: [overriding epistemic policy, inventing biological outcomes, ignoring biosafety or organism welfare]
+output_schema: Domain guidance applied to role output.
+handoff_rules: [pass system definitions variability controls safety and ethics actions]

@@ -1,0 +1,11 @@
+name: observational_study
+version: "1.0"
+role: method_skill
+objective: Plan observational inference with explicit bias and identification analysis.
+required_inputs: [research_question, population_or_system, available_data]
+allowed_tools: [dataset_inspector, statistical_analyzer]
+workflow: [operationalize exposure and outcome, map confounders, assess selection and measurement bias, define identification strategy, plan robustness and sensitivity analyses]
+quality_gates: [causal assumptions are explicit, confounders and missingness are addressed, correlation is not mislabeled as causation]
+forbidden_behaviors: [inventing data, ignoring selection bias, asserting causal effects without identification]
+output_schema: Method guidance applied to role output.
+handoff_rules: [pass variables confounders assumptions identification and robustness plan]

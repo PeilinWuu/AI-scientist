@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from fastapi import FastAPI, HTTPException
 
+from src.ai_scientist.orchestrator import ResearchOrchestrator
+from src.ai_scientist.schemas import ProvideDataRequest, ResearchStartRequest, RevisionRequest
 from src.pure_qwen_client import PureQwenClient, pure_qwen_metadata
 from src.pure_schemas import DebugPayloadResponse, PureChatRequest, PureChatResponse
 from src.search_qwen_client import SEARCH_TOOLS, SearchQwenClient, search_qwen_metadata
@@ -15,6 +17,8 @@ app = FastAPI(
     description="A minimal Qwen pass-through API with pure chat and optional native Qwen search.",
     version="0.1.0",
 )
+
+research_orchestrator = ResearchOrchestrator()
 
 
 @app.get("/health")
@@ -190,3 +194,146 @@ def _sanitize(message: str) -> str:
     except Exception:  # noqa: BLE001 - sanitization must never mask the original error.
         api_key = ""
     return message.replace(api_key, "[REDACTED_API_KEY]") if api_key else message
+
+
+@app.post("/api/research/start")
+def research_start(request: ResearchStartRequest) -> dict:
+    """Create a persisted AI Scientist project without running a model stage."""
+
+    try:
+        project = research_orchestrator.create_project(
+            objective=request.objective,
+            domain_hint=request.domain_hint,
+            constraints=request.constraints,
+            max_iterations=request.max_iterations,
+            planning_only=request.planning_only,
+        )
+        return {
+            "project_id": project.project_id,
+            "phase": project.phase.value,
+            "status": "created",
+        }
+    except Exception as exc:  # noqa: BLE001 - converted to a safe API detail.
+        raise _research_http_error(exc) from exc
+
+
+@app.get("/api/research/{project_id}")
+def research_get(project_id: str) -> dict:
+    """Return display-safe structured project state."""
+
+    try:
+        return research_orchestrator.get_project(project_id).model_dump(mode="json")
+    except Exception as exc:  # noqa: BLE001
+        raise _research_http_error(exc) from exc
+
+
+@app.post("/api/research/{project_id}/step")
+def research_step(project_id: str) -> dict:
+    """Run exactly one state-machine phase."""
+
+    try:
+        return research_orchestrator.run_next_step(project_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _research_http_error(exc) from exc
+
+
+@app.post("/api/research/{project_id}/approve")
+def research_approve(project_id: str) -> dict:
+    try:
+        project = research_orchestrator.approve_project(project_id)
+        return {"project_id": project.project_id, "phase": project.phase.value, "status": "approved"}
+    except Exception as exc:  # noqa: BLE001
+        raise _research_http_error(exc) from exc
+
+
+@app.post("/api/research/{project_id}/revise")
+def research_revise(project_id: str, request: RevisionRequest) -> dict:
+    try:
+        project = research_orchestrator.request_revision(project_id, request.target, request.feedback)
+        return {"project_id": project.project_id, "phase": project.phase.value, "status": "revision_requested"}
+    except Exception as exc:  # noqa: BLE001
+        raise _research_http_error(exc) from exc
+
+
+@app.post("/api/research/{project_id}/provide-data")
+def research_provide_data(project_id: str, request: ProvideDataRequest) -> dict:
+    try:
+        project = research_orchestrator.provide_data(
+            project_id,
+            request.artifact_paths,
+            request.description,
+            request.data_type,
+        )
+        return {"project_id": project.project_id, "phase": project.phase.value, "status": "data_registered"}
+    except Exception as exc:  # noqa: BLE001
+        raise _research_http_error(exc) from exc
+
+
+@app.post("/api/research/{project_id}/cancel")
+def research_cancel(project_id: str) -> dict:
+    try:
+        project = research_orchestrator.cancel_project(project_id)
+        return {"project_id": project.project_id, "phase": project.phase.value, "status": "cancelled"}
+    except Exception as exc:  # noqa: BLE001
+        raise _research_http_error(exc) from exc
+
+
+@app.get("/api/research/{project_id}/claims")
+def research_claims(project_id: str) -> list[dict]:
+    try:
+        return [item.model_dump(mode="json") for item in research_orchestrator.get_project(project_id).claims]
+    except Exception as exc:  # noqa: BLE001
+        raise _research_http_error(exc) from exc
+
+
+@app.get("/api/research/{project_id}/evidence")
+def research_evidence(project_id: str) -> list[dict]:
+    try:
+        return [item.model_dump(mode="json") for item in research_orchestrator.get_project(project_id).evidence]
+    except Exception as exc:  # noqa: BLE001
+        raise _research_http_error(exc) from exc
+
+
+@app.get("/api/research/{project_id}/hypotheses")
+def research_hypotheses(project_id: str) -> list[dict]:
+    try:
+        return [item.model_dump(mode="json") for item in research_orchestrator.get_project(project_id).hypotheses]
+    except Exception as exc:  # noqa: BLE001
+        raise _research_http_error(exc) from exc
+
+
+@app.get("/api/research/{project_id}/artifacts")
+def research_artifacts(project_id: str) -> list[dict]:
+    try:
+        return research_orchestrator.list_artifacts(project_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _research_http_error(exc) from exc
+
+
+@app.get("/api/research/{project_id}/events")
+def research_events(project_id: str) -> list[dict]:
+    try:
+        return [item.model_dump(mode="json") for item in research_orchestrator.list_events(project_id)]
+    except Exception as exc:  # noqa: BLE001
+        raise _research_http_error(exc) from exc
+
+
+@app.get("/api/research/{project_id}/capabilities")
+def research_capabilities(project_id: str) -> dict:
+    try:
+        return research_orchestrator.capabilities(project_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _research_http_error(exc) from exc
+
+
+def _research_http_error(exc: Exception) -> HTTPException:
+    error_type = type(exc).__name__
+    status_code = 404 if error_type == "ProjectNotFoundError" else 409 if error_type == "InvalidTransitionError" else 500
+    return HTTPException(
+        status_code=status_code,
+        detail={
+            "mode": "ai_scientist",
+            "error_type": error_type,
+            "error_message": _sanitize(str(exc)),
+        },
+    )

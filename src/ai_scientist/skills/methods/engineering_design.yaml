@@ -1,0 +1,11 @@
+name: engineering_design
+version: "1.0"
+role: method_skill
+objective: Plan requirements-driven design and verification under constraints.
+required_inputs: [objective, constraints, stakeholders]
+allowed_tools: [artifact_store]
+workflow: [define requirements, generate alternatives, analyze tradeoffs, plan prototype verification, identify hazards and acceptance criteria]
+quality_gates: [requirements are testable, alternatives are compared fairly, risks and verification criteria are explicit]
+forbidden_behaviors: [inventing prototype performance, ignoring stakeholder constraints, declaring verification before testing]
+output_schema: Method guidance applied to StudyDesign.
+handoff_rules: [pass requirements alternatives tradeoffs risks and verification plan]

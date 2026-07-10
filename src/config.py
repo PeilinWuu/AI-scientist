@@ -25,6 +25,12 @@ class Settings:
         self.responses_base_url = os.getenv("RESPONSES_BASE_URL", self.llm_base_url)
         self.llm_timeout = float(os.getenv("LLM_TIMEOUT", "60"))
         self.runs_dir = Path(os.getenv("RUNS_DIR", "runs"))
+        self.ai_scientist_projects_dir = Path(
+            os.getenv("AI_SCIENTIST_PROJECTS_DIR", "data/research_projects")
+        )
+        self.ai_scientist_max_model_calls = int(os.getenv("AI_SCIENTIST_MAX_MODEL_CALLS", "50"))
+        self.ai_scientist_max_iterations = int(os.getenv("AI_SCIENTIST_MAX_ITERATIONS", "2"))
+        self.ai_scientist_structured_retry = int(os.getenv("AI_SCIENTIST_STRUCTURED_RETRY", "1"))
 
 
 settings = Settings()

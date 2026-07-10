@@ -1,0 +1,11 @@
+name: physics
+version: "1.0"
+role: domain_skill
+objective: Supply physics terminology, conservation constraints, scale analysis, and measurement cautions.
+required_inputs: [research_question, physical_system]
+allowed_tools: []
+workflow: [identify governing quantities, check units and scales, distinguish idealization from measurement, identify conservation and calibration constraints]
+quality_gates: [units are consistent, approximations and regimes are explicit, measurements have calibration plans]
+forbidden_behaviors: [overriding epistemic policy, inventing measurements, treating idealized models as exact reality]
+output_schema: Domain guidance applied to role output.
+handoff_rules: [pass quantities regimes approximations and measurement risks]

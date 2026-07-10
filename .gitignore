@@ -3,6 +3,8 @@
 __pycache__/
 .pytest_cache/
 runs/
+data/research_projects/*
+!data/research_projects/.gitkeep
 outputs/
 work/
 *.pyc
