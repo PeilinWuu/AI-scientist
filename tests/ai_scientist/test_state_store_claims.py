@@ -5,8 +5,10 @@ from pydantic import ValidationError
 
 from src.ai_scientist.claim_graph import ClaimGraph
 from src.ai_scientist.exceptions import InvalidTransitionError
+from src.ai_scientist.quality import apply_reviewer_quality_gates, compute_quality_metrics, enrich_evidence_items
 from src.ai_scientist.project_store import ProjectStore
 from src.ai_scientist.orchestrator import ResearchOrchestrator
+from src.ai_scientist.report_writer import build_research_plan_markdown
 from src.ai_scientist.schemas import (
     Claim,
     Conclusion,
@@ -14,6 +16,7 @@ from src.ai_scientist.schemas import (
     ResearchEvent,
     ResearchPhase,
     ResearchProject,
+    ResearchQuestion,
     ReviewResult,
 )
 from src.ai_scientist.state_machine import ResearchStateMachine
@@ -117,9 +120,7 @@ def test_orchestrator_waits_for_execution_and_supports_planning_only(tmp_path: P
     orchestrator.store.save(item)
 
     approved = orchestrator.approve_project(item.project_id)
-    assert approved.phase == ResearchPhase.EXECUTION_WAITING
-    step = orchestrator.run_next_step(item.project_id)
-    assert step["current_phase"] == ResearchPhase.SYNTHESIS.value
+    assert approved.phase == ResearchPhase.SYNTHESIS
 
     waiting = orchestrator.create_project("Wait for real execution", planning_only=False)
     waiting.phase = ResearchPhase.EXECUTION_WAITING
@@ -127,3 +128,71 @@ def test_orchestrator_waits_for_execution_and_supports_planning_only(tmp_path: P
     step = orchestrator.run_next_step(waiting.project_id)
     assert step["current_phase"] == ResearchPhase.EXECUTION_WAITING.value
     assert step["stage_status"] == "waiting_for_execution_or_data"
+
+
+def test_quality_metrics_source_grading_and_reviewer_gates() -> None:
+    evidence = EvidenceItem(
+        evidence_id="evidence_primary",
+        title="Journal article with DOI",
+        source_type="paper",
+        source_url="https://doi.org/10.1234/example",
+        citation="doi:10.1234/example",
+        summary="summary",
+    )
+    item = project()
+    item.evidence = enrich_evidence_items([evidence])
+    item.claims = [
+        Claim(
+            claim_id="claim_supported",
+            statement="Supported claim",
+            claim_type="reported_fact",
+            supporting_evidence_ids=["evidence_primary"],
+            status="supported",
+        )
+    ]
+    item.hypotheses = []
+    metrics = compute_quality_metrics(item)
+    assert metrics.evidence_coverage == 1
+    assert metrics.primary_source_ratio == 1
+    assert item.evidence[0].source_level == "A"
+
+    review = ReviewResult(
+        evidence_quality_score=8,
+        methodological_validity_score=8,
+        feasibility_score=8,
+        reproducibility_score=8,
+        claim_support_score=8,
+        uncertainty_handling_score=8,
+        decision="approve",
+    )
+    gated = apply_reviewer_quality_gates(review, metrics)
+    assert gated.decision == "revise_hypothesis"
+    assert "hypothesis_completeness_below_0.8" in gated.failed_quality_gates
+
+
+def test_human_edit_versions_artifacts_and_targeted_rollback(tmp_path: Path) -> None:
+    orchestrator = ResearchOrchestrator(tmp_path)
+    item = orchestrator.create_project("Edit question", planning_only=True)
+    item.phase = ResearchPhase.HUMAN_APPROVAL
+    item.question = item.question or ResearchQuestion(
+        original_question="old",
+        normalized_question="old",
+    )
+    orchestrator.store.save(item)
+
+    edited = orchestrator.patch_question(item.project_id, {"normalized_question": "new"}, "tighten scope")
+
+    assert edited.phase == ResearchPhase.QUESTION_FORMULATION
+    assert edited.question.normalized_question == "new"
+    artifact_files = sorted((tmp_path / item.project_id / "artifacts").glob("question_v*.json"))
+    assert artifact_files
+    events = orchestrator.list_events(item.project_id)
+    assert any(event.status == "human_edit" for event in events)
+    assert any(event.status == "targeted_rollback" for event in events)
+
+
+def test_research_plan_report_declares_no_real_execution() -> None:
+    item = project(ResearchPhase.COMPLETED)
+    report = build_research_plan_markdown(item)
+    assert "No real experiment, simulation, or data analysis has been executed" in report
+    assert "must not be treated as an experimental conclusion" in report

@@ -74,6 +74,9 @@ class ResearchQuestion(StrictModel):
     missing_information: list[str] = Field(default_factory=list)
 
 
+SourceLevel = Literal["A", "B", "C", "D", "E"]
+
+
 class EvidenceItem(StrictModel):
     evidence_id: str = Field(default_factory=lambda: new_id("evidence"))
     title: str
@@ -87,6 +90,13 @@ class EvidenceItem(StrictModel):
     limitations: list[str] = Field(default_factory=list)
     publication_date: str | None = None
     status: str = "unverified"
+    source_level: SourceLevel = "E"
+    is_primary_source: bool = False
+    verified: bool = False
+    duplicate_of: str | None = None
+    retrieval_date: datetime = Field(default_factory=utc_now)
+    reliability_score: float = Field(default=0.0, ge=0.0, le=1.0)
+    relevance_score: float = Field(default=0.0, ge=0.0, le=1.0)
 
 
 ClaimType = Literal["observation", "reported_fact", "inference", "hypothesis", "prediction", "conclusion"]
@@ -161,6 +171,7 @@ ReviewDecision = Literal[
     "revise_hypothesis",
     "revise_method",
     "revise_design",
+    "revise_analysis",
     "reject",
 ]
 
@@ -176,6 +187,10 @@ class ReviewResult(StrictModel):
     non_blocking_issues: list[str] = Field(default_factory=list)
     recommendations: list[str] = Field(default_factory=list)
     decision: ReviewDecision
+    failed_quality_gates: list[str] = Field(default_factory=list)
+    required_revision_target: Literal[
+        "question", "evidence", "hypothesis", "method", "design", "analysis", "none"
+    ] = "none"
 
     @model_validator(mode="after")
     def reject_invalid_approval(self) -> "ReviewResult":
@@ -189,12 +204,28 @@ class ReviewResult(StrictModel):
         ]
         if self.decision == "approve" and min(scores) < 6:
             raise ValueError("Review decision cannot be approve when any critical score is below 6.")
+        if self.decision == "approve" and self.blocking_issues:
+            raise ValueError("Review decision cannot be approve with blocking issues.")
+        if self.decision == "approve" and self.failed_quality_gates:
+            raise ValueError("Review decision cannot be approve with failed quality gates.")
         return self
 
 
+class ConclusionItem(StrictModel):
+    conclusion_id: str = Field(default_factory=lambda: new_id("conclusion"))
+    statement: str
+    supporting_claim_ids: list[str] = Field(default_factory=list)
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    limitations: list[str] = Field(default_factory=list)
+    scope_of_validity: list[str] = Field(default_factory=list)
+
+
 class Conclusion(StrictModel):
-    planning_status_statement: str = "研究计划已形成，但尚未执行，不能生成实验结论。"
-    supported_findings: list[str] = Field(default_factory=list)
+    planning_status_statement: str = (
+        "This report is a research plan produced by AI Scientist. No real experiment, "
+        "simulation, or data analysis has been executed, so it must not be treated as an experimental conclusion."
+    )
+    supported_findings: list[ConclusionItem] = Field(default_factory=list)
     tentative_inferences: list[str] = Field(default_factory=list)
     unsupported_claims: list[str] = Field(default_factory=list)
     negative_results: list[str] = Field(default_factory=list)
@@ -204,10 +235,46 @@ class Conclusion(StrictModel):
     next_questions: list[str] = Field(default_factory=list)
     human_verification_required: list[str] = Field(default_factory=list)
 
+    @model_validator(mode="before")
+    @classmethod
+    def coerce_legacy_supported_findings(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        findings = data.get("supported_findings")
+        if isinstance(findings, list):
+            data = dict(data)
+            data["supported_findings"] = [
+                {"statement": item} if isinstance(item, str) else item
+                for item in findings
+            ]
+        return data
+
+
+class ResearchQualityMetrics(StrictModel):
+    total_key_claims: int = 0
+    supported_key_claims: int = 0
+    disputed_key_claims: int = 0
+    unsupported_key_claims: int = 0
+    evidence_coverage: float = 0.0
+    primary_source_ratio: float = 0.0
+    total_hypotheses: int = 0
+    falsifiable_hypotheses: int = 0
+    hypothesis_completeness: float = 0.0
+    total_conclusions: int = 0
+    traceable_conclusions: int = 0
+    conclusion_traceability: float = 0.0
+    reviewer_min_score: float = 0.0
+    blocking_issue_count: int = 0
+    unverifiable_source_count: int = 0
+
 
 class BudgetState(StrictModel):
     max_model_calls: int = Field(default=50, ge=1)
     used_model_calls: int = Field(default=0, ge=0)
+    attempted_model_calls: int = Field(default=0, ge=0)
+    successful_model_calls: int = Field(default=0, ge=0)
+    failed_model_calls: int = Field(default=0, ge=0)
+    fallback_model_calls: int = Field(default=0, ge=0)
     max_iterations: int = Field(default=2, ge=0)
     used_iterations: int = Field(default=0, ge=0)
     optional_token_budget: int | None = Field(default=None, ge=1)
@@ -226,6 +293,7 @@ class ArtifactRecord(StrictModel):
 
 class ResearchEvent(StrictModel):
     event_id: str = Field(default_factory=lambda: new_id("event"))
+    job_id: str | None = None
     project_id: str
     phase: ResearchPhase
     agent_name: str
@@ -236,11 +304,36 @@ class ResearchEvent(StrictModel):
     output_artifact_ids: list[str] = Field(default_factory=list)
     status: str
     error: str | None = None
+    error_type: str | None = None
+    error_message: str | None = None
     schema_valid: bool = True
     tool_names: list[str] = Field(default_factory=list)
     token_usage: dict[str, int] = Field(default_factory=dict)
+    query_count: int | None = None
+    search_result_count: int | None = None
+    extracted_page_count: int | None = None
+    model_call_count: int | None = None
     started_at: datetime = Field(default_factory=utc_now)
     finished_at: datetime | None = None
+    changed_fields: list[str] = Field(default_factory=list)
+    feedback: str | None = None
+    reason: str | None = None
+    previous_phase: ResearchPhase | None = None
+    target_phase: ResearchPhase | None = None
+    revision_reason: str | None = None
+    invalidated_artifact_ids: list[str] = Field(default_factory=list)
+    preserved_artifact_ids: list[str] = Field(default_factory=list)
+    display_markdown: str = ""
+    attempted_calls: int = 0
+    successful_calls: int = 0
+    failed_calls: int = 0
+    fallback_calls: int = 0
+    failing_component: str | None = None
+    attempted_model: str | None = None
+    fallback_attempted: bool = False
+    tool_name: str | None = None
+    stage_substep: str | None = None
+    safe_traceback: str | None = None
 
 
 class ResearchProject(StrictModel):
@@ -262,6 +355,7 @@ class ResearchProject(StrictModel):
     reproducibility_plan: dict[str, Any] = Field(default_factory=dict)
     reviews: list[ReviewResult] = Field(default_factory=list)
     conclusion: Conclusion | None = None
+    quality_metrics: ResearchQualityMetrics = Field(default_factory=ResearchQualityMetrics)
     artifacts: list[ArtifactRecord] = Field(default_factory=list)
     events: list[str] = Field(default_factory=list)
     iteration: int = 0
@@ -271,6 +365,7 @@ class ResearchProject(StrictModel):
     missing_capabilities: list[str] = Field(default_factory=list)
     human_actions_required: list[str] = Field(default_factory=list)
     previous_response_ids: dict[str, str] = Field(default_factory=dict)
+    stage_messages: list[str] = Field(default_factory=list)
     planning_only: bool = True
     domain_hint: str | None = None
     method_rationale: str = ""
@@ -349,6 +444,7 @@ class ReproducibilityOutput(StrictModel):
 class ResearchStartRequest(StrictModel):
     objective: str
     domain_hint: str | None = None
+    constraints_text: str = ""
     constraints: dict[str, Any] = Field(default_factory=dict)
     max_iterations: int = Field(
         default_factory=lambda: int(os.getenv("AI_SCIENTIST_MAX_ITERATIONS", "2")),
@@ -361,7 +457,7 @@ class ResearchStartRequest(StrictModel):
 
 
 class RevisionRequest(StrictModel):
-    target: Literal["question", "evidence", "hypothesis", "method", "design"]
+    target: Literal["question", "evidence", "hypothesis", "method", "design", "analysis"]
     feedback: str
 
 
@@ -369,3 +465,27 @@ class ProvideDataRequest(StrictModel):
     artifact_paths: list[str]
     description: str
     data_type: str
+
+
+class HumanEditRequest(StrictModel):
+    patch: dict[str, Any] = Field(default_factory=dict)
+    reason: str = ""
+
+
+class EvidenceCreateRequest(StrictModel):
+    evidence: EvidenceItem
+    reason: str = ""
+
+
+class AgentStageResult(StrictModel):
+    internal_data: dict[str, Any] = Field(default_factory=dict)
+    display_markdown: str = ""
+    citations: list[dict[str, Any]] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    requested_model: str = ""
+    actual_model: str = ""
+    fallback_used: bool = False
+    attempted_calls: int = 0
+    successful_calls: int = 0
+    failed_calls: int = 0
+    tool_names: list[str] = Field(default_factory=list)

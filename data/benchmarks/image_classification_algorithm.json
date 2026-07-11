@@ -1,0 +1,12 @@
+{
+  "benchmark_id": "image_classification_algorithm",
+  "objective": "Plan a fair comparison study for image classification algorithms under limited compute and strict train-test separation.",
+  "domain_hint": "computer_science",
+  "constraints": {
+    "planning_only": true,
+    "no_code_execution": true,
+    "require_reproducibility_plan": true,
+    "required_outputs": ["method_selection", "study_design", "analysis_plan", "review", "research_plan"]
+  },
+  "expected_completion_status": "COMPLETED"
+}

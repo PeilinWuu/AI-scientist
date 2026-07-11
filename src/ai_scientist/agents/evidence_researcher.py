@@ -51,7 +51,13 @@ class EvidenceResearcherAgent(BaseResearchAgent[EvidenceResearchOutput]):
             output=result.value,
             metadata=result.metadata,
             tool_names=["web_search", "web_extractor"],
-            auxiliary={"response_id": search_result.get("response_id")},
+            auxiliary={
+                "response_id": search_result.get("response_id"),
+                "search_model_calls": 1,
+                "query_count": 1,
+                "search_result_count": len(explicit_sources),
+                "extracted_page_count": int((search_result.get("tool_usage") or {}).get("web_extractor", 0)),
+            },
         )
 
     def build_payload(self, project: ResearchProject) -> dict:

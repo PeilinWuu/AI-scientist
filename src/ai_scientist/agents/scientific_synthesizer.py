@@ -14,13 +14,18 @@ class ScientificSynthesizerAgent(BaseResearchAgent[Conclusion]):
         graph = ClaimGraph(project.evidence, project.claims)
         unsupported_findings = graph.validate_conclusion_traceability(result.output)
         if unsupported_findings:
+            unsupported_set = set(unsupported_findings)
             result.output.supported_findings = [
-                item for item in result.output.supported_findings if item not in unsupported_findings
+                item for item in result.output.supported_findings if item.statement not in unsupported_set
             ]
             result.output.unsupported_claims.extend(
                 item for item in unsupported_findings if item not in result.output.unsupported_claims
             )
-        result.output.planning_status_statement = "研究计划已形成，但尚未执行，不能生成实验结论。"
+        result.output.planning_status_statement = (
+            "This report is a research plan produced through AI Scientist multi-role planning and review. "
+            "No real experiment, simulation, or data analysis has been executed, so it must not be treated "
+            "as an experimental conclusion."
+        )
         return result
 
     def build_payload(self, project: ResearchProject) -> dict:

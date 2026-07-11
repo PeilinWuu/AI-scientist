@@ -1,0 +1,16 @@
+{
+  "project_id": "project_b87e8bd5f601421ab9cc82f2cba7f480",
+  "completion_status": "INTAKE",
+  "total_duration": 0.027,
+  "stage_durations": {},
+  "total_model_calls": 0,
+  "fallback_count": 0,
+  "structured_retry_count": 0,
+  "evidence_count": 0,
+  "evidence_coverage": 0.0,
+  "hypothesis_completeness": 0.0,
+  "conclusion_traceability": 0.0,
+  "reviewer_scores": null,
+  "final_decision": null,
+  "errors": []
+}

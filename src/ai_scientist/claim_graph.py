@@ -57,12 +57,32 @@ class ClaimGraph:
         return errors
 
     def validate_conclusion_traceability(self, conclusion: Conclusion) -> list[str]:
-        supported_statements = {
-            claim.statement
-            for claim in self.claims.values()
-            if claim.status in {"supported", "partially_supported"} and self.get_supporting_evidence(claim.claim_id)
-        }
-        return [item for item in conclusion.supported_findings if item not in supported_statements]
+        errors: list[str] = []
+        for item in conclusion.supported_findings:
+            if item.supporting_claim_ids:
+                missing_or_unsupported = [
+                    claim_id
+                    for claim_id in item.supporting_claim_ids
+                    if claim_id not in self.claims
+                    or self.claims[claim_id].status not in {"supported", "partially_supported"}
+                    or not self.get_supporting_evidence(claim_id)
+                ]
+                if missing_or_unsupported:
+                    errors.append(item.statement)
+                continue
+            matching_claim = next(
+                (
+                    claim
+                    for claim in self.claims.values()
+                    if claim.statement == item.statement
+                    and claim.status in {"supported", "partially_supported"}
+                    and self.get_supporting_evidence(claim.claim_id)
+                ),
+                None,
+            )
+            if matching_claim is None:
+                errors.append(item.statement)
+        return errors
 
     def _claim(self, claim_id: str) -> Claim:
         if claim_id not in self.claims:

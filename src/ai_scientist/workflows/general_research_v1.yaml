@@ -18,6 +18,7 @@ transitions:
     revise_hypothesis: HYPOTHESIS_GENERATION
     revise_method: METHOD_SELECTION
     revise_design: STUDY_DESIGN
+    revise_analysis: ANALYSIS_PLANNING
     reject: FAILED
   HUMAN_APPROVAL:
     approve: EXECUTION_WAITING
@@ -29,6 +30,7 @@ transitions:
     hypothesis: HYPOTHESIS_GENERATION
     method: METHOD_SELECTION
     design: STUDY_DESIGN
+    analysis: ANALYSIS_PLANNING
   EXECUTION_WAITING:
     data_provided: DATA_ANALYSIS
     execution_tool_available: EXECUTION
@@ -42,6 +44,7 @@ transitions:
     revise_hypothesis: HYPOTHESIS_GENERATION
     revise_method: METHOD_SELECTION
     revise_design: STUDY_DESIGN
+    revise_analysis: ANALYSIS_PLANNING
     rerun: EXECUTION_WAITING
     reject: FAILED
   SYNTHESIS: {next: COMPLETED}

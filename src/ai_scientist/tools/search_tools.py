@@ -9,5 +9,5 @@ class QwenEvidenceSearchTool:
     name = "web_search"
 
     def run(self, query: str, previous_response_id: str | None = None) -> dict[str, object]:
-        client = SearchQwenClient()
-        return client.search(query, previous_response_id=previous_response_id)
+        client = SearchQwenClient(timeout_env="AI_SCIENTIST_SEARCH_TIMEOUT")
+        return client.search(message=query, previous_response_id=previous_response_id)

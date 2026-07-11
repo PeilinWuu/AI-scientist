@@ -2,10 +2,20 @@
 
 from __future__ import annotations
 
-from fastapi import FastAPI, HTTPException
+import threading
 
+from fastapi import FastAPI, HTTPException, status
+from fastapi.responses import PlainTextResponse
+
+from src.ai_scientist.job_store import ResearchJobStore, fail_job
 from src.ai_scientist.orchestrator import ResearchOrchestrator
-from src.ai_scientist.schemas import ProvideDataRequest, ResearchStartRequest, RevisionRequest
+from src.ai_scientist.schemas import (
+    EvidenceCreateRequest,
+    HumanEditRequest,
+    ProvideDataRequest,
+    ResearchStartRequest,
+    RevisionRequest,
+)
 from src.pure_qwen_client import PureQwenClient, pure_qwen_metadata
 from src.pure_schemas import DebugPayloadResponse, PureChatRequest, PureChatResponse
 from src.search_qwen_client import SEARCH_TOOLS, SearchQwenClient, search_qwen_metadata
@@ -19,6 +29,7 @@ app = FastAPI(
 )
 
 research_orchestrator = ResearchOrchestrator()
+research_job_store = ResearchJobStore(research_orchestrator.store.root)
 
 
 @app.get("/health")
@@ -204,6 +215,7 @@ def research_start(request: ResearchStartRequest) -> dict:
         project = research_orchestrator.create_project(
             objective=request.objective,
             domain_hint=request.domain_hint,
+            constraints_text=request.constraints_text,
             constraints=request.constraints,
             max_iterations=request.max_iterations,
             planning_only=request.planning_only,
@@ -237,6 +249,70 @@ def research_step(project_id: str) -> dict:
         raise _research_http_error(exc) from exc
 
 
+@app.post("/api/research/{project_id}/step_async", status_code=status.HTTP_202_ACCEPTED)
+def research_step_async(project_id: str) -> dict:
+    """Queue one state-machine phase and return immediately."""
+
+    try:
+        project = research_orchestrator.get_project(project_id)
+        active_job = research_job_store.active_step_job(project_id)
+        if active_job:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "error": "project_step_already_running",
+                    "job_id": active_job.job_id,
+                    "project_id": project_id,
+                },
+            )
+        job = research_job_store.create(project_id, project.phase.value)
+        thread = threading.Thread(
+            target=_run_research_job,
+            args=(project_id, job.job_id),
+            name=f"research-step-{job.job_id}",
+            daemon=True,
+        )
+        thread.start()
+        return {
+            "job_id": job.job_id,
+            "project_id": project_id,
+            "phase": job.phase,
+            "status": job.status,
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        raise _research_http_error(exc) from exc
+
+
+@app.get("/api/research/jobs/{job_id}")
+def research_job_status(job_id: str) -> dict:
+    """Return a persisted asynchronous AI Scientist job record."""
+
+    try:
+        return research_job_store.load_any(job_id).model_dump(mode="json")
+    except Exception as exc:  # noqa: BLE001
+        raise _research_http_error(exc) from exc
+
+
+def _run_research_job(project_id: str, job_id: str) -> None:
+    job = research_job_store.load(project_id, job_id)
+    job.status = "running"
+    from src.ai_scientist.schemas import utc_now
+
+    job.started_at = utc_now()
+    research_job_store.save(job)
+    try:
+        result = research_orchestrator.run_next_step(project_id, job_id=job_id)
+        job.status = "completed"
+        job.finished_at = utc_now()
+        job.result = result
+        research_job_store.save(job)
+    except Exception as exc:  # noqa: BLE001 - safe detail is persisted for UI polling.
+        job = fail_job(job, exc)
+        research_job_store.save(job)
+
+
 @app.post("/api/research/{project_id}/approve")
 def research_approve(project_id: str) -> dict:
     try:
@@ -265,6 +341,59 @@ def research_provide_data(project_id: str, request: ProvideDataRequest) -> dict:
             request.data_type,
         )
         return {"project_id": project.project_id, "phase": project.phase.value, "status": "data_registered"}
+    except Exception as exc:  # noqa: BLE001
+        raise _research_http_error(exc) from exc
+
+
+@app.patch("/api/research/{project_id}/question")
+def research_patch_question(project_id: str, request: HumanEditRequest) -> dict:
+    try:
+        return research_orchestrator.patch_question(project_id, request.patch, request.reason).model_dump(mode="json")
+    except Exception as exc:  # noqa: BLE001
+        raise _research_http_error(exc) from exc
+
+
+@app.patch("/api/research/{project_id}/hypotheses/{hypothesis_id}")
+def research_patch_hypothesis(project_id: str, hypothesis_id: str, request: HumanEditRequest) -> dict:
+    try:
+        return research_orchestrator.patch_hypothesis(
+            project_id,
+            hypothesis_id,
+            request.patch,
+            request.reason,
+        ).model_dump(mode="json")
+    except Exception as exc:  # noqa: BLE001
+        raise _research_http_error(exc) from exc
+
+
+@app.patch("/api/research/{project_id}/study-design")
+def research_patch_study_design(project_id: str, request: HumanEditRequest) -> dict:
+    try:
+        return research_orchestrator.patch_study_design(project_id, request.patch, request.reason).model_dump(mode="json")
+    except Exception as exc:  # noqa: BLE001
+        raise _research_http_error(exc) from exc
+
+
+@app.patch("/api/research/{project_id}/analysis-plan")
+def research_patch_analysis_plan(project_id: str, request: HumanEditRequest) -> dict:
+    try:
+        return research_orchestrator.patch_analysis_plan(project_id, request.patch, request.reason).model_dump(mode="json")
+    except Exception as exc:  # noqa: BLE001
+        raise _research_http_error(exc) from exc
+
+
+@app.post("/api/research/{project_id}/evidence")
+def research_add_evidence(project_id: str, request: EvidenceCreateRequest) -> dict:
+    try:
+        return research_orchestrator.add_evidence(project_id, request.evidence, request.reason).model_dump(mode="json")
+    except Exception as exc:  # noqa: BLE001
+        raise _research_http_error(exc) from exc
+
+
+@app.delete("/api/research/{project_id}/evidence/{evidence_id}")
+def research_delete_evidence(project_id: str, evidence_id: str, reason: str = "") -> dict:
+    try:
+        return research_orchestrator.delete_evidence(project_id, evidence_id, reason).model_dump(mode="json")
     except Exception as exc:  # noqa: BLE001
         raise _research_http_error(exc) from exc
 
@@ -306,6 +435,32 @@ def research_hypotheses(project_id: str) -> list[dict]:
 def research_artifacts(project_id: str) -> list[dict]:
     try:
         return research_orchestrator.list_artifacts(project_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _research_http_error(exc) from exc
+
+
+@app.get("/api/research/{project_id}/report.md", response_class=PlainTextResponse)
+def research_report_markdown(project_id: str) -> str:
+    try:
+        project = research_orchestrator.get_project(project_id)
+        path = research_orchestrator.store.project_dir(project.project_id) / "artifacts" / "research_plan.md"
+        if not path.exists():
+            raise FileNotFoundError("research_plan.md has not been generated yet.")
+        return path.read_text(encoding="utf-8")
+    except Exception as exc:  # noqa: BLE001
+        raise _research_http_error(exc) from exc
+
+
+@app.get("/api/research/{project_id}/report.json")
+def research_report_json(project_id: str) -> dict:
+    try:
+        import json
+
+        project = research_orchestrator.get_project(project_id)
+        path = research_orchestrator.store.project_dir(project.project_id) / "artifacts" / "research_plan.json"
+        if not path.exists():
+            raise FileNotFoundError("research_plan.json has not been generated yet.")
+        return json.loads(path.read_text(encoding="utf-8"))
     except Exception as exc:  # noqa: BLE001
         raise _research_http_error(exc) from exc
 

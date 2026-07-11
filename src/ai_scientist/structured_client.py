@@ -35,6 +35,10 @@ class StructuredCallMetadata:
     finished_at: datetime
     token_usage: dict[str, int] = field(default_factory=dict)
     model_calls: int = 0
+    attempted_calls: int = 0
+    successful_calls: int = 0
+    failed_calls: int = 0
+    fallback_calls: int = 0
 
 
 @dataclass
@@ -53,7 +57,7 @@ class StructuredQwenClient:
         self.registry = registry or ModelRegistry()
         self.retry_count = min(1, max(0, int(os.getenv("AI_SCIENTIST_STRUCTURED_RETRY", "1"))))
         self.http_client = httpx.Client(
-            timeout=float(os.getenv("LLM_TIMEOUT", "120")),
+            timeout=float(os.getenv("AI_SCIENTIST_MODEL_TIMEOUT", os.getenv("LLM_TIMEOUT", "300"))),
             trust_env=False,
         )
         self.client = OpenAI(
@@ -152,6 +156,10 @@ class StructuredQwenClient:
                 finished_at=utc_now(),
                 token_usage=token_usage,
                 model_calls=model_calls,
+                attempted_calls=model_calls,
+                successful_calls=model_calls,
+                failed_calls=0,
+                fallback_calls=1 if fallback_used else 0,
             ),
         )
 

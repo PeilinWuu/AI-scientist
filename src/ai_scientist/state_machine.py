@@ -40,6 +40,7 @@ class ResearchStateMachine:
             ResearchPhase.HYPOTHESIS_GENERATION,
             ResearchPhase.METHOD_SELECTION,
             ResearchPhase.STUDY_DESIGN,
+            ResearchPhase.ANALYSIS_PLANNING,
         } and project.phase in {ResearchPhase.FEASIBILITY_REVIEW, ResearchPhase.REVISION}:
             project.iteration += 1
             project.budget.used_iterations += 1

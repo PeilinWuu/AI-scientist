@@ -24,7 +24,7 @@ SEARCH_TOOLS = [
 class SearchQwenClient:
     """Call Qwen's Responses API with built-in web tools."""
 
-    def __init__(self) -> None:
+    def __init__(self, timeout_env: str | None = None) -> None:
         api_key = os.getenv("DASHSCOPE_API_KEY", "")
         if not api_key:
             raise RuntimeError("DASHSCOPE_API_KEY is missing. Please set it in .env.")
@@ -35,7 +35,10 @@ class SearchQwenClient:
             os.getenv("RESPONSES_BASE_URL")
             or os.getenv("LLM_BASE_URL", DEFAULT_BASE_URL)
         ).rstrip("/")
-        self.timeout = float(os.getenv("LLM_TIMEOUT", "120"))
+        if timeout_env:
+            self.timeout = float(os.getenv(timeout_env, os.getenv("LLM_TIMEOUT", "120")))
+        else:
+            self.timeout = float(os.getenv("LLM_TIMEOUT", "120"))
         self.http_client = httpx.Client(
             timeout=self.timeout,
             trust_env=False,
