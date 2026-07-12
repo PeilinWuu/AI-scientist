@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import threading
 import time
+from urllib.parse import urlparse
 
 from fastapi import FastAPI, HTTPException, status
 from fastapi.responses import PlainTextResponse
@@ -296,6 +297,13 @@ def _model_error_message(exc: Exception) -> str:
     }[_model_error_category(exc)]
 
 
+def _responses_endpoint_host() -> str:
+    base_url = os.getenv("RESPONSES_BASE_URL") or os.getenv(
+        "LLM_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    )
+    return urlparse(base_url).netloc
+
+
 @app.post("/api/research/start")
 def research_start(request: ResearchStartRequest) -> dict:
     """Create a persisted AI Scientist project without running a model stage."""
@@ -317,6 +325,57 @@ def research_start(request: ResearchStartRequest) -> dict:
         }
     except Exception as exc:  # noqa: BLE001 - converted to a safe API detail.
         raise _research_http_error(exc) from exc
+
+
+@app.get("/api/research/debug/evidence-model")
+def research_debug_evidence_model() -> dict:
+    """Return safe evidence researcher model resolution for new projects."""
+
+    resolution = ModelRegistry().resolve_model("evidence_researcher")
+    return {
+        "role": "evidence_researcher",
+        "override_present": False,
+        "environment_model_configured": bool(resolution.environment_model),
+        "fallback_model_configured": bool(resolution.fallback_model),
+        "resolved_model": resolution.resolved_model,
+        "resolution_source": resolution.resolution_source,
+        "responses_base_url_host": _responses_endpoint_host(),
+    }
+
+
+@app.post("/api/research/debug/evidence-search-ping")
+def research_debug_evidence_search_ping(request: dict) -> dict:
+    """Run the same minimal evidence search path used by BACKGROUND_RESEARCH."""
+
+    project_id = str(request.get("project_id") or "")
+    query = str(request.get("query") or "").strip()
+    if not project_id or not query:
+        raise HTTPException(status_code=400, detail={"error_message": "project_id and query are required."})
+    project = research_orchestrator.get_project(project_id)
+    resolution = ModelRegistry(project.model_overrides).resolve_model("evidence_researcher")
+    try:
+        result = SearchQwenClient(timeout_env="AI_SCIENTIST_SEARCH_TIMEOUT").search(
+            message=query,
+            model=resolution.resolved_model,
+            previous_response_id=None,
+        )
+        return {
+            "status": "ok",
+            "resolved_model": resolution.resolved_model,
+            "response_id": result.get("response_id"),
+            "request_id": result.get("request_id"),
+            "search_used": result.get("search_used"),
+            "summary": result.get("reply"),
+        }
+    except Exception as exc:  # noqa: BLE001 - diagnostic endpoint returns safe detail.
+        return {
+            "status": "error",
+            "resolved_model": resolution.resolved_model,
+            "status_code": getattr(exc, "status_code", None),
+            "provider_error_code": getattr(exc, "provider_error_code", None),
+            "provider_error_message": getattr(exc, "provider_error_message", None) or _sanitize(str(exc)),
+            "request_id": getattr(exc, "request_id", None),
+        }
 
 
 @app.get("/api/research/{project_id}")

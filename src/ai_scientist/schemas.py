@@ -466,6 +466,12 @@ class ResearchEvent(StrictModel):
     stage_substep: str | None = None
     safe_traceback: str | None = None
     validation_errors: list[dict[str, Any]] = Field(default_factory=list)
+    status_code: int | None = None
+    provider_error_code: str | None = None
+    provider_error_message: str | None = None
+    request_id: str | None = None
+    endpoint_host: str | None = None
+    previous_response_id_present: bool | None = None
 
 
 class BackgroundResearchCheckpoint(StrictModel):

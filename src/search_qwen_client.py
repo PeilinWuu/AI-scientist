@@ -5,10 +5,14 @@ from __future__ import annotations
 import os
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 import httpx
 from dotenv import load_dotenv
+from openai import BadRequestError
 from openai import OpenAI
+
+from src.model_utils import normalize_model_name
 
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
@@ -57,16 +61,28 @@ class SearchQwenClient:
     ) -> dict[str, object]:
         """Send the current user text and optionally continue a Responses conversation."""
 
-        resolved_model = model or self.default_model
+        resolved_model = normalize_model_name(model) or self.default_model
+        tools = [tool.copy() for tool in SEARCH_TOOLS]
+        validate_search_request(resolved_model, message, tools)
         kwargs: dict[str, object] = {
             "model": resolved_model,
             "input": message,
-            "tools": SEARCH_TOOLS,
+            "tools": tools,
         }
         if previous_response_id:
             kwargs["previous_response_id"] = previous_response_id
 
-        response = self.client.responses.create(**kwargs)
+        try:
+            response = self.client.responses.create(**kwargs)
+        except Exception as exc:
+            _annotate_search_exception(
+                exc,
+                model=resolved_model,
+                base_url=self.base_url,
+                tools=tools,
+                previous_response_id=previous_response_id,
+            )
+            raise
         return self.parse_response(response)
 
     def parse_response(self, response: Any) -> dict[str, object]:
@@ -181,6 +197,47 @@ def search_qwen_metadata() -> dict[str, object]:
         "search_method": "responses_api_builtin_tools",
         "tools": [tool.copy() for tool in SEARCH_TOOLS],
     }
+
+
+def validate_search_request(model: str | None, input_text: str | None, tools: list[dict[str, str]]) -> None:
+    """Validate a minimal Responses API search request before provider I/O."""
+
+    normalized_model = normalize_model_name(model)
+    if not normalized_model:
+        raise ValueError("Search model must be a non-empty string.")
+    if not isinstance(input_text, str) or not input_text.strip():
+        raise ValueError("Search input must be a non-empty string.")
+    tool_names = {tool.get("type") for tool in tools}
+    if "web_search" not in tool_names:
+        raise ValueError("Search tools must include web_search.")
+    if "web_extractor" in tool_names and "web_search" not in tool_names:
+        raise ValueError("web_extractor requires web_search.")
+
+
+def _annotate_search_exception(
+    exc: Exception,
+    model: str,
+    base_url: str,
+    tools: list[dict[str, str]],
+    previous_response_id: str | None,
+) -> None:
+    """Attach safe diagnostics to provider exceptions without wrapping them."""
+
+    setattr(exc, "requested_model", model)
+    setattr(exc, "actual_model", model)
+    setattr(exc, "endpoint_host", urlparse(base_url).netloc)
+    setattr(exc, "tool_names", [tool.get("type", "") for tool in tools])
+    setattr(exc, "previous_response_id_present", bool(previous_response_id))
+    if isinstance(exc, BadRequestError):
+        setattr(exc, "status_code", getattr(exc, "status_code", 400))
+    provider_body = getattr(exc, "body", None)
+    if isinstance(provider_body, dict):
+        error = provider_body.get("error") if isinstance(provider_body.get("error"), dict) else provider_body
+        setattr(exc, "provider_error_code", str(error.get("code", "")))
+        setattr(exc, "provider_error_message", str(error.get("message", "")))
+    request_id = getattr(exc, "request_id", None) or getattr(exc, "_request_id", None)
+    if request_id:
+        setattr(exc, "request_id", str(request_id))
 
 
 def _assistant_output_text_items(response: Any) -> list[Any]:

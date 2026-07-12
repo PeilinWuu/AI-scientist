@@ -325,8 +325,8 @@ def test_evidence_search_tool_passes_previous_response_id_as_keyword(monkeypatch
             return {"reply": "ok", "sources": [], "search_used": True}
 
     monkeypatch.setattr("src.ai_scientist.tools.search_tools.SearchQwenClient", FakeSearchClient)
-    QwenEvidenceSearchTool().run("query", previous_response_id="resp_123")
+    QwenEvidenceSearchTool().run("query", model="evidence-model", previous_response_id="resp_123")
 
     assert captured["message"] == "query"
+    assert captured["model"] == "evidence-model"
     assert captured["previous_response_id"] == "resp_123"
-    assert "model" not in captured

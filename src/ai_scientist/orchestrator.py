@@ -7,6 +7,7 @@ import traceback
 from contextvars import ContextVar
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from src.ai_scientist.agents import (
     AnalystAgent,
@@ -306,13 +307,23 @@ class ResearchOrchestrator:
                 finished_at=utc_now(),
                 failing_component=self._failing_component_for_substep(stage_substep),
                 stage_substep=stage_substep,
+                requested_model=getattr(exc, "requested_model", None),
+                actual_model=getattr(exc, "actual_model", None),
                 attempted_model=self._agent_name_for_phase(previous_phase),
                 fallback_attempted=True,
                 tool_name="web_search" if previous_phase == ResearchPhase.BACKGROUND_RESEARCH else None,
+                tool_names=getattr(exc, "tool_names", []),
                 safe_traceback=self._sanitize_traceback(exc),
                 display_markdown=self._failure_display_message(previous_phase, stage_substep),
                 validation_errors=self._validation_errors(exc),
+                attempted_calls=1 if previous_phase == ResearchPhase.BACKGROUND_RESEARCH else 0,
                 failed_calls=1,
+                status_code=getattr(exc, "status_code", None),
+                provider_error_code=getattr(exc, "provider_error_code", None),
+                provider_error_message=getattr(exc, "provider_error_message", None),
+                request_id=getattr(exc, "request_id", None),
+                endpoint_host=getattr(exc, "endpoint_host", None),
+                previous_response_id_present=getattr(exc, "previous_response_id_present", None),
             )
             project.stage_messages.append(event.display_markdown)
             self._append_event(project, event)
@@ -522,6 +533,7 @@ class ResearchOrchestrator:
             acquisition = SearchAcquisitionResult.model_validate(checkpoint.search_payload)
         else:
             self._ensure_budget(project, 1)
+            search_model_resolution = ModelRegistry(project.model_overrides).resolve_model("evidence_researcher")
             self._append_event(
                 project,
                 completed_event(
@@ -530,15 +542,23 @@ class ResearchOrchestrator:
                     "evidence_researcher",
                     status="search_acquisition_started",
                     stage_substep="search_acquisition",
+                    requested_model=search_model_resolution.resolved_model,
+                    actual_model=search_model_resolution.resolved_model,
+                    fallback_used=search_model_resolution.fallback_used,
                     tool_names=["web_search", "web_extractor"],
                     tool_name="web_search",
+                    attempted_calls=1,
+                    model_call_count=1,
+                    endpoint_host=self._responses_endpoint_host(),
+                    previous_response_id_present=False,
                 ),
             )
             project.budget.attempted_model_calls += 1
             self.store.save(project)
             try:
-                acquisition = agent.acquire_search(project)
-            except Exception:
+                acquisition = agent.acquire_search(project, search_model_resolution.resolved_model)
+            except Exception as exc:
+                self._attach_search_model_diagnostics(exc, search_model_resolution)
                 project.budget.failed_model_calls += 1
                 self.store.save(project)
                 raise
@@ -567,6 +587,9 @@ class ResearchOrchestrator:
                     status="search_acquisition_completed",
                     stage_substep="search_acquisition",
                     output_artifact_ids=[search_record.artifact_id],
+                    requested_model=search_model_resolution.resolved_model,
+                    actual_model=search_model_resolution.resolved_model,
+                    fallback_used=search_model_resolution.fallback_used,
                     tool_names=["web_search", "web_extractor"],
                     tool_name="web_search",
                     query_count=1,
@@ -943,6 +966,25 @@ class ResearchOrchestrator:
     def _ensure_budget(project: ResearchProject, required_calls: int) -> None:
         if project.budget.used_model_calls + required_calls > project.budget.max_model_calls:
             raise BudgetExceededError("AI Scientist model-call budget is exhausted.")
+
+    @staticmethod
+    def _responses_endpoint_host() -> str:
+        base_url = os.getenv("RESPONSES_BASE_URL") or os.getenv(
+            "LLM_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"
+        )
+        return urlparse(base_url).netloc
+
+    def _attach_search_model_diagnostics(self, exc: Exception, resolution: Any) -> None:
+        if not getattr(exc, "requested_model", None):
+            setattr(exc, "requested_model", resolution.resolved_model)
+        if not getattr(exc, "actual_model", None):
+            setattr(exc, "actual_model", resolution.resolved_model)
+        if not getattr(exc, "endpoint_host", None):
+            setattr(exc, "endpoint_host", self._responses_endpoint_host())
+        if not getattr(exc, "tool_names", None):
+            setattr(exc, "tool_names", ["web_search", "web_extractor"])
+        if getattr(exc, "previous_response_id_present", None) is None:
+            setattr(exc, "previous_response_id_present", False)
 
     @staticmethod
     def _sanitize_error(exc: Exception) -> str:

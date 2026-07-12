@@ -5,6 +5,7 @@ from __future__ import annotations
 from src.ai_scientist.agents.base_agent import AgentRun, BaseResearchAgent, project_snapshot
 from src.ai_scientist.domain_resolution import canonicalize_domain
 from src.ai_scientist.exceptions import StructuredOutputError
+from src.ai_scientist.model_registry import ModelRegistry
 from src.ai_scientist.schemas import EvidenceResearchOutput, ResearchProject, SearchAcquisitionResult, SearchSource
 from src.ai_scientist.tools.search_tools import QwenEvidenceSearchTool
 
@@ -18,10 +19,11 @@ class EvidenceResearcherAgent(BaseResearchAgent[EvidenceResearchOutput]):
         self.search_tool = search_tool or QwenEvidenceSearchTool()
 
     def run(self, project: ResearchProject) -> AgentRun[EvidenceResearchOutput]:
-        acquisition = self.acquire_search(project)
+        resolution = ModelRegistry(project.model_overrides).resolve_model(self.agent_name)
+        acquisition = self.acquire_search(project, resolution.resolved_model)
         return self.normalize_search_result(project, acquisition)
 
-    def acquire_search(self, project: ResearchProject) -> SearchAcquisitionResult:
+    def acquire_search(self, project: ResearchProject, search_model: str) -> SearchAcquisitionResult:
         """Run web search and store only final answer text plus explicit sources."""
 
         if project.question is None:
@@ -29,7 +31,8 @@ class EvidenceResearcherAgent(BaseResearchAgent[EvidenceResearchOutput]):
         query = self._search_query(project)
         search_result = self.search_tool.run(
             query,
-            previous_response_id=project.previous_response_ids.get("evidence_search"),
+            model=search_model,
+            previous_response_id=None,
         )
         sources = [SearchSource.model_validate(item) for item in (search_result.get("sources") or [])]
         warnings: list[str] = []

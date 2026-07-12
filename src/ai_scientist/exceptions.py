@@ -23,3 +23,7 @@ class StructuredOutputError(AIScientistError):
 
 class BudgetExceededError(AIScientistError):
     """Raised when the configured research budget is exhausted."""
+
+
+class ModelConfigurationError(AIScientistError):
+    """Raised before provider calls when no valid model can be resolved."""

@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from src.ai_scientist.agents.base_agent import AgentRun
 from src.ai_scientist.agents.evidence_researcher import EvidenceResearcherAgent
 from src.ai_scientist.domain_resolution import resolve_domain
@@ -137,6 +139,36 @@ def test_evidence_normalization_does_not_keep_invented_urls() -> None:
     assert run.output.claims[0].status == "unknown"
 
 
+def test_evidence_search_uses_explicit_model_and_no_previous_response_id() -> None:
+    captured = {}
+
+    class FakeSearchTool:
+        def run(self, query, model, previous_response_id=None):
+            captured["query"] = query
+            captured["model"] = model
+            captured["previous_response_id"] = previous_response_id
+            return {"reply": "ok", "sources": [], "search_used": True}
+
+    project = type(
+        "ProjectLike",
+        (),
+        {
+            "question": question("Does life necessarily require molecular homochirality?"),
+            "objective": "Does life necessarily require molecular homochirality?",
+            "domain": "biology",
+            "secondary_domains": [],
+            "previous_response_ids": {"evidence_search": "resp_old"},
+        },
+    )()
+    agent = EvidenceResearcherAgent(search_tool=FakeSearchTool())
+
+    acquisition = agent.acquire_search(project, "evidence-model")
+
+    assert acquisition.final_text == "ok"
+    assert captured["model"] == "evidence-model"
+    assert captured["previous_response_id"] is None
+
+
 def test_background_research_checkpoint_reaches_claim_mapping(
     tmp_path: Path,
     monkeypatch,
@@ -158,7 +190,8 @@ def test_background_research_checkpoint_reaches_claim_mapping(
         def __init__(self, *args, **kwargs):
             pass
 
-        def acquire_search(self, project_arg):
+        def acquire_search(self, project_arg, search_model):
+            assert search_model
             FakeEvidenceResearcher.acquire_calls += 1
             return SearchAcquisitionResult(
                 final_text="Search found discussions of homochirality and alternative biochemical systems.",
@@ -199,3 +232,49 @@ def test_background_research_checkpoint_reaches_claim_mapping(
     assert FakeEvidenceResearcher.acquire_calls == 1
     assert "search_acquisition_completed" in {event.status for event in events}
     assert "evidence_normalization_completed" in {event.status for event in events}
+
+
+def test_bad_request_records_attempted_and_resolved_model(tmp_path: Path, monkeypatch) -> None:
+    orchestrator = ResearchOrchestrator(tmp_path)
+    project = orchestrator.create_project(
+        "Bad request diagnostics",
+        model_overrides={"evidence_researcher": "bad-search-model"},
+    )
+    project.phase = ResearchPhase.BACKGROUND_RESEARCH
+    project.question = question(project.objective)
+    project.research_mode = ResearchMode.THEORETICAL
+    orchestrator.store.save(project)
+
+    class FakeEvidenceResearcher:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def acquire_search(self, project_arg, search_model):
+            exc = RuntimeError("BadRequestError: unsupported model/tool")
+            exc.requested_model = search_model
+            exc.actual_model = search_model
+            exc.status_code = 400
+            exc.provider_error_code = "InvalidParameter"
+            exc.provider_error_message = "model does not support web_search"
+            exc.endpoint_host = "dashscope.aliyuncs.com"
+            exc.tool_names = ["web_search", "web_extractor"]
+            exc.previous_response_id_present = False
+            raise exc
+
+    monkeypatch.setattr("src.ai_scientist.orchestrator.EvidenceResearcherAgent", FakeEvidenceResearcher)
+
+    with pytest.raises(RuntimeError):
+        orchestrator.run_next_step(project.project_id)
+    updated = orchestrator.get_project(project.project_id)
+    events = orchestrator.list_events(project.project_id)
+    failed = events[-1]
+
+    assert updated.budget.attempted_model_calls == 1
+    assert updated.budget.failed_model_calls == 1
+    assert failed.requested_model == "bad-search-model"
+    assert failed.actual_model == "bad-search-model"
+    assert failed.attempted_calls == 1
+    assert failed.failed_calls == 1
+    assert failed.status_code == 400
+    assert failed.provider_error_message == "model does not support web_search"
+    assert failed.previous_response_id_present is False
