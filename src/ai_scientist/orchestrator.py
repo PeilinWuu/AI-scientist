@@ -22,10 +22,12 @@ from src.ai_scientist.agents import (
 from src.ai_scientist.agents.base_agent import AgentRun
 from src.ai_scientist.artifact_store import ArtifactStore
 from src.ai_scientist.claim_graph import ClaimGraph
+from src.ai_scientist.domain_resolution import resolve_domain
 from src.ai_scientist.domain_router import DomainRouter
 from src.ai_scientist.events import completed_event
 from src.ai_scientist.exceptions import AIScientistError, BudgetExceededError, InvalidTransitionError
 from src.ai_scientist.method_selector import MethodSelector
+from src.ai_scientist.model_registry import ModelRegistry
 from src.ai_scientist.presentation import (
     render_analysis_plan,
     render_claim_mapping,
@@ -46,6 +48,7 @@ from src.ai_scientist.schemas import (
     DomainSelectionOutput,
     EvidenceResearchOutput,
     EvidenceItem,
+    SearchAcquisitionResult,
     Hypothesis,
     MethodologyOutput,
     ResearchEvent,
@@ -61,6 +64,7 @@ from src.ai_scientist.state_machine import ResearchStateMachine, TERMINAL_PHASES
 from src.ai_scientist.structured_client import StructuredQwenClient, StructuredCallMetadata
 from src.ai_scientist.tools.execution_adapter import ExecutionAdapter
 from src.ai_scientist.tools.registry import ToolRegistry
+from src.model_utils import normalize_model_overrides
 
 
 _CURRENT_JOB_ID: ContextVar[str | None] = ContextVar("current_research_job_id", default=None)
@@ -84,6 +88,7 @@ class ResearchOrchestrator:
         domain_hint: str | None = None,
         constraints_text: str = "",
         constraints: dict[str, Any] | None = None,
+        model_overrides: dict[str, str | None] | None = None,
         max_iterations: int = 2,
         planning_only: bool = True,
     ) -> ResearchProject:
@@ -93,6 +98,7 @@ class ResearchOrchestrator:
             objective=objective.strip(),
             domain_hint=domain_hint,
             constraints={**(constraints or {}), **({"constraints_text": constraints_text} if constraints_text else {})},
+            model_overrides=normalize_model_overrides(model_overrides),
             max_iterations=max_iterations,
             planning_only=planning_only,
             budget={
@@ -155,29 +161,26 @@ class ResearchOrchestrator:
                 if project.question is None:
                     raise AIScientistError("Domain selection requires a formulated question.")
                 selection, metadata = self._run_domain_selection(project)
-                project.domain = selection.primary_domain
-                project.secondary_domains = selection.secondary_domains
+                resolution = resolve_domain(selection.primary_domain, selection.secondary_domains)
+                project.domain_resolution = resolution
+                project.domain = resolution.canonical_primary_domain
+                project.secondary_domains = resolution.canonical_secondary_domains
                 project.human_actions_required.extend(selection.clarification_questions)
                 produced_artifacts += self._record_structured_output(
                     project,
                     previous_phase,
                     "research_director",
-                    selection,
+                    {
+                        "selection": selection.model_dump(mode="json"),
+                        "domain_resolution": resolution.model_dump(mode="json"),
+                    },
                     "domain_selection",
                     metadata=metadata,
-                    display_markdown=render_domain_selection(selection.primary_domain, selection.secondary_domains),
+                    display_markdown=render_domain_selection(project.domain, project.secondary_domains),
                 )
                 self.state_machine.transition(project, "next")
             elif project.phase == ResearchPhase.BACKGROUND_RESEARCH:
-                run = self._run_agent(project, EvidenceResearcherAgent)
-                project.evidence = enrich_evidence_items(run.output.evidence)
-                project.claims = run.output.claims
-                project.evidence_gaps = run.output.evidence_gaps
-                project.conflicting_evidence = run.output.conflicting_evidence
-                self._refresh_quality_metrics(project)
-                if run.auxiliary.get("response_id"):
-                    project.previous_response_ids["evidence_search"] = str(run.auxiliary["response_id"])
-                produced_artifacts += self._record_agent_output(project, previous_phase, run, "evidence_map")
+                produced_artifacts += self._run_background_research(project, previous_phase)
                 self.state_machine.transition(project, "next")
             elif project.phase == ResearchPhase.CLAIM_EVIDENCE_MAPPING:
                 mapping, metadata = self._run_claim_mapping(project)
@@ -289,6 +292,7 @@ class ResearchOrchestrator:
                 raise InvalidTransitionError(f"No stage handler for phase {project.phase.value}")
             self.store.save(project)
         except Exception as exc:
+            stage_substep = self._substep_for_error(previous_phase, exc)
             event = ResearchEvent(
                 job_id=job_id,
                 project_id=project.project_id,
@@ -300,13 +304,14 @@ class ResearchOrchestrator:
                 error_message=self._sanitize_error(exc),
                 schema_valid=False,
                 finished_at=utc_now(),
-                failing_component=self._agent_name_for_phase(previous_phase),
-                stage_substep=self._substep_for_error(previous_phase, exc),
+                failing_component=self._failing_component_for_substep(stage_substep),
+                stage_substep=stage_substep,
                 attempted_model=self._agent_name_for_phase(previous_phase),
                 fallback_attempted=True,
                 tool_name="web_search" if previous_phase == ResearchPhase.BACKGROUND_RESEARCH else None,
                 safe_traceback=self._sanitize_traceback(exc),
-                display_markdown=self._failure_display_message(previous_phase, exc),
+                display_markdown=self._failure_display_message(previous_phase, stage_substep),
+                validation_errors=self._validation_errors(exc),
                 failed_calls=1,
             )
             project.stage_messages.append(event.display_markdown)
@@ -482,15 +487,158 @@ class ResearchOrchestrator:
             "human_actions_required": project.human_actions_required,
         }
 
-    def _run_agent(self, project: ResearchProject, agent_class: type) -> AgentRun:
-        self._ensure_budget(project, 1)
+    def _run_background_research(self, project: ResearchProject, phase: ResearchPhase) -> list[str]:
+        produced: list[str] = []
+        agent = EvidenceResearcherAgent(client=self._structured_client_for_project(project))
+        resolution = project.domain_resolution or resolve_domain(project.domain, project.secondary_domains)
+        project.domain_resolution = resolution
+        project.domain = resolution.canonical_primary_domain
+        project.secondary_domains = resolution.canonical_secondary_domains
+        self._append_event(
+            project,
+            completed_event(
+                project.project_id,
+                phase,
+                "evidence_researcher",
+                status="skill_resolution_started",
+                stage_substep="domain_skill_resolution",
+            ),
+        )
+        self._append_event(
+            project,
+            completed_event(
+                project.project_id,
+                phase,
+                "evidence_researcher",
+                status="skill_resolution_completed",
+                stage_substep="domain_skill_resolution",
+                fallback_used=resolution.fallback_used,
+                display_markdown=f"Domain skill resolved to {resolution.loaded_domain_skill}.",
+            ),
+        )
+
+        checkpoint = project.background_research_checkpoint
+        if checkpoint.search_completed and checkpoint.search_payload:
+            acquisition = SearchAcquisitionResult.model_validate(checkpoint.search_payload)
+        else:
+            self._ensure_budget(project, 1)
+            self._append_event(
+                project,
+                completed_event(
+                    project.project_id,
+                    phase,
+                    "evidence_researcher",
+                    status="search_acquisition_started",
+                    stage_substep="search_acquisition",
+                    tool_names=["web_search", "web_extractor"],
+                    tool_name="web_search",
+                ),
+            )
+            project.budget.attempted_model_calls += 1
+            self.store.save(project)
+            try:
+                acquisition = agent.acquire_search(project)
+            except Exception:
+                project.budget.failed_model_calls += 1
+                self.store.save(project)
+                raise
+            project.budget.successful_model_calls += 1
+            project.budget.used_model_calls += 1
+            if acquisition.response_id:
+                project.previous_response_ids["evidence_search"] = acquisition.response_id
+            search_record = self.artifacts.save_json(
+                project.project_id,
+                "search_acquisition",
+                acquisition.model_dump(mode="json"),
+                "evidence_researcher",
+            )
+            project.artifacts.append(search_record)
+            checkpoint.search_artifact_id = search_record.artifact_id
+            checkpoint.search_completed = True
+            checkpoint.normalization_completed = False
+            checkpoint.search_payload = acquisition.model_dump(mode="json")
+            produced.append(search_record.artifact_id)
+            self._append_event(
+                project,
+                completed_event(
+                    project.project_id,
+                    phase,
+                    "evidence_researcher",
+                    status="search_acquisition_completed",
+                    stage_substep="search_acquisition",
+                    output_artifact_ids=[search_record.artifact_id],
+                    tool_names=["web_search", "web_extractor"],
+                    tool_name="web_search",
+                    query_count=1,
+                    search_result_count=len(acquisition.sources),
+                    display_markdown="Search acquisition completed and checkpoint was saved.",
+                    successful_calls=1,
+                    attempted_calls=1,
+                    model_call_count=1,
+                ),
+            )
+            self._append_event(
+                project,
+                completed_event(
+                    project.project_id,
+                    phase,
+                    "evidence_researcher",
+                    status="artifact_save_completed",
+                    stage_substep="search_acquisition",
+                    output_artifact_ids=[search_record.artifact_id],
+                ),
+            )
+
+        self._append_event(
+            project,
+            completed_event(
+                project.project_id,
+                phase,
+                "evidence_researcher",
+                status="evidence_normalization_started",
+                stage_substep="evidence_normalization",
+            ),
+        )
         try:
-            return agent_class().run(project)
+            run = agent.normalize_search_result(project, acquisition)
         except Exception:
             project.budget.attempted_model_calls += 1
             project.budget.failed_model_calls += 1
             self.store.save(project)
             raise
+        project.evidence = enrich_evidence_items(run.output.evidence)
+        project.claims = run.output.claims
+        project.evidence_gaps = run.output.evidence_gaps
+        project.conflicting_evidence = run.output.conflicting_evidence
+        self._refresh_quality_metrics(project)
+        checkpoint.normalization_completed = True
+        produced += self._record_agent_output(project, phase, run, "evidence_map")
+        self._append_event(
+            project,
+            completed_event(
+                project.project_id,
+                phase,
+                "evidence_researcher",
+                status="evidence_normalization_completed",
+                stage_substep="evidence_normalization",
+                search_result_count=len(acquisition.sources),
+                display_markdown=render_evidence_summary(project.evidence, project.evidence_gaps),
+            ),
+        )
+        return produced
+
+    def _run_agent(self, project: ResearchProject, agent_class: type) -> AgentRun:
+        self._ensure_budget(project, 1)
+        try:
+            return agent_class(client=self._structured_client_for_project(project)).run(project)
+        except Exception:
+            project.budget.attempted_model_calls += 1
+            project.budget.failed_model_calls += 1
+            self.store.save(project)
+            raise
+
+    def _structured_client_for_project(self, project: ResearchProject) -> StructuredQwenClient:
+        return StructuredQwenClient(registry=ModelRegistry(project.model_overrides))
 
     def _run_domain_selection(self, project: ResearchProject) -> tuple[DomainSelectionOutput, StructuredCallMetadata]:
         payload = {
@@ -506,7 +654,7 @@ class ResearchOrchestrator:
             ),
         }
         try:
-            result = StructuredQwenClient().call(
+            result = self._structured_client_for_project(project).call(
                 "research_director",
                 "You are an AI Scientist domain analyst. Return structured domain routing only.",
                 payload,
@@ -532,7 +680,7 @@ class ResearchOrchestrator:
             ),
         }
         try:
-            result = StructuredQwenClient().call(
+            result = self._structured_client_for_project(project).call(
                 "evidence_researcher",
                 "You are an AI Scientist evidence researcher. Return validated evidence and claim mapping only.",
                 payload,
@@ -813,18 +961,50 @@ class ResearchOrchestrator:
         if phase == ResearchPhase.BACKGROUND_RESEARCH:
             message = str(exc).lower()
             if "search" in message or "responses api" in message:
-                return "search_call"
+                return "search_acquisition"
             if "validation" in message or "schema" in message:
-                return "schema_validation"
+                return "evidence_schema_validation"
             if "source" in message or "evidence" in message:
                 return "evidence_normalization"
         return "model_call"
 
     @staticmethod
-    def _failure_display_message(phase: ResearchPhase, exc: Exception) -> str:
+    def _failing_component_for_substep(stage_substep: str) -> str:
+        return {
+            "domain_skill_resolution": "domain_skill_resolution",
+            "search_acquisition": "search_acquisition",
+            "evidence_normalization": "evidence_normalization",
+            "evidence_schema_validation": "evidence_schema_validation",
+        }.get(stage_substep, "model_call")
+
+    @staticmethod
+    def _failure_display_message(phase: ResearchPhase, stage_substep: str) -> str:
         if phase == ResearchPhase.BACKGROUND_RESEARCH:
-            return "证据研究阶段在整理搜索结果时失败。项目仍保留在上一完整阶段，可以重试。"
-        return f"{phase.value} 阶段执行失败，项目已保留在上一完整阶段。"
+            return {
+                "domain_skill_resolution": "系统无法匹配专用学科规则，已尝试使用通用研究规则。",
+                "search_acquisition": "联网证据检索未成功，项目已保留在上一个完整阶段。",
+                "evidence_normalization": "证据已经检索完成，但整理为研究证据时出现问题，可以直接重试整理，无需重新搜索。",
+                "evidence_schema_validation": "部分证据信息不完整，系统未将不可靠内容写入正式研究记录。",
+            }.get(stage_substep, "证据研究阶段执行失败，项目已保留在上一个完整阶段，可以重试。")
+        return f"{phase.value} 阶段执行失败，项目已保留在上一个完整阶段。"
+
+    @staticmethod
+    def _validation_errors(exc: Exception) -> list[dict[str, Any]]:
+        errors: list[dict[str, Any]] = []
+        current: BaseException | None = exc
+        while current:
+            if hasattr(current, "errors") and callable(getattr(current, "errors")):
+                try:
+                    raw_errors = current.errors()
+                except Exception:
+                    raw_errors = []
+                for item in raw_errors:
+                    if isinstance(item, dict):
+                        errors.append({"loc": item.get("loc"), "type": item.get("type"), "msg": item.get("msg")})
+                if errors:
+                    return errors
+            current = current.__cause__
+        return []
 
 
 def _optional_int(value: Any) -> int | None:

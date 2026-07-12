@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import os
 import threading
+import time
 
 from fastapi import FastAPI, HTTPException, status
 from fastapi.responses import PlainTextResponse
 
 from src.ai_scientist.job_store import ResearchJobStore, fail_job
+from src.ai_scientist.model_registry import ModelRegistry
 from src.ai_scientist.orchestrator import ResearchOrchestrator
 from src.ai_scientist.schemas import (
     EvidenceCreateRequest,
@@ -20,6 +23,7 @@ from src.pure_qwen_client import PureQwenClient, pure_qwen_metadata
 from src.pure_schemas import DebugPayloadResponse, PureChatRequest, PureChatResponse
 from src.search_qwen_client import SEARCH_TOOLS, SearchQwenClient, search_qwen_metadata
 from src.search_schemas import SearchChatRequest, SearchChatResponse, SearchDebugPayloadResponse
+from src.model_utils import normalize_model_name
 
 
 app = FastAPI(
@@ -39,6 +43,58 @@ def health() -> dict:
     return {"status": "ok", **pure_qwen_metadata()}
 
 
+@app.get("/api/config/models")
+def model_config() -> dict:
+    """Return public default model configuration without secrets."""
+
+    return {
+        "pure_qwen": {
+            "default_model": os.getenv("LLM_MODEL", "qwen-turbo"),
+        },
+        "qwen_search": {
+            "default_model": os.getenv("LLM_SEARCH_MODEL", "qwen3.7-plus"),
+        },
+        "ai_scientist": ModelRegistry.public_defaults(),
+    }
+
+
+@app.post("/api/models/test")
+def model_connectivity_test(request: dict) -> dict:
+    """Test one user-provided model id using a minimal Qwen call."""
+
+    started = time.perf_counter()
+    try:
+        model = normalize_model_name(request.get("model"))
+        mode = request.get("mode")
+        if not model:
+            raise ValueError("Model name is required.")
+        if mode not in {"chat", "search"}:
+            raise ValueError("mode must be 'chat' or 'search'.")
+        if mode == "chat":
+            PureQwenClient().chat(messages=[{"role": "user", "content": "Reply with OK."}], model=model)
+        else:
+            client = SearchQwenClient()
+            client.client.responses.create(
+                model=model,
+                input="Search for the current date and reply briefly.",
+                tools=[{"type": "web_search"}],
+            )
+        return {
+            "status": "ok",
+            "model": model,
+            "mode": mode,
+            "latency_ms": int((time.perf_counter() - started) * 1000),
+        }
+    except Exception as exc:  # noqa: BLE001 - safe diagnostic endpoint.
+        return {
+            "status": "error",
+            "model": _safe_request_model(request),
+            "mode": str(request.get("mode") or ""),
+            "error_category": _model_error_category(exc),
+            "message": _model_error_message(exc),
+        }
+
+
 @app.post("/api/debug_payload", response_model=DebugPayloadResponse)
 def debug_payload(request: PureChatRequest) -> DebugPayloadResponse:
     """Return the exact messages that would be sent to Qwen without calling Qwen."""
@@ -46,7 +102,7 @@ def debug_payload(request: PureChatRequest) -> DebugPayloadResponse:
     messages = _build_messages_without_client(request)
     return DebugPayloadResponse(
         messages=messages,
-        model=request.model or str(pure_qwen_metadata()["model"]),
+        model=normalize_model_name(request.model) or str(pure_qwen_metadata()["model"]),
     )
 
 
@@ -115,7 +171,7 @@ def chat(request: PureChatRequest) -> PureChatResponse:
     try:
         client = PureQwenClient()
         messages = client.build_messages(request.message, request.history)
-        model = request.model or client.model
+        model = normalize_model_name(request.model) or client.model
         reply = client.chat(messages, model=model)
     except Exception as exc:  # noqa: BLE001 - API should return an actionable error.
         detail = {
@@ -136,7 +192,7 @@ def debug_search_payload(request: SearchChatRequest) -> SearchDebugPayloadRespon
     """Return the exact safe Responses API search payload without calling Qwen."""
 
     return SearchDebugPayloadResponse(
-        model=request.model or str(search_qwen_metadata()["model"]),
+        model=normalize_model_name(request.model) or str(search_qwen_metadata()["model"]),
         input=request.message,
         previous_response_id=request.previous_response_id,
         tools=[tool.copy() for tool in SEARCH_TOOLS],
@@ -149,7 +205,7 @@ def chat_search(request: SearchChatRequest) -> SearchChatResponse:
 
     try:
         client = SearchQwenClient()
-        model = request.model or client.model
+        model = normalize_model_name(request.model) or client.model
         result = client.search(
             message=request.message,
             model=model,
@@ -207,6 +263,39 @@ def _sanitize(message: str) -> str:
     return message.replace(api_key, "[REDACTED_API_KEY]") if api_key else message
 
 
+def _safe_request_model(request: dict) -> str:
+    try:
+        return normalize_model_name(request.get("model")) or ""
+    except Exception:
+        return ""
+
+
+def _model_error_category(exc: Exception) -> str:
+    text = f"{type(exc).__name__}: {exc}".lower()
+    if any(token in text for token in ["not found", "does not exist", "invalid model", "model_not_found"]):
+        return "model_not_found"
+    if any(token in text for token in ["permission", "not authorized", "forbidden", "access denied"]):
+        return "permission_denied"
+    if any(token in text for token in ["quota", "insufficient", "rate limit"]):
+        return "quota_exhausted"
+    if any(token in text for token in ["web_search", "tool", "unsupported"]):
+        return "unsupported_tool"
+    if any(token in text for token in ["timeout", "connection", "ssl", "network"]):
+        return "network_error"
+    return "provider_error"
+
+
+def _model_error_message(exc: Exception) -> str:
+    return {
+        "model_not_found": "模型名称不可用，请确认该模型 ID 是否被当前百炼账号支持。",
+        "permission_denied": "当前账号没有调用该模型的权限。",
+        "quota_exhausted": "模型调用额度或速率限制可能已耗尽。",
+        "unsupported_tool": "该模型可能不支持当前联网搜索工具。",
+        "network_error": "网络或连接层调用失败，请稍后重试。",
+        "provider_error": "模型服务返回错误，请检查模型名称和账号权限。",
+    }[_model_error_category(exc)]
+
+
 @app.post("/api/research/start")
 def research_start(request: ResearchStartRequest) -> dict:
     """Create a persisted AI Scientist project without running a model stage."""
@@ -217,6 +306,7 @@ def research_start(request: ResearchStartRequest) -> dict:
             domain_hint=request.domain_hint,
             constraints_text=request.constraints_text,
             constraints=request.constraints,
+            model_overrides=request.model_overrides,
             max_iterations=request.max_iterations,
             planning_only=request.planning_only,
         )

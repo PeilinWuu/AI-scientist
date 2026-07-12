@@ -8,6 +8,7 @@ from typing import Any
 
 import yaml
 
+from src.ai_scientist.domain_resolution import canonicalize_domain
 from src.ai_scientist.exceptions import SkillValidationError
 from src.ai_scientist.schemas import ResearchMode
 
@@ -68,13 +69,25 @@ class SkillLoader:
         domain_skill: str,
     ) -> list[dict[str, Any]]:
         method_name = METHOD_SKILL_NAMES[research_mode or ResearchMode.THEORETICAL]
-        selected_domain = domain_skill if (self.root / "domains" / f"{domain_skill}.yaml").exists() else "general"
+        selected_domain = self.resolve_domain_skill_name(domain_skill)
         return [
             self.load("core", "epistemic_policy"),
             self.load("core", agent_name),
             self.load("methods", method_name),
             self.load("domains", selected_domain),
         ]
+
+    def resolve_domain_skill_name(self, domain_skill: str) -> str:
+        """Return a loadable domain skill, falling back safely to general."""
+
+        canonical = canonicalize_domain(domain_skill)
+        candidate = self.root / "domains" / f"{canonical}.yaml"
+        if candidate.exists():
+            return canonical
+        general = self.root / "domains" / "general.yaml"
+        if general.exists():
+            return "general"
+        raise SkillValidationError("Neither the selected domain skill nor general.yaml is available.")
 
     @staticmethod
     def compose_instructions(skills: list[dict[str, Any]]) -> str:

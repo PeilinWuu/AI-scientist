@@ -5,6 +5,8 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
+from src.model_utils import normalize_model_overrides
+
 
 ROLE_ENV_VARS = {
     "research_director": "AI_SCIENTIST_DIRECTOR_MODEL",
@@ -31,15 +33,16 @@ class ModelResolution:
 class ModelRegistry:
     """Resolve role models without hard-coding model IDs in agents."""
 
-    def __init__(self) -> None:
-        self.fallback_model = os.getenv("AI_SCIENTIST_FALLBACK_MODEL") or os.getenv(
+    def __init__(self, overrides: dict[str, str | None] | None = None) -> None:
+        self.overrides = normalize_model_overrides(overrides)
+        self.fallback_model = self.overrides.get("fallback") or os.getenv("AI_SCIENTIST_FALLBACK_MODEL") or os.getenv(
             "LLM_MODEL", "qwen-turbo"
         )
 
     def resolve(self, agent_name: str) -> ModelResolution:
         if agent_name not in ROLE_ENV_VARS:
             raise KeyError(f"Unknown AI Scientist role: {agent_name}")
-        configured = os.getenv(ROLE_ENV_VARS[agent_name], "").strip()
+        configured = self.overrides.get(agent_name) or os.getenv(ROLE_ENV_VARS[agent_name], "").strip()
         selected = configured or self.fallback_model
         return ModelResolution(
             agent_name=agent_name,
@@ -53,4 +56,12 @@ class ModelRegistry:
         return {
             role: (os.getenv(env_name, "").strip() or self.fallback_model)
             for role, env_name in ROLE_ENV_VARS.items()
+        }
+
+    @classmethod
+    def public_defaults(cls) -> dict[str, object]:
+        registry = cls()
+        return {
+            "roles": registry.public_configuration(),
+            "fallback_model": registry.fallback_model,
         }

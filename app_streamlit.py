@@ -12,16 +12,28 @@ import streamlit as st
 from dotenv import load_dotenv
 
 from src.ai_scientist.presentation import PHASE_LABELS, render_event_dict, render_project_overview
+from src.model_utils import normalize_model_name
 
 
 ROOT_DIR = Path(__file__).resolve().parent
 load_dotenv(ROOT_DIR / ".env")
 
 DEFAULT_BACKEND_URL = "http://localhost:8000"
-PURE_MODEL_OPTIONS = ["qwen-turbo", "qwen-plus", "qwen-plus-latest"]
-SEARCH_MODEL_OPTIONS = ["qwen3.7-plus", "qwen3.7-max", "qwen3.6-plus", "qwen3.5-plus"]
 APP_MODES = ["Pure Qwen", "Qwen Search", "AI Scientist"]
 RESEARCH_STEP_TIMEOUT = int(os.getenv("AI_SCIENTIST_FRONTEND_STEP_TIMEOUT", "600"))
+
+SCIENTIST_MODEL_KEYS = {
+    "research_director": ("scientist_director_model", "研究总监模型"),
+    "evidence_researcher": ("scientist_research_model", "证据研究员模型"),
+    "methodologist": ("scientist_methodologist_model", "方法学专家模型"),
+    "hypothesis_scientist": ("scientist_hypothesis_model", "假设科学家模型"),
+    "study_designer": ("scientist_designer_model", "研究设计师模型"),
+    "analyst": ("scientist_analyst_model", "分析师模型"),
+    "reproducibility_engineer": ("scientist_reproducibility_model", "复现工程师模型"),
+    "skeptical_reviewer": ("scientist_reviewer_model", "独立审查员模型"),
+    "scientific_synthesizer": ("scientist_synthesizer_model", "科学综合员模型"),
+    "fallback": ("scientist_fallback_model", "备用模型"),
+}
 
 
 class BackendAPIError(RuntimeError):
@@ -68,6 +80,63 @@ def get_text(backend_url: str, path: str) -> str:
     if not response.ok:
         raise BackendAPIError(response.status_code, _extract_error_detail(response))
     return response.text
+
+
+def get_model_config(backend_url: str) -> dict:
+    try:
+        config = get_json(backend_url, "/api/config/models")
+        return config if isinstance(config, dict) else {}
+    except Exception:
+        return {}
+
+
+def model_default(config: dict, section: str, fallback: str) -> str:
+    value = (config.get(section) or {}).get("default_model")
+    return str(value or fallback)
+
+
+def effective_model_input(key: str, default_model: str) -> str | None:
+    try:
+        return normalize_model_name(st.session_state.get(key)) or default_model
+    except ValueError as exc:
+        st.sidebar.error(str(exc))
+        return None
+
+
+def scientist_default_models(config: dict) -> dict[str, str]:
+    scientist = config.get("ai_scientist") or {}
+    roles = scientist.get("roles") or {}
+    fallback = str(scientist.get("fallback_model") or os.getenv("LLM_MODEL", "qwen-turbo"))
+    defaults = {role: str(roles.get(role) or fallback) for role in SCIENTIST_MODEL_KEYS if role != "fallback"}
+    defaults["fallback"] = fallback
+    return defaults
+
+
+def scientist_model_overrides(defaults: dict[str, str]) -> dict[str, str]:
+    overrides: dict[str, str] = {}
+    for role, (key, _) in SCIENTIST_MODEL_KEYS.items():
+        value = normalize_model_name(st.session_state.get(key))
+        if value and value != defaults.get(role):
+            overrides[role] = value
+    return overrides
+
+
+def test_model(backend_url: str, model: str, mode: str) -> dict:
+    return post_json(backend_url, "/api/models/test", {"model": model, "mode": mode}, timeout=180)
+
+
+def render_model_test_result(result: dict) -> None:
+    if result.get("status") == "ok":
+        st.success(f"模型可用：{result.get('model')}（{result.get('latency_ms')} ms）")
+    else:
+        st.error(f"模型不可用：{result.get('model')}")
+        st.caption(str(result.get("message") or result.get("error_category") or "调用失败"))
+
+
+def render_model_test_table(rows: list[dict]) -> None:
+    if not rows:
+        return
+    st.dataframe(rows, use_container_width=True, hide_index=True)
 
 
 def normalize_records(records: object) -> list[dict]:
@@ -132,18 +201,45 @@ def render_search_debug(metadata: dict) -> None:
 
 def render_chat_mode(backend_url: str, mode: str, show_debug: bool) -> None:
     search_enabled = mode == "Qwen Search"
+    config = get_model_config(backend_url)
     if search_enabled:
-        default_model = os.getenv("LLM_SEARCH_MODEL", "qwen3.7-plus")
-        default_index = SEARCH_MODEL_OPTIONS.index(default_model) if default_model in SEARCH_MODEL_OPTIONS else 0
-        model = st.sidebar.selectbox(
-            "Model", SEARCH_MODEL_OPTIONS, index=default_index, key="search_model_control"
+        default_model = model_default(config, "qwen_search", os.getenv("LLM_SEARCH_MODEL", "qwen3.7-plus"))
+        key = "qwen_search_model_input"
+        if key not in st.session_state:
+            st.session_state[key] = default_model
+        if st.sidebar.button("恢复默认联网模型"):
+            st.session_state[key] = default_model
+            st.rerun()
+        st.sidebar.text_input(
+            "联网模型名称",
+            key=key,
+            placeholder="例如：qwen3.7-plus",
+            help="请输入百炼实际支持的完整模型 ID。留空时使用服务器默认配置。联网模型必须支持当前 Responses API 搜索工具。",
         )
+        model = effective_model_input(key, default_model)
+        if not model:
+            return
+        if st.sidebar.button("测试联网模型"):
+            render_model_test_result(test_model(backend_url, model, "search"))
     else:
-        default_model = os.getenv("LLM_MODEL", "qwen-turbo")
-        default_index = PURE_MODEL_OPTIONS.index(default_model) if default_model in PURE_MODEL_OPTIONS else 0
-        model = st.sidebar.selectbox(
-            "Model", PURE_MODEL_OPTIONS, index=default_index, key="pure_model_control"
+        default_model = model_default(config, "pure_qwen", os.getenv("LLM_MODEL", "qwen-turbo"))
+        key = "pure_qwen_model_input"
+        if key not in st.session_state:
+            st.session_state[key] = default_model
+        if st.sidebar.button("恢复默认模型"):
+            st.session_state[key] = default_model
+            st.rerun()
+        st.sidebar.text_input(
+            "模型名称",
+            key=key,
+            placeholder="例如：qwen-plus",
+            help="请输入百炼实际支持的完整模型 ID。留空时使用服务器默认配置。",
         )
+        model = effective_model_input(key, default_model)
+        if not model:
+            return
+        if st.sidebar.button("测试模型"):
+            render_model_test_result(test_model(backend_url, model, "chat"))
 
     if not search_enabled:
         st.session_state.search_previous_response_id = None
@@ -244,8 +340,56 @@ def refresh_research_project(backend_url: str) -> dict | None:
     return project  # type: ignore[return-value]
 
 
+def render_scientist_model_config(backend_url: str) -> dict[str, str]:
+    config = get_model_config(backend_url)
+    defaults = scientist_default_models(config)
+    for role, (key, _) in SCIENTIST_MODEL_KEYS.items():
+        if key not in st.session_state:
+            st.session_state[key] = defaults.get(role, "")
+
+    with st.expander("模型团队配置", expanded=False):
+        if st.button("恢复 .env 模型团队"):
+            for role, (key, _) in SCIENTIST_MODEL_KEYS.items():
+                st.session_state[key] = defaults.get(role, "")
+            st.rerun()
+        with st.form("scientist_model_team_form"):
+            for role, (key, label) in SCIENTIST_MODEL_KEYS.items():
+                st.text_input(
+                    label,
+                    key=key,
+                    placeholder="请输入百炼支持的完整模型 ID；留空使用服务器默认配置",
+                )
+            apply_models = st.form_submit_button("应用模型配置")
+            test_models = st.form_submit_button("测试团队配置")
+        if apply_models:
+            st.success("模型配置已应用到当前前端会话。创建新项目时会写入该项目。")
+        if test_models:
+            rows = []
+            model_to_roles: dict[tuple[str, str], list[str]] = {}
+            for role, (key, label) in SCIENTIST_MODEL_KEYS.items():
+                model = normalize_model_name(st.session_state.get(key)) or defaults.get(role, "")
+                if not model:
+                    continue
+                mode = "search" if role == "evidence_researcher" else "chat"
+                model_to_roles.setdefault((model, mode), []).append(label)
+            for (model, test_mode), labels in model_to_roles.items():
+                result = test_model(backend_url, model, test_mode)
+                rows.append(
+                    {
+                        "模型名称": model,
+                        "用途": "、".join(labels),
+                        "状态": "可用" if result.get("status") == "ok" else "不可用",
+                        "说明": "调用成功" if result.get("status") == "ok" else result.get("message", "调用失败"),
+                    }
+                )
+            render_model_test_table(rows)
+        st.caption("这些输入只影响当前会话和新建项目，不会修改 .env。")
+    return defaults
+
+
 def render_research_workspace(backend_url: str, show_debug: bool) -> None:
     st.title("AI Scientist")
+    model_defaults = render_scientist_model_config(backend_url)
     st.caption("多 Qwen 角色按状态机协作；当前版本执行研究规划，不伪造实验或分析结果。")
 
     with st.expander("创建研究项目", expanded=not bool(st.session_state.research_project_id)):
@@ -277,6 +421,7 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
                         "domain_hint": domain_hint or None,
                         "constraints_text": constraints_text,
                         "constraints": {},
+                        "model_overrides": scientist_model_overrides(model_defaults),
                         "max_iterations": int(max_iterations),
                         "planning_only": planning_only,
                     },
@@ -301,6 +446,10 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
     budget = project.get("budget") or {}
     columns[4].metric("Model calls", f"{budget.get('used_model_calls', 0)}/{budget.get('max_model_calls', 0)}")
     st.caption(f"Project ID: {project.get('project_id')}")
+    if project.get("model_overrides"):
+        st.caption("This project uses model overrides saved at creation time.")
+        if show_debug:
+            render_debug_object(project.get("model_overrides"))
 
     metrics = project.get("quality_metrics") or {}
     st.subheader("Research Quality")

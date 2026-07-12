@@ -77,12 +77,67 @@ class ResearchQuestion(StrictModel):
 SourceLevel = Literal["A", "B", "C", "D", "E"]
 
 
+def _string_list(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [value] if value.strip() else []
+    if isinstance(value, list):
+        result: list[str] = []
+        for item in value:
+            if item is None:
+                continue
+            if isinstance(item, dict):
+                text = item.get("title") or item.get("url") or item.get("name") or item.get("text")
+                if text:
+                    result.append(str(text))
+            else:
+                text = str(item).strip()
+                if text:
+                    result.append(text)
+        return result
+    return [str(value)]
+
+
+def normalize_evidence_payload(data: Any) -> Any:
+    """Normalize a parsed evidence dict without guessing JSON from text."""
+
+    if not isinstance(data, dict):
+        return data
+    normalized = dict(data)
+    normalized.pop("supporting_sources", None)
+    if not normalized.get("evidence_id"):
+        normalized.pop("evidence_id", None)
+    normalized["authors"] = _string_list(normalized.get("authors"))
+    normalized["limitations"] = _string_list(normalized.get("limitations"))
+    normalized["extracted_claims"] = _string_list(normalized.get("extracted_claims"))
+    if not normalized.get("source_url"):
+        normalized["source_url"] = None
+        normalized["verified"] = False
+        normalized.setdefault("verification_note", "No verifiable URL was returned.")
+    if not normalized.get("doi"):
+        normalized["doi"] = None
+    if normalized.get("publication_date") is not None:
+        normalized["publication_date"] = str(normalized["publication_date"])
+    source_type = str(normalized.get("source_type") or "unknown").strip().lower().replace(" ", "_")
+    allowed = {"paper", "article", "website", "report", "review", "dataset", "book", "unknown", "web_source"}
+    normalized["source_type"] = source_type if source_type in allowed else "unknown"
+    for key in ("reliability", "relevance"):
+        if normalized.get(key) is None:
+            normalized[key] = "unknown"
+        elif not isinstance(normalized.get(key), str):
+            normalized[key] = str(normalized[key])
+    return normalized
+
+
 class EvidenceItem(StrictModel):
     evidence_id: str = Field(default_factory=lambda: new_id("evidence"))
     title: str
-    source_type: str
+    source_type: str = "unknown"
     source_url: str | None = None
     citation: str | None = None
+    authors: list[str] = Field(default_factory=list)
+    doi: str | None = None
     summary: str
     extracted_claims: list[str] = Field(default_factory=list)
     reliability: str = "unknown"
@@ -93,10 +148,69 @@ class EvidenceItem(StrictModel):
     source_level: SourceLevel = "E"
     is_primary_source: bool = False
     verified: bool = False
+    verification_note: str | None = None
     duplicate_of: str | None = None
     retrieval_date: datetime = Field(default_factory=utc_now)
     reliability_score: float = Field(default=0.0, ge=0.0, le=1.0)
     relevance_score: float = Field(default=0.0, ge=0.0, le=1.0)
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_evidence_payload(cls, data: Any) -> Any:
+        """Normalize common model variants before strict validation."""
+
+        return normalize_evidence_payload(data)
+
+
+class SearchSource(StrictModel):
+    title: str = ""
+    url: str | None = None
+    site_name: str | None = None
+    snippet: str | None = None
+    publication_date: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_source(cls, data: Any) -> Any:
+        if isinstance(data, str):
+            return {"title": data, "url": data if data.startswith(("http://", "https://")) else None}
+        if not isinstance(data, dict):
+            return {"title": str(data)}
+        normalized = dict(data)
+        normalized["title"] = str(normalized.get("title") or normalized.get("name") or normalized.get("url") or "")
+        normalized["url"] = normalized.get("url") or normalized.get("source_url") or normalized.get("link")
+        if not normalized.get("url"):
+            normalized["url"] = None
+        normalized["site_name"] = normalized.get("site_name") or normalized.get("site") or normalized.get("domain")
+        normalized["snippet"] = normalized.get("snippet") or normalized.get("summary") or normalized.get("text")
+        if normalized.get("publication_date") is not None:
+            normalized["publication_date"] = str(normalized["publication_date"])
+        return {
+            "title": normalized.get("title") or "",
+            "url": normalized.get("url"),
+            "site_name": normalized.get("site_name"),
+            "snippet": normalized.get("snippet"),
+            "publication_date": normalized.get("publication_date"),
+        }
+
+
+class SearchAcquisitionResult(StrictModel):
+    final_text: str = ""
+    sources: list[SearchSource] = Field(default_factory=list)
+    response_id: str | None = None
+    request_id: str | None = None
+    search_used: bool = False
+    warnings: list[str] = Field(default_factory=list)
+
+
+class DomainResolution(StrictModel):
+    reported_primary_domain: str
+    reported_secondary_domains: list[str] = Field(default_factory=list)
+    canonical_primary_domain: str
+    canonical_secondary_domains: list[str] = Field(default_factory=list)
+    loaded_domain_skill: str
+    fallback_used: bool = False
+    mapping_reason: str = ""
 
 
 ClaimType = Literal["observation", "reported_fact", "inference", "hypothesis", "prediction", "conclusion"]
@@ -113,6 +227,23 @@ class Claim(StrictModel):
     assumptions: list[str] = Field(default_factory=list)
     limitations: list[str] = Field(default_factory=list)
     status: ClaimStatus = "unknown"
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_claim_payload(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        normalized = dict(data)
+        if not normalized.get("claim_id"):
+            normalized.pop("claim_id", None)
+        normalized.pop("supporting_sources", None)
+        normalized["supporting_evidence_ids"] = _string_list(normalized.get("supporting_evidence_ids"))
+        normalized["contradicting_evidence_ids"] = _string_list(normalized.get("contradicting_evidence_ids"))
+        normalized["assumptions"] = _string_list(normalized.get("assumptions"))
+        normalized["limitations"] = _string_list(normalized.get("limitations"))
+        normalized["claim_type"] = normalized.get("claim_type") or "reported_fact"
+        normalized["status"] = normalized.get("status") or "unknown"
+        return normalized
 
 
 class Hypothesis(StrictModel):
@@ -334,6 +465,14 @@ class ResearchEvent(StrictModel):
     tool_name: str | None = None
     stage_substep: str | None = None
     safe_traceback: str | None = None
+    validation_errors: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class BackgroundResearchCheckpoint(StrictModel):
+    search_artifact_id: str | None = None
+    search_completed: bool = False
+    normalization_completed: bool = False
+    search_payload: dict[str, Any] | None = None
 
 
 class ResearchProject(StrictModel):
@@ -342,8 +481,10 @@ class ResearchProject(StrictModel):
     objective: str
     domain: str = "general"
     secondary_domains: list[str] = Field(default_factory=list)
+    domain_resolution: DomainResolution | None = None
     research_mode: ResearchMode | None = None
     secondary_modes: list[ResearchMode] = Field(default_factory=list)
+    model_overrides: dict[str, str] = Field(default_factory=dict)
     phase: ResearchPhase = ResearchPhase.INTAKE
     constraints: dict[str, Any] = Field(default_factory=dict)
     question: ResearchQuestion | None = None
@@ -365,6 +506,9 @@ class ResearchProject(StrictModel):
     missing_capabilities: list[str] = Field(default_factory=list)
     human_actions_required: list[str] = Field(default_factory=list)
     previous_response_ids: dict[str, str] = Field(default_factory=dict)
+    background_research_checkpoint: BackgroundResearchCheckpoint = Field(
+        default_factory=BackgroundResearchCheckpoint
+    )
     stage_messages: list[str] = Field(default_factory=list)
     planning_only: bool = True
     domain_hint: str | None = None
@@ -395,6 +539,28 @@ class EvidenceResearchOutput(StrictModel):
     conflicting_evidence: list[str] = Field(default_factory=list)
     unsupported_claims: list[str] = Field(default_factory=list)
     confidence_summary: str = ""
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_collection_payload(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        normalized = dict(data)
+        if "evidence" not in normalized:
+            normalized["evidence"] = (
+                normalized.pop("evidence_items", None)
+                or normalized.pop("items", None)
+                or normalized.pop("sources", None)
+                or []
+            )
+        if "claims" not in normalized:
+            normalized["claims"] = normalized.pop("key_claims", None) or normalized.pop("findings", None) or []
+        normalized["evidence_gaps"] = _string_list(normalized.get("evidence_gaps"))
+        normalized["conflicting_evidence"] = _string_list(normalized.get("conflicting_evidence"))
+        normalized["unsupported_claims"] = _string_list(normalized.get("unsupported_claims"))
+        if normalized.get("confidence_summary") is None:
+            normalized["confidence_summary"] = ""
+        return normalized
 
 
 class MethodSelectionOutput(StrictModel):
@@ -446,6 +612,7 @@ class ResearchStartRequest(StrictModel):
     domain_hint: str | None = None
     constraints_text: str = ""
     constraints: dict[str, Any] = Field(default_factory=dict)
+    model_overrides: dict[str, str | None] = Field(default_factory=dict)
     max_iterations: int = Field(
         default_factory=lambda: int(os.getenv("AI_SCIENTIST_MAX_ITERATIONS", "2")),
         ge=0,

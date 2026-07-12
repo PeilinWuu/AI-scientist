@@ -112,6 +112,29 @@ AI_SCIENTIST_DEFAULT_PLANNING_ONLY=true
 
 Do not assume every account supports the same model IDs. If a role variable is empty, the registry uses `AI_SCIENTIST_FALLBACK_MODEL`, then `LLM_MODEL`. Configuration or runtime fallback is recorded in the event log through `requested_model`, `actual_model`, and `fallback_used`; it is never silent.
 
+The Streamlit UI no longer uses a fixed model dropdown. Pure Qwen, Qwen Search, and every AI Scientist role accept a free-form model ID. Values in `.env` are defaults only; frontend edits affect the current browser session, and AI Scientist model overrides are saved into the project at creation time. Updating `.env` later does not silently change an existing research project.
+
+Model names are lightly sanitized before use: empty input falls back to the default, while line breaks, control characters, and names longer than 128 characters are rejected. The app does not guess, correct, or validate against a hard-coded model list. Use the built-in test buttons or the API below to verify real account support.
+
+```text
+GET  /api/config/models
+POST /api/models/test
+```
+
+`POST /api/models/test` accepts:
+
+```json
+{"model": "qwen3.7-plus", "mode": "chat"}
+```
+
+or:
+
+```json
+{"model": "qwen3.7-plus", "mode": "search"}
+```
+
+It returns a safe success/error category and never returns API keys or authorization headers.
+
 ## Run
 
 Backend:
@@ -136,6 +159,23 @@ Create a planning-only project:
 curl -X POST http://127.0.0.1:8000/api/research/start ^
   -H "Content-Type: application/json" ^
   -d "{\"objective\":\"Evaluate whether a new classification algorithm outperforms existing methods.\",\"domain_hint\":\"computer_science\",\"constraints\":{},\"max_iterations\":2,\"planning_only\":true}"
+```
+
+You can pin a model team for one project with `model_overrides`:
+
+```json
+{
+  "objective": "Evaluate whether a new classification algorithm outperforms existing methods.",
+  "domain_hint": "computer_science",
+  "constraints": {},
+  "max_iterations": 2,
+  "planning_only": true,
+  "model_overrides": {
+    "research_director": "qwen-plus",
+    "evidence_researcher": "qwen3.7-plus",
+    "fallback": "qwen-plus"
+  }
+}
 ```
 
 Advance exactly one phase:
