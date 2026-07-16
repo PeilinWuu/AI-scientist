@@ -378,6 +378,19 @@ def research_debug_evidence_search_ping(request: dict) -> dict:
         }
 
 
+@app.post("/api/research/debug/claim-mapping")
+def research_debug_claim_mapping(request: dict) -> dict:
+    """Dry-run claim-evidence mapping diagnostics without advancing project state."""
+
+    project_id = str(request.get("project_id") or "")
+    if not project_id:
+        raise HTTPException(status_code=400, detail={"error_message": "project_id is required."})
+    try:
+        return research_orchestrator.debug_claim_mapping(project_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _research_http_error(exc) from exc
+
+
 @app.get("/api/research/{project_id}")
 def research_get(project_id: str) -> dict:
     """Return display-safe structured project state."""
@@ -639,5 +652,13 @@ def _research_http_error(exc: Exception) -> HTTPException:
             "mode": "ai_scientist",
             "error_type": error_type,
             "error_message": _sanitize(str(exc)),
+            "stage": getattr(exc, "stage", None),
+            "stage_substep": getattr(exc, "substep", None),
+            "failing_component": getattr(exc, "failing_component", None),
+            "failure_category": getattr(exc, "failure_category", None),
+            "artifact_type": getattr(exc, "artifact_type", None),
+            "cause_type": getattr(exc, "cause_type", None),
+            "cause_message": _sanitize(str(getattr(exc, "cause_message", "") or "")),
+            "validation_errors": getattr(exc, "validation_errors", []),
         },
     )

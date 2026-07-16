@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from src.ai_scientist.exceptions import InvalidEvidenceReferenceError
 from src.ai_scientist.schemas import Claim, Conclusion, EvidenceItem
 
 
@@ -55,6 +56,41 @@ class ClaimGraph:
             if claim.status == "supported" and not claim.supporting_evidence_ids:
                 errors.append(f"Supported claim {claim.claim_id} has no evidence.")
         return errors
+
+    def validate_or_raise(self) -> None:
+        """Raise a typed error for the first invalid evidence reference."""
+
+        for claim in self.claims.values():
+            for evidence_id in claim.supporting_evidence_ids + claim.contradicting_evidence_ids:
+                if evidence_id not in self.evidence:
+                    raise InvalidEvidenceReferenceError(claim.claim_id, evidence_id)
+
+    def to_dict(self) -> dict:
+        """Return a safe serializable graph without model prompts or provider data."""
+
+        return {
+            "evidence_ids": sorted(self.evidence),
+            "claims": [
+                {
+                    "claim_id": claim.claim_id,
+                    "statement": claim.statement,
+                    "status": claim.status,
+                    "supporting_evidence_ids": claim.supporting_evidence_ids,
+                    "contradicting_evidence_ids": claim.contradicting_evidence_ids,
+                }
+                for claim in self.claims.values()
+            ],
+            "links": [
+                {"claim_id": claim.claim_id, "evidence_id": evidence_id, "relation": "supports"}
+                for claim in self.claims.values()
+                for evidence_id in claim.supporting_evidence_ids
+            ]
+            + [
+                {"claim_id": claim.claim_id, "evidence_id": evidence_id, "relation": "contradicts"}
+                for claim in self.claims.values()
+                for evidence_id in claim.contradicting_evidence_ids
+            ],
+        }
 
     def validate_conclusion_traceability(self, conclusion: Conclusion) -> list[str]:
         errors: list[str] = []

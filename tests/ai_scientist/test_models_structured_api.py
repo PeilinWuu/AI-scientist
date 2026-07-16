@@ -13,9 +13,11 @@ from src.ai_scientist.model_registry import ModelRegistry
 from src.ai_scientist.orchestrator import ResearchOrchestrator
 from src.ai_scientist.schemas import (
     Claim,
+    ClaimEvidenceLink,
+    ClaimEvidenceMappingResult,
+    ClaimItem,
     DomainSelectionOutput,
     EvidenceItem,
-    EvidenceResearchOutput,
     MethodologyOutput,
     ResearchMode,
     ResearchPhase,
@@ -201,9 +203,28 @@ def test_claim_evidence_mapping_uses_evidence_researcher_model_stage(
     ]
     orchestrator.store.save(project)
 
-    def fake_mapping(project_arg):
+    def fake_mapping(project_arg, evidence_collection):
         return (
-            EvidenceResearchOutput(evidence=project.evidence, claims=project.claims),
+            ClaimEvidenceMappingResult(
+                claims=[
+                    ClaimItem(
+                        claim_id="c1",
+                        statement="A supported claim",
+                        claim_type="reported_fact",
+                        importance="high",
+                        status="supported",
+                    )
+                ],
+                links=[
+                    ClaimEvidenceLink(
+                        claim_id="c1",
+                        evidence_id="e1",
+                        relation="supports",
+                        rationale="The supplied evidence supports the claim.",
+                    )
+                ],
+                evidence_coverage=1.0,
+            ),
             fake_metadata("evidence_researcher"),
         )
 

@@ -146,6 +146,8 @@ def render_event_dict(event: dict[str, Any]) -> str:
     if status == "failed":
         detail = event.get("display_markdown") or event.get("error_message") or "阶段执行失败，项目保留在上一完整阶段。"
         return f"{time_text}　{detail}"
+    if event.get("summary_markdown"):
+        return f"{time_text}　{event['summary_markdown']}"
     if event.get("display_markdown"):
         return f"{time_text}　{event['display_markdown']}"
     return f"{time_text}　{phase}完成。"

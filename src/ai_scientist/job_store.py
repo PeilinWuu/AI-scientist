@@ -24,7 +24,7 @@ class ResearchJob(BaseModel):
     status: JobStatus = "queued"
     started_at: datetime | None = None
     finished_at: datetime | None = None
-    error: dict[str, str] | None = None
+    error: dict[str, Any] | None = None
     result: dict[str, Any] | None = None
 
 
@@ -99,6 +99,14 @@ def fail_job(job: ResearchJob, exc: Exception) -> ResearchJob:
     job.error = {
         "error_type": type(exc).__name__,
         "error_message": _sanitize_text(str(exc)),
+        "stage": getattr(exc, "stage", None),
+        "stage_substep": getattr(exc, "substep", None),
+        "failing_component": getattr(exc, "failing_component", None),
+        "failure_category": getattr(exc, "failure_category", None),
+        "artifact_type": getattr(exc, "artifact_type", None),
+        "cause_type": getattr(exc, "cause_type", None),
+        "cause_message": _sanitize_text(str(getattr(exc, "cause_message", "") or "")),
+        "validation_errors": getattr(exc, "validation_errors", []),
     }
     return job
 

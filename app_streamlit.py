@@ -29,9 +29,9 @@ SCIENTIST_MODEL_KEYS = {
     "hypothesis_scientist": ("scientist_hypothesis_model", "假设科学家模型"),
     "study_designer": ("scientist_designer_model", "研究设计师模型"),
     "analyst": ("scientist_analyst_model", "分析师模型"),
-    "reproducibility_engineer": ("scientist_reproducibility_model", "复现工程师模型"),
+    "reproducibility_engineer": ("scientist_reproducibility_model", "可复现性工程师模型"),
     "skeptical_reviewer": ("scientist_reviewer_model", "独立审查员模型"),
-    "scientific_synthesizer": ("scientist_synthesizer_model", "科学综合员模型"),
+    "scientific_synthesizer": ("scientist_synthesizer_model", "科学综合模型"),
     "fallback": ("scientist_fallback_model", "备用模型"),
 }
 
@@ -130,7 +130,7 @@ def render_model_test_result(result: dict) -> None:
         st.success(f"模型可用：{result.get('model')}（{result.get('latency_ms')} ms）")
     else:
         st.error(f"模型不可用：{result.get('model')}")
-        st.caption(str(result.get("message") or result.get("error_category") or "调用失败"))
+        st.caption(str(result.get("message") or result.get("error_category") or "模型测试失败。"))
 
 
 def render_model_test_table(rows: list[dict]) -> None:
@@ -164,7 +164,7 @@ def render_debug_object(data: object) -> None:
         if rows:
             st.dataframe(rows, use_container_width=True, hide_index=True)
         else:
-            st.info("No debug details.")
+            st.info("没有调试信息。")
     else:
         st.write(_short_debug_value(data))
 
@@ -187,15 +187,15 @@ def render_search_debug(metadata: dict) -> None:
     with st.expander("搜索来源", expanded=bool(metadata.get("sources"))):
         sources = metadata.get("sources") or []
         if not sources:
-            st.info("当前接口未返回可验证搜索来源。")
+            st.info("当前 API 响应未包含可验证的搜索来源。")
         for source in sources:
-            st.markdown(f"**[{source.get('index', '')}] {source.get('title') or '(untitled)'}**")
-            st.write(source.get("site_name") or "(unknown site)")
+            st.markdown(f"**[{source.get('index', '')}] {source.get('title') or '（无标题）'}**")
+            st.write(source.get("site_name") or "（未知网站）")
             if source.get("url"):
                 st.write(source["url"])
             if source.get("snippet"):
                 st.caption(source["snippet"])
-    with st.expander("Response metadata", expanded=False):
+    with st.expander("响应元数据", expanded=False):
         render_debug_object(metadata)
 
 
@@ -207,33 +207,33 @@ def render_chat_mode(backend_url: str, mode: str, show_debug: bool) -> None:
         key = "qwen_search_model_input"
         if key not in st.session_state:
             st.session_state[key] = default_model
-        if st.sidebar.button("恢复默认联网模型"):
+        if st.sidebar.button("重置搜索模型"):
             st.session_state[key] = default_model
             st.rerun()
         st.sidebar.text_input(
-            "联网模型名称",
+            "搜索模型名称",
             key=key,
             placeholder="例如：qwen3.7-plus",
-            help="请输入百炼实际支持的完整模型 ID。留空时使用服务器默认配置。联网模型必须支持当前 Responses API 搜索工具。",
+            help="请输入 DashScope 模型 ID。搜索模型必须支持当前 Responses API 的联网搜索工具。",
         )
         model = effective_model_input(key, default_model)
         if not model:
             return
-        if st.sidebar.button("测试联网模型"):
+        if st.sidebar.button("测试搜索模型"):
             render_model_test_result(test_model(backend_url, model, "search"))
     else:
         default_model = model_default(config, "pure_qwen", os.getenv("LLM_MODEL", "qwen-turbo"))
         key = "pure_qwen_model_input"
         if key not in st.session_state:
             st.session_state[key] = default_model
-        if st.sidebar.button("恢复默认模型"):
+        if st.sidebar.button("重置模型"):
             st.session_state[key] = default_model
             st.rerun()
         st.sidebar.text_input(
             "模型名称",
             key=key,
             placeholder="例如：qwen-plus",
-            help="请输入百炼实际支持的完整模型 ID。留空时使用服务器默认配置。",
+            help="请输入 DashScope 模型 ID。留空时使用服务器默认模型。",
         )
         model = effective_model_input(key, default_model)
         if not model:
@@ -249,7 +249,7 @@ def render_chat_mode(backend_url: str, mode: str, show_debug: bool) -> None:
     if search_enabled:
         st.session_state.last_search_model = model
 
-    if st.sidebar.button("Clear conversation"):
+    if st.sidebar.button("清空对话"):
         st.session_state.messages = []
         st.session_state.search_previous_response_id = None
         st.session_state.last_search_model = None
@@ -259,23 +259,23 @@ def render_chat_mode(backend_url: str, mode: str, show_debug: bool) -> None:
         st.session_state.last_response_metadata = None
         st.rerun()
 
-    if show_debug and st.sidebar.button("查看发送 payload"):
+    if show_debug and st.sidebar.button("查看发送载荷"):
         if st.session_state.last_debug_payload is None:
-            st.sidebar.info("还没有可查看的 payload。请先发送一条消息。")
+            st.sidebar.info("暂无载荷，请先发送一条消息。")
         else:
-            st.sidebar.write(f"**Chat endpoint:** `{st.session_state.last_chat_endpoint}`")
-            st.sidebar.write(f"**Debug endpoint:** `{st.session_state.last_endpoint}`")
+            st.sidebar.write(f"**聊天接口：** `{st.session_state.last_chat_endpoint}`")
+            st.sidebar.write(f"**调试接口：** `{st.session_state.last_endpoint}`")
             st.sidebar.json(st.session_state.last_debug_payload)
             if st.session_state.last_response_metadata:
-                st.sidebar.write("**Last response metadata:**")
+                st.sidebar.write("**最近一次响应元数据：**")
                 st.sidebar.json(st.session_state.last_response_metadata)
 
-    st.title(mode)
+    st.title({"Pure Qwen": "纯 Qwen 对话", "Qwen Search": "Qwen 联网搜索"}.get(mode, mode))
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.write(message["content"])
 
-    user_input = st.chat_input("请输入消息")
+    user_input = st.chat_input("输入消息")
     if not user_input:
         return
     if search_enabled:
@@ -299,7 +299,7 @@ def render_chat_mode(backend_url: str, mode: str, show_debug: bool) -> None:
         st.session_state.last_debug_payload = debug_payload
         st.session_state.last_endpoint = debug_endpoint if show_debug else None
         st.session_state.last_chat_endpoint = chat_endpoint
-        with st.spinner("Qwen is replying..."):
+        with st.spinner("Qwen 正在回复……"):
             response = post_json(backend_url, chat_endpoint, payload)
         metadata_keys = ["mode", "model", "response_id", "request_id", "search_used", "sources", "tool_usage"]
         st.session_state.last_response_metadata = {
@@ -313,9 +313,9 @@ def render_chat_mode(backend_url: str, mode: str, show_debug: bool) -> None:
         with st.chat_message("assistant"):
             st.write(reply)
         if show_debug:
-            with st.expander("Debug payload sent to Qwen", expanded=False):
-                st.write(f"**Chat endpoint:** `{chat_endpoint}`")
-                st.write(f"**Debug endpoint:** `{debug_endpoint}`")
+            with st.expander("发送给 Qwen 的调试载荷", expanded=False):
+                st.write(f"**聊天接口：** `{chat_endpoint}`")
+                st.write(f"**调试接口：** `{debug_endpoint}`")
                 render_debug_object(debug_payload)
             if search_enabled:
                 render_search_debug(st.session_state.last_response_metadata or {})
@@ -326,7 +326,7 @@ def render_chat_mode(backend_url: str, mode: str, show_debug: bool) -> None:
         else:
             st.write(exc.detail)
     except Exception as exc:  # noqa: BLE001
-        st.error("前端或后端调用出错。")
+        st.error("前端或后端调用失败。")
         if show_debug:
             st.exception(exc)
 
@@ -348,7 +348,7 @@ def render_scientist_model_config(backend_url: str) -> dict[str, str]:
             st.session_state[key] = defaults.get(role, "")
 
     with st.expander("模型团队配置", expanded=False):
-        if st.button("恢复 .env 模型团队"):
+        if st.button("从 .env 重置模型团队"):
             for role, (key, _) in SCIENTIST_MODEL_KEYS.items():
                 st.session_state[key] = defaults.get(role, "")
             st.rerun()
@@ -357,12 +357,12 @@ def render_scientist_model_config(backend_url: str) -> dict[str, str]:
                 st.text_input(
                     label,
                     key=key,
-                    placeholder="请输入百炼支持的完整模型 ID；留空使用服务器默认配置",
+                    placeholder="输入 DashScope 模型 ID；留空使用服务器默认值",
                 )
             apply_models = st.form_submit_button("应用模型配置")
-            test_models = st.form_submit_button("测试团队配置")
+            test_models = st.form_submit_button("测试模型团队")
         if apply_models:
-            st.success("模型配置已应用到当前前端会话。创建新项目时会写入该项目。")
+            st.success("模型配置已在当前前端会话中生效，并会保存到新建项目。")
         if test_models:
             rows = []
             model_to_roles: dict[tuple[str, str], list[str]] = {}
@@ -383,17 +383,17 @@ def render_scientist_model_config(backend_url: str) -> dict[str, str]:
                     }
                 )
             render_model_test_table(rows)
-        st.caption("这些输入只影响当前会话和新建项目，不会修改 .env。")
+        st.caption("这些输入仅影响当前前端会话和新建项目，不会修改 .env 文件。")
     return defaults
 
 
 def render_research_workspace(backend_url: str, show_debug: bool) -> None:
     st.title("AI Scientist")
     model_defaults = render_scientist_model_config(backend_url)
-    st.caption("多 Qwen 角色按状态机协作；当前版本执行研究规划，不伪造实验或分析结果。")
+    st.caption("多个 Qwen 角色通过状态机协作。当前模式只生成科研规划，不虚构实验或分析结果。")
 
     with st.expander("创建研究项目", expanded=not bool(st.session_state.research_project_id)):
-        existing_project_id = st.text_input("加载已有 Project ID", key="existing_research_project_id")
+        existing_project_id = st.text_input("加载已有项目 ID", key="existing_research_project_id")
         if st.button("加载项目"):
             try:
                 st.session_state.research_project_id = existing_project_id.strip()
@@ -401,16 +401,16 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
                 st.rerun()
             except BackendAPIError as exc:
                 st.error(exc.detail)
-        objective = st.text_area("Research objective", key="research_objective")
-        domain_hint = st.text_input("Domain hint（可选）", key="research_domain_hint")
+        objective = st.text_area("研究目标", key="research_objective")
+        domain_hint = st.text_input("领域提示（可选）", key="research_domain_hint")
         constraints_text = st.text_area(
             "补充要求与约束",
             value="",
             key="research_constraints_text",
-            placeholder="例如：研究对象为软件工程师，周期最多 2 周，可获得项目管理系统、代码仓库和问卷数据，需要区分相关性和因果关系。",
+            placeholder="例如：目标人群、可用数据、时间范围、约束条件，以及是否允许因果推断。",
         )
-        max_iterations = st.number_input("Max iterations", min_value=0, max_value=10, value=2)
-        planning_only = st.checkbox("Planning only", value=True)
+        max_iterations = st.number_input("最大修订次数", min_value=0, max_value=10, value=2)
+        planning_only = st.checkbox("仅规划模式", value=True)
         if st.button("创建项目", type="primary"):
             try:
                 created = post_json(
@@ -434,41 +434,55 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
 
     project = st.session_state.research_project
     if not project:
-        st.info("创建项目后，可以逐阶段运行研究流程。")
+        st.info("请先创建项目，再逐阶段运行科研工作流。")
         return
 
     st.subheader("项目状态")
     columns = st.columns(5)
-    columns[0].metric("Phase", project.get("phase", ""))
-    columns[1].metric("Mode", project.get("research_mode") or "pending")
-    columns[2].metric("Domain", project.get("domain") or "general")
-    columns[3].metric("Iteration", project.get("iteration", 0))
+    columns[0].metric("当前阶段", PHASE_LABELS.get(project.get("phase", ""), project.get("phase", "")))
+    columns[1].metric("研究模式", project.get("research_mode") or "待选择")
+    columns[2].metric("研究领域", project.get("domain") or "通用")
+    columns[3].metric("修订轮次", project.get("iteration", 0))
     budget = project.get("budget") or {}
-    columns[4].metric("Model calls", f"{budget.get('used_model_calls', 0)}/{budget.get('max_model_calls', 0)}")
-    st.caption(f"Project ID: {project.get('project_id')}")
+    columns[4].metric("模型调用", f"{budget.get('used_model_calls', 0)}/{budget.get('max_model_calls', 0)}")
+    st.caption(f"项目 ID：{project.get('project_id')}")
     if project.get("model_overrides"):
-        st.caption("This project uses model overrides saved at creation time.")
+        st.caption("该项目使用创建时保存的模型覆盖配置。")
         if show_debug:
             render_debug_object(project.get("model_overrides"))
 
     metrics = project.get("quality_metrics") or {}
-    st.subheader("Research Quality")
+    st.subheader("研究质量")
     quality_columns = st.columns(5)
-    quality_columns[0].metric("Evidence coverage", metrics.get("evidence_coverage", 0))
-    quality_columns[1].metric("Hypothesis completeness", metrics.get("hypothesis_completeness", 0))
-    quality_columns[2].metric("Conclusion traceability", metrics.get("conclusion_traceability", 0))
-    quality_columns[3].metric("Reviewer min score", metrics.get("reviewer_min_score", 0))
-    quality_columns[4].metric("Unverifiable sources", metrics.get("unverifiable_source_count", 0))
+    quality_columns[0].metric("证据覆盖率", metrics.get("evidence_coverage", 0))
+    quality_columns[1].metric("假设完整度", metrics.get("hypothesis_completeness", 0))
+    if metrics.get("total_conclusions", 0):
+        quality_columns[2].metric("结论可追溯性", metrics.get("conclusion_traceability", 0))
+    else:
+        quality_columns[2].metric("结论可追溯性", "尚未评估")
+    quality_columns[3].metric("审查最低评分", metrics.get("reviewer_min_score", 0))
+    quality_columns[4].metric("不可验证来源", metrics.get("unverifiable_source_count", 0))
+    st.caption(
+        f"已验证的唯一来源：{metrics.get('verified_evidence_count', 0)}/"
+        f"{metrics.get('unique_evidence_count', metrics.get('total_evidence_count', 0))}"
+    )
 
     st.markdown(render_project_overview(project))
-    st.subheader("研究日志")
-    messages = project.get("stage_messages") or []
-    if messages:
-        for message in messages[-8:]:
-            st.markdown(message)
+    st.subheader("研究进度")
+    try:
+        events = get_json(backend_url, f"/api/research/{project['project_id']}/events")
+    except BackendAPIError:
+        events = []
+    visible_events = [
+        event
+        for event in events
+        if isinstance(events, list) and (show_debug or event.get("visibility") == "user")
+    ]
+    if visible_events:
+        for event in visible_events[-8:]:
+            st.markdown(render_event_dict(event))
     else:
-        st.info("运行阶段后，这里会显示各个科研角色的自然语言反馈。")
-
+        st.info("运行一个研究阶段后，这里将显示用户可见的进度。")
     active_job = _render_research_job_status(backend_url, project, show_debug)
     job_running = bool(active_job and active_job.get("status") in {"queued", "running"})
 
@@ -488,18 +502,22 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
     try:
         report_md = get_text(backend_url, f"/api/research/{project['project_id']}/report.md")
         action_columns[4].download_button(
-            "下载研究方案",
+            "下载研究计划",
             data=report_md,
             file_name="research_plan.md",
             mime="text/markdown",
         )
     except BackendAPIError:
-        action_columns[4].button("下载研究方案", disabled=True)
+        action_columns[4].button("下载研究计划", disabled=True)
 
-    with st.expander("要求修改"):
-        target = st.selectbox("Revision target", ["question", "evidence", "hypothesis", "method", "design"])
-        feedback = st.text_area("Feedback", key="revision_feedback")
-        if st.button("提交修改请求", disabled=job_running or project.get("phase") != "HUMAN_APPROVAL"):
+    with st.expander("请求修订"):
+        target = st.selectbox(
+            "修订目标",
+            ["question", "evidence", "hypothesis", "method", "design"],
+            format_func=lambda value: {"question": "研究问题", "evidence": "证据", "hypothesis": "假设", "method": "研究方法", "design": "研究设计"}[value],
+        )
+        feedback = st.text_area("反馈意见", key="revision_feedback")
+        if st.button("提交修订请求", disabled=job_running or project.get("phase") != "HUMAN_APPROVAL"):
             _research_action(
                 backend_url,
                 f"/api/research/{project['project_id']}/revise",
@@ -508,21 +526,27 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
 
     with st.expander("结构化人工编辑"):
         edit_target = st.selectbox(
-            "Edit target",
+            "编辑目标",
             ["question", "hypothesis", "study_design", "analysis_plan"],
             key="human_edit_target",
+            format_func=lambda value: {
+                "question": "研究问题",
+                "hypothesis": "研究假设",
+                "study_design": "研究设计",
+                "analysis_plan": "分析计划",
+            }[value],
         )
         hypothesis_options = [item.get("hypothesis_id", "") for item in project.get("hypotheses") or []]
         selected_hypothesis = ""
         if edit_target == "hypothesis":
-            selected_hypothesis = st.selectbox("Hypothesis ID", hypothesis_options, key="human_edit_hypothesis_id")
-        edit_patch_text = st.text_area("Patch JSON", value="{}", key="human_edit_patch")
-        edit_reason = st.text_input("Reason", key="human_edit_reason")
+            selected_hypothesis = st.selectbox("假设 ID", hypothesis_options, key="human_edit_hypothesis_id")
+        edit_patch_text = st.text_area("补丁 JSON", value="{}", key="human_edit_patch")
+        edit_reason = st.text_input("编辑原因", key="human_edit_reason")
         if st.button("保存人工编辑", disabled=job_running):
             try:
                 patch = json.loads(edit_patch_text)
                 if not isinstance(patch, dict):
-                    raise ValueError("Patch JSON must be an object.")
+                    raise ValueError("补丁 JSON 必须是一个对象。")
                 endpoint = {
                     "question": f"/api/research/{project['project_id']}/question",
                     "study_design": f"/api/research/{project['project_id']}/study-design",
@@ -530,16 +554,16 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
                 }.get(edit_target)
                 if edit_target == "hypothesis":
                     if not selected_hypothesis:
-                        raise ValueError("Select a hypothesis first.")
+                        raise ValueError("请先选择一个假设。")
                     endpoint = f"/api/research/{project['project_id']}/hypotheses/{selected_hypothesis}"
                 _research_patch(backend_url, endpoint or "", {"patch": patch, "reason": edit_reason})
             except BackendAPIError as exc:
                 st.error(exc.detail if isinstance(exc, BackendAPIError) else str(exc))
 
     with st.expander("提供数据"):
-        paths = st.text_area("Artifact paths（每行一个）", key="data_paths")
-        description = st.text_area("Description", key="data_description")
-        data_type = st.text_input("Data type", key="data_type")
+        paths = st.text_area("产物路径（每行一个）", key="data_paths")
+        description = st.text_area("数据说明", key="data_description")
+        data_type = st.text_input("数据类型", key="data_type")
         if st.button("登记数据", disabled=job_running):
             _research_action(
                 backend_url,
@@ -552,59 +576,72 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
             )
 
     capability_columns = st.columns(2)
-    capability_columns[0].write("**当前可用**")
-    capability_columns[0].write(["联网检索", "网页读取", "产物保存"])
-    capability_columns[1].write("**尚未接入**")
-    capability_columns[1].write(["文件分析", "Python 执行", "统计分析", "代码运行"])
+    capability_columns[0].write("**当前可用能力**")
+    capability_columns[0].write(["联网搜索", "网页内容提取", "研究产物持久化"])
+    capability_columns[1].write("**尚未接入的能力**")
+    capability_columns[1].write(["文件分析", "Python 执行", "统计分析", "代码运行器"])
     if show_debug:
-        st.write("**Raw capability IDs**")
+        st.write("**原始能力 ID**")
         render_debug_object({"available_tools": project.get("available_tools") or [], "missing_capabilities": project.get("missing_capabilities") or []})
 
-    tabs = st.tabs(["研究问题", "证据与假设", "方案与审查", "研究方案", "事件记录"])
+    tabs = st.tabs(["研究问题", "证据与假设", "规划与审查", "研究计划", "事件日志"])
     with tabs[0]:
         question = project.get("question") or {}
         if question:
-            st.markdown(f"**研究问题**：{question.get('normalized_question') or '尚未明确'}")
-            st.markdown(f"**研究范围**：{question.get('scope') or '仍需细化'}")
+            st.markdown(f"**研究问题：** {question.get('normalized_question') or '尚未指定'}")
+            st.markdown(f"**研究范围：** {question.get('scope') or '尚未指定'}")
             criteria = question.get("measurable_success_criteria") or []
-            st.markdown("**成功标准**：" + ("；".join(criteria) if criteria else "尚未明确。"))
+            st.markdown("**成功标准：** " + ("；".join(criteria) if criteria else "尚未指定"))
         else:
-            st.info("研究总监尚未完成问题整理。")
+            st.info("研究总监尚未完成研究问题形式化。")
     with tabs[1]:
         evidence = project.get("evidence") or []
         claims = project.get("claims") or []
         hypotheses = project.get("hypotheses") or []
-        st.markdown(f"证据研究员已保留 **{len(evidence)}** 条证据，整理出 **{len(claims)}** 条关键主张。")
-        st.markdown(f"假设科学家已形成 **{len(hypotheses)}** 个候选假设。")
+        st.markdown(f"已保留证据：**{len(evidence)}** 条；已映射关键主张：**{len(claims)}** 条。")
+        st.markdown(f"候选假设：**{len(hypotheses)}** 个。")
         source_levels = {"A": 0, "B": 0, "C": 0, "D": 0, "E": 0}
         for item in evidence:
             level = item.get("source_level", "E")
             source_levels[level] = source_levels.get(level, 0) + 1
-        st.markdown("来源等级分布：" + "、".join(f"{k}:{v}" for k, v in source_levels.items()))
+        st.markdown("来源等级分布：" + "；".join(f"{k}:{v}" for k, v in source_levels.items()))
+        verified_count = len([item for item in evidence if item.get("verification_status") == "verified" and not item.get("duplicate_of")])
+        unique_count = len([item for item in evidence if not item.get("duplicate_of")])
+        st.markdown(f"已验证的唯一来源：**{verified_count}/{unique_count}**")
         if show_debug:
-            rows = [{"title": item.get("title", ""), "level": item.get("source_level", "E"), "verified": item.get("verified", False)} for item in evidence]
+            rows = [{"title": item.get("title", ""), "level": item.get("source_level", "E"), "verification_status": item.get("verification_status", "unverified"), "verification_method": item.get("verification_method", "none"), "doi": item.get("doi"), "pmid": item.get("pmid"), "url": item.get("source_url")} for item in evidence]
             if rows:
                 st.dataframe(rows, use_container_width=True, hide_index=True)
     with tabs[2]:
-        st.markdown(f"**主要研究模式**：{project.get('research_mode') or '尚未选择'}")
-        st.markdown(f"**方法学判断**：{project.get('method_rationale') or '尚未形成。'}")
+        st.markdown(f"**研究模式：** {project.get('research_mode') or '尚未选择'}")
+        st.markdown(f"**方法选择依据：** {project.get('method_rationale') or '尚未生成'}")
         reviews = project.get("reviews") or []
         if reviews:
             review = reviews[-1]
-            st.markdown(f"独立审查决定：**{review.get('decision')}**。")
+            if review.get("decision") == "approve":
+                st.success("独立审查已批准当前方案。")
+            elif review.get("decision") == "reject":
+                st.error("独立审查已否决当前方案。")
+            else:
+                st.warning("独立审查要求进行定向修订。")
             issues = review.get("blocking_issues") or []
-            st.markdown("阻断问题：" + ("；".join(issues) if issues else "暂无。"))
+            st.markdown("阻断问题：" + ("；".join(issues) if issues else "无"))
         else:
-            st.info("独立审查尚未完成。")
+            st.info("尚未运行独立审查。")
     with tabs[3]:
         conclusion = project.get("conclusion")
         if conclusion:
-            st.markdown("科学综合已生成。请下载 Markdown 研究方案查看完整内容。")
+            st.markdown("科学综合报告已生成，可下载 Markdown 报告查看完整内容。")
         else:
-            st.info("最终研究方案尚未生成。")
+            st.info("最终研究计划尚未生成。")
     with tabs[4]:
         events = get_json(backend_url, f"/api/research/{project['project_id']}/events")
-        for event in events if isinstance(events, list) else []:
+        visible_events = [
+            event
+            for event in events if isinstance(events, list)
+            if show_debug or event.get("visibility") == "user"
+        ]
+        for event in visible_events:
             st.markdown(render_event_dict(event))
         if show_debug:
             debug_rows = [
@@ -630,13 +667,13 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
         try:
             report_md = get_text(backend_url, f"/api/research/{project['project_id']}/report.md")
             st.download_button(
-                "下载研究方案",
+                "下载研究计划",
                 data=report_md,
                 file_name="research_plan.md",
                 mime="text/markdown",
             )
         except BackendAPIError:
-            st.info("研究方案尚未生成。")
+            st.info("研究计划尚未生成。")
 
 
 def _render_research_job_status(backend_url: str, project: dict, show_debug: bool) -> dict | None:
@@ -647,7 +684,7 @@ def _render_research_job_status(backend_url: str, project: dict, show_debug: boo
         job = get_json(backend_url, f"/api/research/jobs/{job_id}")
     except BackendAPIError as exc:
         st.session_state.research_job_id = None
-        st.warning("Research stage status could not be loaded. Refresh the project before retrying.")
+        st.warning("无法加载研究阶段状态，请刷新项目后重试。")
         if show_debug:
             render_debug_object(exc.detail)
         return None
@@ -657,27 +694,70 @@ def _render_research_job_status(backend_url: str, project: dict, show_debug: boo
     status = job.get("status")
     phase = job.get("phase") or project.get("phase")
     if status == "queued":
-        st.info(f"Research stage queued: {phase}")
+        st.info(f"研究阶段已排队：{PHASE_LABELS.get(str(phase), phase)}")
         time.sleep(2)
         st.rerun()
     if status == "running":
-        st.info(f"Running {phase}. Background research with web search may take several minutes.")
+        st.info(f"正在运行{PHASE_LABELS.get(str(phase), phase)}。包含联网搜索的背景研究可能需要几分钟。")
         time.sleep(3)
         st.rerun()
     if status == "completed":
         st.session_state.research_job_id = None
         refresh_research_project(backend_url)
-        st.success("Research stage completed.")
+        result = job.get("result") or {}
+        if result.get("max_revision_exhausted"):
+            st.error("项目已达到最大修订次数，但仍未通过独立审查。")
+        elif result.get("revision_required"):
+            st.warning(_revision_message(result))
+        else:
+            st.success("当前研究阶段已完成。")
         st.rerun()
     if status == "failed":
         st.session_state.research_job_id = None
-        st.error("Research stage timed out or failed. The project remains at the last complete phase; refresh and retry.")
+        error = job.get("error") or {}
+        message = str(error.get("error_message") or "")
+        stage_substep = str(error.get("stage_substep") or "")
+        if stage_substep:
+            st.error(_research_failure_message(stage_substep))
+        elif "timeout" in message.lower():
+            st.error("研究阶段运行超时，项目保留在上一个已完成阶段。")
+        else:
+            st.error("研究阶段执行失败，项目保留在上一个已完成阶段。")
         if show_debug:
             render_debug_object(job)
     elif show_debug:
         render_debug_object(job)
     return job
 
+
+def _research_failure_message(stage_substep: str) -> str:
+    messages = {
+        "model_output_parse": "主张映射输出未通过格式检查，已有证据已保留。",
+        "schema_validation": "主张映射输出未通过结构验证，已有证据已保留。",
+        "evidence_reference_validation": "部分主张引用了缺失或过期的证据，因此未写入不一致结果。",
+        "claim_graph_build": "无法构建主张—证据图，因此没有写入不完整的图数据。",
+        "artifact_save": "主张—证据映射已完成，但研究产物保存失败。",
+        "project_state_update": "主张—证据映射已完成，但项目状态更新失败，可以安全重试。",
+        "phase_transition": "研究内容已生成，但工作流状态未推进，可以安全重试。",
+    }
+    return messages.get(stage_substep, "研究阶段执行失败，项目保留在上一个已完成阶段。")
+
+
+def _revision_message(result: dict) -> str:
+    target = result.get("current_phase")
+    target_text = {
+        "BACKGROUND_RESEARCH": "背景证据研究阶段",
+        "HYPOTHESIS_GENERATION": "假设生成阶段",
+        "METHOD_SELECTION": "方法选择阶段",
+        "STUDY_DESIGN": "研究设计阶段",
+        "QUESTION_FORMULATION": "研究问题形式化阶段",
+        "ANALYSIS_PLANNING": "分析规划阶段",
+    }.get(str(target), "相应修订阶段")
+    issues = result.get("blocking_issues") or []
+    if issues:
+        bullets = "\n".join(f"- {item}" for item in issues[:4])
+        return f"独立审查要求修订，项目已返回{target_text}。\n\n主要阻断问题：\n{bullets}"
+    return f"独立审查要求修订，项目已返回{target_text}。"
 
 def _start_research_step_job(backend_url: str, project_id: str) -> None:
     try:
@@ -688,10 +768,10 @@ def _start_research_step_job(backend_url: str, project_id: str) -> None:
         detail = exc.detail
         if isinstance(detail, dict) and detail.get("error") == "project_step_already_running":
             st.session_state.research_job_id = detail.get("job_id")
-            st.warning("A research stage is already running for this project.")
+            st.warning("该项目已有一个研究阶段正在运行。")
             st.rerun()
         else:
-            st.error("Research stage could not be started.")
+            st.error("无法启动研究阶段。")
             if isinstance(detail, dict):
                 render_debug_object(detail)
             else:
@@ -700,7 +780,7 @@ def _start_research_step_job(backend_url: str, project_id: str) -> None:
 
 def _research_action(backend_url: str, path: str, payload: dict | None = None) -> None:
     try:
-        with st.spinner("正在处理当前研究阶段..."):
+        with st.spinner("正在处理研究操作……"):
             timeout = RESEARCH_STEP_TIMEOUT if path.endswith("/step") else 120
             post_json(backend_url, path, payload, timeout=timeout)
         refresh_research_project(backend_url)
@@ -721,7 +801,7 @@ def _research_patch(backend_url: str, path: str, payload: dict) -> None:
         raise
 
 
-st.set_page_config(page_title="Qwen Research Shell", layout="wide")
+st.set_page_config(page_title="Qwen 科研工作台", layout="wide")
 
 STATE_DEFAULTS = {
     "messages": [],
@@ -739,10 +819,19 @@ for key, value in STATE_DEFAULTS.items():
     if key not in st.session_state:
         st.session_state[key] = value
 
-st.sidebar.header("Qwen Research Shell")
-backend_url = st.sidebar.text_input("Backend URL", value=DEFAULT_BACKEND_URL)
-mode = st.sidebar.radio("Mode", APP_MODES, horizontal=False)
-show_debug = st.sidebar.checkbox("Developer debug", value=False)
+st.sidebar.header("Qwen 科研工作台")
+backend_url = st.sidebar.text_input("后端地址", value=DEFAULT_BACKEND_URL)
+mode = st.sidebar.radio(
+    "应用模式",
+    APP_MODES,
+    horizontal=False,
+    format_func=lambda value: {
+        "Pure Qwen": "纯 Qwen 对话",
+        "Qwen Search": "Qwen 联网搜索",
+        "AI Scientist": "AI Scientist",
+    }[value],
+)
+show_debug = st.sidebar.checkbox("开发者调试", value=False)
 
 if mode == "AI Scientist":
     st.session_state.search_previous_response_id = None

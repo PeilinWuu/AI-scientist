@@ -4,8 +4,9 @@ import pytest
 from pydantic import ValidationError
 
 from src.ai_scientist.claim_graph import ClaimGraph
-from src.ai_scientist.exceptions import InvalidTransitionError
+from src.ai_scientist.exceptions import InvalidReviewDecisionError, InvalidTransitionError
 from src.ai_scientist.quality import apply_reviewer_quality_gates, compute_quality_metrics, enrich_evidence_items
+from src.ai_scientist.quality import failed_quality_gates
 from src.ai_scientist.project_store import ProjectStore
 from src.ai_scientist.orchestrator import ResearchOrchestrator
 from src.ai_scientist.report_writer import build_research_plan_markdown
@@ -46,6 +47,13 @@ def test_state_machine_blocks_skips_terminals_and_excess_revision() -> None:
 
     exhausted = project(ResearchPhase.FEASIBILITY_REVIEW, max_iterations=0)
     assert machine.transition(exhausted, "revise_design") == ResearchPhase.FAILED
+
+    review = project(ResearchPhase.FEASIBILITY_REVIEW)
+    with pytest.raises(InvalidReviewDecisionError):
+        machine.transition(review, "unknown_decision")
+
+    critical = project(ResearchPhase.CRITICAL_REVIEW)
+    assert machine.transition(critical, "revise_evidence") == ResearchPhase.BACKGROUND_RESEARCH
 
 
 def test_project_store_save_restore_atomic_and_append(tmp_path: Path) -> None:
@@ -168,6 +176,15 @@ def test_quality_metrics_source_grading_and_reviewer_gates() -> None:
     gated = apply_reviewer_quality_gates(review, metrics)
     assert gated.decision == "revise_hypothesis"
     assert "hypothesis_completeness_below_0.8" in gated.failed_quality_gates
+
+
+def test_missing_conclusion_does_not_fail_traceability_gate() -> None:
+    item = project()
+    metrics = compute_quality_metrics(item)
+
+    assert metrics.total_conclusions == 0
+    assert metrics.conclusion_traceability == 0
+    assert "conclusion_traceability_below_0.9" not in failed_quality_gates(metrics, None)
 
 
 def test_human_edit_versions_artifacts_and_targeted_rollback(tmp_path: Path) -> None:

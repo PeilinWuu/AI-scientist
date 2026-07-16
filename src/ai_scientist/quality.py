@@ -6,6 +6,7 @@ import re
 from collections import Counter
 from urllib.parse import urlparse
 
+from src.ai_scientist.evidence_verifier import evidence_dedupe_key, verify_evidence_item
 from src.ai_scientist.schemas import (
     Claim,
     Conclusion,
@@ -23,18 +24,20 @@ def enrich_evidence_items(evidence: list[EvidenceItem]) -> list[EvidenceItem]:
 
     seen: dict[str, str] = {}
     enriched: list[EvidenceItem] = []
-    for item in evidence:
+    for raw_item in evidence:
+        item = verify_evidence_item(raw_item)
         key = evidence_dedupe_key(item)
         duplicate_of = seen.get(key)
         if not duplicate_of:
             seen[key] = item.evidence_id
         level = grade_source(item)
+        is_primary = _is_primary_source(item, level)
         enriched.append(
             item.model_copy(
                 update={
                     "source_level": level,
-                    "is_primary_source": level == "A",
-                    "verified": level in {"A", "B", "C"} and bool(item.source_url or item.citation),
+                    "is_primary_source": is_primary,
+                    "verified": item.verification_status == "verified",
                     "duplicate_of": duplicate_of,
                     "reliability_score": max(item.reliability_score, _level_reliability(level)),
                     "relevance_score": max(item.relevance_score, _text_relevance_score(item.relevance)),
@@ -49,6 +52,8 @@ def compute_quality_metrics(project: ResearchProject) -> ResearchQualityMetrics:
 
     claims = _unique_claims(project.claims)
     evidence = project.evidence
+    unique_evidence = [item for item in evidence if not item.duplicate_of]
+    verified_evidence = [item for item in unique_evidence if item.verification_status == "verified"]
     hypotheses = project.hypotheses
     conclusion = project.conclusion
     review = project.reviews[-1] if project.reviews else None
@@ -56,7 +61,7 @@ def compute_quality_metrics(project: ResearchProject) -> ResearchQualityMetrics:
     supported = [item for item in claims if item.status in {"supported", "partially_supported"}]
     disputed = [item for item in claims if item.status == "disputed" or item.contradicting_evidence_ids]
     unsupported = [item for item in claims if item.status in {"unsupported", "unknown"}]
-    primary_count = len([item for item in evidence if item.is_primary_source and not item.duplicate_of])
+    primary_count = len([item for item in verified_evidence if item.is_primary_source])
     complete_hypotheses = [
         item
         for item in hypotheses
@@ -69,12 +74,23 @@ def compute_quality_metrics(project: ResearchProject) -> ResearchQualityMetrics:
         if item.supporting_claim_ids and all(_claim_has_supported_evidence(claim_id, claims) for claim_id in item.supporting_claim_ids)
     ]
     return ResearchQualityMetrics(
+        total_evidence_count=len(evidence),
+        verified_evidence_count=len(verified_evidence),
+        partially_verified_evidence_count=len(
+            [item for item in unique_evidence if item.verification_status == "partially_verified"]
+        ),
+        unverified_evidence_count=len(
+            [item for item in unique_evidence if item.verification_status in {"unverified", "invalid", "contradicted"}]
+        ),
+        unique_evidence_count=len(unique_evidence),
+        verified_primary_source_count=primary_count,
+        evidence_verification_rate=_ratio(len(verified_evidence), len(unique_evidence)),
         total_key_claims=len(claims),
         supported_key_claims=len(supported),
         disputed_key_claims=len(disputed),
         unsupported_key_claims=len(unsupported),
         evidence_coverage=_ratio(len(supported), len(claims)),
-        primary_source_ratio=_ratio(primary_count, len([item for item in evidence if not item.duplicate_of])),
+        primary_source_ratio=_ratio(primary_count, len(unique_evidence)),
         total_hypotheses=len(hypotheses),
         falsifiable_hypotheses=len([item for item in hypotheses if item.falsification_conditions]),
         hypothesis_completeness=_ratio(len(complete_hypotheses), len(hypotheses)),
@@ -83,14 +99,20 @@ def compute_quality_metrics(project: ResearchProject) -> ResearchQualityMetrics:
         conclusion_traceability=_ratio(len(traceable), len(conclusions)),
         reviewer_min_score=_reviewer_min_score(review),
         blocking_issue_count=len(review.blocking_issues) if review else 0,
-        unverifiable_source_count=len([item for item in evidence if item.source_level == "E" or not item.verified]),
+        unverifiable_source_count=len(
+            [item for item in unique_evidence if item.verification_status not in {"verified", "partially_verified"}]
+        ),
     )
 
 
 def failed_quality_gates(metrics: ResearchQualityMetrics, review: ReviewResult | None) -> list[str]:
     failed: list[str] = []
-    if metrics.evidence_coverage < 0.8:
+    if metrics.evidence_coverage < 0.8 and (
+        metrics.unique_evidence_count == 0 or metrics.evidence_verification_rate < 0.5
+    ):
         failed.append("evidence_coverage_below_0.8")
+    if metrics.primary_source_ratio < 0.2 and metrics.total_key_claims and metrics.verified_evidence_count == 0:
+        failed.append("primary_source_ratio_below_0.2")
     if metrics.hypothesis_completeness < 0.8:
         failed.append("hypothesis_completeness_below_0.8")
     if metrics.total_conclusions and metrics.conclusion_traceability < 0.9:
@@ -120,23 +142,31 @@ def apply_reviewer_quality_gates(review: ReviewResult, metrics: ResearchQualityM
         "analysis": "revise_analysis",
         "question": "revise_question",
     }
-    decision = "reject" if "unverifiable_sources_present" in failed else decision_map.get(target, "revise_evidence")
+    decision = "reject" if review.decision == "reject" else decision_map.get(target, "revise_evidence")
     blocking = list(dict.fromkeys(review.blocking_issues + [f"Quality gate failed: {item}" for item in failed]))
+    revision_plan = _merge_revision_actions(review.revision_plan, failed, target, blocking)
     return review.model_copy(
         update={
             "decision": decision,
             "failed_quality_gates": failed,
             "required_revision_target": target,
             "blocking_issues": blocking,
+            "revision_plan": revision_plan,
         }
     )
 
 
 def required_revision_target(failed: list[str], review: ReviewResult | None = None) -> str:
-    if "unverifiable_sources_present" in failed or "evidence_coverage_below_0.8" in failed:
+    if (
+        "unverifiable_sources_present" in failed
+        or "evidence_coverage_below_0.8" in failed
+        or "primary_source_ratio_below_0.2" in failed
+    ):
         return "evidence"
     if "hypothesis_completeness_below_0.8" in failed:
         return "hypothesis"
+    if review and review.required_revision_target != "none":
+        return review.required_revision_target
     if review and review.methodological_validity_score < 6:
         return "method"
     if review and review.feasibility_score < 6:
@@ -146,31 +176,75 @@ def required_revision_target(failed: list[str], review: ReviewResult | None = No
     return "evidence"
 
 
+def _merge_revision_actions(existing: list, failed: list[str], target: str, blocking: list[str]) -> list:
+    from src.ai_scientist.schemas import RevisionAction
+
+    actions = list(existing)
+    targets = {_normalize_revision_target(item.target) for item in actions}
+    required_targets: list[str] = []
+    if target != "none":
+        required_targets.append(target)
+    if any(item in failed for item in ["reviewer_score_below_6", "blocking_issues_present"]):
+        text = " ".join(blocking).lower()
+        if any(token in text for token in ["protocol", "reproducib", "boolean", "database", "screening"]):
+            required_targets.append("reproducibility_plan")
+        if any(token in text for token in ["analysis", "conflate", "clinical", "mechanism", "structure"]):
+            required_targets.append("analysis_plan")
+    priority = len(actions) + 1
+    for item in required_targets:
+        normalized = _normalize_revision_target(item)
+        if normalized in targets:
+            continue
+        actions.append(
+            RevisionAction(
+                target=normalized,
+                priority=priority,
+                reason=f"Quality review requires revision of {normalized}.",
+                required_changes=[issue for issue in blocking[:5]],
+                completion_criteria=[f"{normalized} revision is completed and re-reviewed."],
+            )
+        )
+        priority += 1
+        targets.add(normalized)
+    return sorted(actions, key=lambda item: item.priority)
+
+
+def _normalize_revision_target(target: str) -> str:
+    return {
+        "design": "study_design",
+        "analysis": "analysis_plan",
+        "method": "method",
+        "hypothesis": "hypothesis",
+    }.get(target, target)
+
+
 def grade_source(item: EvidenceItem) -> SourceLevel:
-    text = " ".join([item.source_type, item.title, item.citation or "", item.source_url or ""]).lower()
-    if any(token in text for token in ["doi", "journal", "paper", "article", "dataset", "standard", "official data"]):
+    """Deterministically grade source level from verification, not model preference."""
+
+    status = item.verification_status
+    has_formal_id = bool(item.doi or item.pmid or item.arxiv_id or item.official_record_url)
+    text = " ".join(
+        [
+            item.source_type,
+            item.title,
+            item.citation or "",
+            item.source_url or "",
+            item.journal_or_publisher or "",
+        ]
+    ).lower()
+    if status == "invalid" or status == "contradicted":
+        return "E"
+    if status != "verified":
+        return "D" if item.source_url or item.authors or item.publication_year else "E"
+    if _is_primary_source(item, "A") and has_formal_id:
         return "A"
-    if any(token in text for token in ["systematic review", "meta-analysis", "authority report", "government report"]):
+    if any(token in text for token in ["systematic review", "meta-analysis", "authority report", "government report", "guideline"]):
         return "B"
-    if any(token in text for token in ["technical documentation", "official", "documentation", "white paper"]):
+    if any(token in text for token in ["technical documentation", "official", "documentation", "white paper", "method"]):
         return "C"
     if any(token in text for token in ["news", "blog", "press", "media"]):
         return "D"
-    if item.source_url or item.citation:
-        return "D"
-    return "E"
-
-
-def evidence_dedupe_key(item: EvidenceItem) -> str:
-    doi = _doi(item.citation or "") or _doi(item.source_url or "")
-    if doi:
-        return f"doi:{doi}"
-    if item.source_url:
-        parsed = urlparse(item.source_url.lower())
-        return f"url:{parsed.netloc}{parsed.path}".rstrip("/")
-    title = re.sub(r"\W+", " ", item.title.lower()).strip()
-    year = re.search(r"(19|20)\d{2}", item.publication_date or item.citation or "")
-    return f"title:{title}:year:{year.group(0) if year else ''}"
+    return "C" if has_formal_id or item.source_url else "D"
 
 
 def source_level_distribution(evidence: list[EvidenceItem]) -> dict[str, int]:
@@ -216,6 +290,17 @@ def _reviewer_min_score(review: ReviewResult | None) -> float:
 
 def _level_reliability(level: SourceLevel) -> float:
     return {"A": 1.0, "B": 0.85, "C": 0.7, "D": 0.45, "E": 0.0}[level]
+
+
+def _is_primary_source(item: EvidenceItem, level: SourceLevel) -> bool:
+    if item.verification_status != "verified":
+        return False
+    text = " ".join([item.source_type, item.title, item.journal_or_publisher or ""]).lower()
+    if any(token in text for token in ["review", "meta-analysis", "guideline", "report", "blog", "news"]):
+        return False
+    if item.source_type in {"paper", "article", "dataset"} and level == "A":
+        return True
+    return bool(item.is_primary_source and level == "A")
 
 
 def _text_relevance_score(value: str) -> float:

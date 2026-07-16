@@ -8,7 +8,7 @@ import os
 from typing import Any, Literal
 from uuid import uuid4
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 def utc_now() -> datetime:
@@ -36,6 +36,7 @@ class ResearchPhase(str, Enum):
     ANALYSIS_PLANNING = "ANALYSIS_PLANNING"
     FEASIBILITY_REVIEW = "FEASIBILITY_REVIEW"
     HUMAN_APPROVAL = "HUMAN_APPROVAL"
+    HUMAN_INTERVENTION_REQUIRED = "HUMAN_INTERVENTION_REQUIRED"
     EXECUTION_WAITING = "EXECUTION_WAITING"
     EXECUTION = "EXECUTION"
     DATA_ANALYSIS = "DATA_ANALYSIS"
@@ -75,6 +76,26 @@ class ResearchQuestion(StrictModel):
 
 
 SourceLevel = Literal["A", "B", "C", "D", "E"]
+VerificationStatus = Literal["verified", "partially_verified", "unverified", "contradicted", "invalid"]
+VerificationMethod = Literal[
+    "doi",
+    "pmid",
+    "arxiv",
+    "official_url",
+    "publisher_record",
+    "exact_title_match",
+    "title_author_year_match",
+    "none",
+]
+ClaimDimension = Literal[
+    "structural_existence",
+    "physiological_function",
+    "biophysical_mechanism",
+    "clinical_efficacy",
+    "theoretical_concept",
+    "safety",
+    "unspecified",
+]
 
 
 def _string_list(value: Any) -> list[str]:
@@ -117,8 +138,23 @@ def normalize_evidence_payload(data: Any) -> Any:
         normalized.setdefault("verification_note", "No verifiable URL was returned.")
     if not normalized.get("doi"):
         normalized["doi"] = None
+    if not normalized.get("pmid"):
+        normalized["pmid"] = None
+    if not normalized.get("arxiv_id"):
+        normalized["arxiv_id"] = None
+    if not normalized.get("official_record_url"):
+        normalized["official_record_url"] = None
+    if not normalized.get("journal_or_publisher"):
+        normalized["journal_or_publisher"] = None
+    if normalized.get("publication_year") is None and normalized.get("publication_date"):
+        year_match = str(normalized.get("publication_date"))
+        normalized["publication_year"] = year_match[:4] if year_match[:4].isdigit() else None
     if normalized.get("publication_date") is not None:
         normalized["publication_date"] = str(normalized["publication_date"])
+    if not normalized.get("verification_status"):
+        normalized["verification_status"] = "unverified"
+    if not normalized.get("verification_method"):
+        normalized["verification_method"] = "none"
     source_type = str(normalized.get("source_type") or "unknown").strip().lower().replace(" ", "_")
     allowed = {"paper", "article", "website", "report", "review", "dataset", "book", "unknown", "web_source"}
     normalized["source_type"] = source_type if source_type in allowed else "unknown"
@@ -138,16 +174,23 @@ class EvidenceItem(StrictModel):
     citation: str | None = None
     authors: list[str] = Field(default_factory=list)
     doi: str | None = None
+    pmid: str | None = None
+    arxiv_id: str | None = None
+    official_record_url: str | None = None
+    journal_or_publisher: str | None = None
     summary: str
     extracted_claims: list[str] = Field(default_factory=list)
     reliability: str = "unknown"
     relevance: str = "unknown"
     limitations: list[str] = Field(default_factory=list)
     publication_date: str | None = None
+    publication_year: str | None = None
     status: str = "unverified"
     source_level: SourceLevel = "E"
     is_primary_source: bool = False
     verified: bool = False
+    verification_status: VerificationStatus = "unverified"
+    verification_method: VerificationMethod = "none"
     verification_note: str | None = None
     duplicate_of: str | None = None
     retrieval_date: datetime = Field(default_factory=utc_now)
@@ -203,6 +246,35 @@ class SearchAcquisitionResult(StrictModel):
     warnings: list[str] = Field(default_factory=list)
 
 
+class EvidenceCollection(StrictModel):
+    evidence_items: list[EvidenceItem] = Field(default_factory=list)
+    preliminary_claims: list["Claim"] = Field(default_factory=list)
+    evidence_gaps: list[str] = Field(default_factory=list)
+    conflicting_evidence: list[str] = Field(default_factory=list)
+    source_summary: str = ""
+
+    @model_validator(mode="before")
+    @classmethod
+    def migrate_legacy_evidence_collection(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        normalized = dict(data)
+        if "evidence_items" not in normalized:
+            normalized["evidence_items"] = (
+                normalized.pop("evidence", None)
+                or normalized.pop("normalized_evidence", None)
+                or normalized.pop("sources", None)
+                or []
+            )
+        if "preliminary_claims" not in normalized:
+            normalized["preliminary_claims"] = normalized.pop("claims", None) or normalized.pop("key_claims", None) or []
+        normalized["evidence_gaps"] = _string_list(normalized.get("evidence_gaps"))
+        normalized["conflicting_evidence"] = _string_list(normalized.get("conflicting_evidence"))
+        if normalized.get("source_summary") is None:
+            normalized["source_summary"] = ""
+        return normalized
+
+
 class DomainResolution(StrictModel):
     reported_primary_domain: str
     reported_secondary_domains: list[str] = Field(default_factory=list)
@@ -227,6 +299,7 @@ class Claim(StrictModel):
     assumptions: list[str] = Field(default_factory=list)
     limitations: list[str] = Field(default_factory=list)
     status: ClaimStatus = "unknown"
+    dimension: ClaimDimension = "unspecified"
 
     @model_validator(mode="before")
     @classmethod
@@ -243,6 +316,134 @@ class Claim(StrictModel):
         normalized["limitations"] = _string_list(normalized.get("limitations"))
         normalized["claim_type"] = normalized.get("claim_type") or "reported_fact"
         normalized["status"] = normalized.get("status") or "unknown"
+        normalized["dimension"] = normalized.get("dimension") or _infer_claim_dimension(str(normalized.get("statement") or ""))
+        return normalized
+
+
+class ClaimEvidenceLink(StrictModel):
+    claim_id: str
+    evidence_id: str
+    relation: Literal["supports", "contradicts", "contextualizes", "insufficient"]
+    strength: float | None = Field(default=None, ge=0.0, le=1.0)
+    rationale: str
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_link_payload(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        normalized = dict(data)
+        normalized["claim_id"] = str(
+            normalized.get("claim_id")
+            or normalized.get("source_claim_id")
+            or normalized.get("claim")
+            or ""
+        ).strip()
+        normalized["evidence_id"] = str(
+            normalized.get("evidence_id")
+            or normalized.get("source_evidence_id")
+            or normalized.get("evidence")
+            or ""
+        ).strip()
+        relation = str(normalized.get("relation") or normalized.get("relationship") or "contextualizes").lower()
+        if relation in {"support", "supported_by", "supports_claim"}:
+            relation = "supports"
+        elif relation in {"contradict", "contradiction", "refutes", "against"}:
+            relation = "contradicts"
+        elif relation in {"unclear", "weak", "none", "missing"}:
+            relation = "insufficient"
+        normalized["relation"] = relation
+        normalized["rationale"] = str(normalized.get("rationale") or normalized.get("reason") or "").strip()
+        return {
+            "claim_id": normalized["claim_id"],
+            "evidence_id": normalized["evidence_id"],
+            "relation": normalized["relation"],
+            "strength": normalized.get("strength"),
+            "rationale": normalized["rationale"],
+        }
+
+
+class ClaimItem(StrictModel):
+    claim_id: str = ""
+    statement: str
+    claim_type: str
+    importance: str
+    status: str
+    dimension: ClaimDimension = "unspecified"
+    supporting_evidence_ids: list[str] = Field(default_factory=list)
+    contradicting_evidence_ids: list[str] = Field(default_factory=list)
+    assumptions: list[str] = Field(default_factory=list)
+    limitations: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_claim_item_payload(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        normalized = dict(data)
+        normalized["claim_id"] = str(normalized.get("claim_id") or normalized.get("id") or "").strip()
+        normalized["claim_type"] = str(normalized.get("claim_type") or "reported_fact")
+        normalized["importance"] = str(normalized.get("importance") or "medium")
+        normalized["status"] = str(normalized.get("status") or "unknown")
+        normalized["dimension"] = normalized.get("dimension") or _infer_claim_dimension(str(normalized.get("statement") or ""))
+        normalized["supporting_evidence_ids"] = _string_list(normalized.get("supporting_evidence_ids"))
+        normalized["contradicting_evidence_ids"] = _string_list(normalized.get("contradicting_evidence_ids"))
+        normalized["assumptions"] = _string_list(normalized.get("assumptions"))
+        normalized["limitations"] = _string_list(normalized.get("limitations"))
+        return {
+            "claim_id": normalized["claim_id"],
+            "statement": normalized.get("statement"),
+            "claim_type": normalized["claim_type"],
+            "importance": normalized["importance"],
+            "status": normalized["status"],
+            "dimension": normalized["dimension"],
+            "supporting_evidence_ids": normalized["supporting_evidence_ids"],
+            "contradicting_evidence_ids": normalized["contradicting_evidence_ids"],
+            "assumptions": normalized["assumptions"],
+            "limitations": normalized["limitations"],
+        }
+
+    @field_validator("claim_type")
+    @classmethod
+    def normalize_claim_type(cls, value: str) -> str:
+        allowed = {"observation", "reported_fact", "inference", "hypothesis", "prediction", "conclusion"}
+        return value if value in allowed else "reported_fact"
+
+    @field_validator("status")
+    @classmethod
+    def normalize_status(cls, value: str) -> str:
+        allowed = {"supported", "partially_supported", "disputed", "unsupported", "unknown"}
+        return value if value in allowed else "unknown"
+
+
+class ClaimEvidenceMappingResult(StrictModel):
+    claims: list[ClaimItem] = Field(default_factory=list)
+    links: list[ClaimEvidenceLink] = Field(default_factory=list)
+    unsupported_claim_ids: list[str] = Field(default_factory=list)
+    disputed_claim_ids: list[str] = Field(default_factory=list)
+    evidence_coverage: float = Field(default=0.0, ge=0.0, le=1.0)
+    display_markdown: str = ""
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_mapping_result_payload(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        normalized = dict(data)
+        normalized["claims"] = normalized.get("claims") or normalized.pop("claim_items", None) or []
+        normalized["links"] = (
+            normalized.get("links")
+            or normalized.pop("claim_evidence_links", None)
+            or normalized.pop("mappings", None)
+            or normalized.pop("claim_mappings", None)
+            or []
+        )
+        normalized["unsupported_claim_ids"] = _string_list(normalized.get("unsupported_claim_ids"))
+        normalized["disputed_claim_ids"] = _string_list(normalized.get("disputed_claim_ids"))
+        if normalized.get("evidence_coverage") is None:
+            normalized["evidence_coverage"] = 0.0
+        if normalized.get("display_markdown") is None:
+            normalized["display_markdown"] = ""
         return normalized
 
 
@@ -322,6 +523,8 @@ class ReviewResult(StrictModel):
     required_revision_target: Literal[
         "question", "evidence", "hypothesis", "method", "design", "analysis", "none"
     ] = "none"
+    revision_plan: list["RevisionAction"] = Field(default_factory=list)
+    approval_conditions: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def reject_invalid_approval(self) -> "ReviewResult":
@@ -349,6 +552,7 @@ class ConclusionItem(StrictModel):
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     limitations: list[str] = Field(default_factory=list)
     scope_of_validity: list[str] = Field(default_factory=list)
+    dimension: ClaimDimension = "unspecified"
 
 
 class Conclusion(StrictModel):
@@ -382,6 +586,13 @@ class Conclusion(StrictModel):
 
 
 class ResearchQualityMetrics(StrictModel):
+    total_evidence_count: int = 0
+    verified_evidence_count: int = 0
+    partially_verified_evidence_count: int = 0
+    unverified_evidence_count: int = 0
+    unique_evidence_count: int = 0
+    verified_primary_source_count: int = 0
+    evidence_verification_rate: float = 0.0
     total_key_claims: int = 0
     supported_key_claims: int = 0
     disputed_key_claims: int = 0
@@ -397,6 +608,75 @@ class ResearchQualityMetrics(StrictModel):
     reviewer_min_score: float = 0.0
     blocking_issue_count: int = 0
     unverifiable_source_count: int = 0
+    revision_improvement_score: float = 0.0
+    stagnation_detected: bool = False
+
+
+class RevisionAction(StrictModel):
+    target: Literal[
+        "question",
+        "evidence",
+        "hypothesis",
+        "method",
+        "study_design",
+        "design",
+        "analysis_plan",
+        "analysis",
+        "reproducibility_plan",
+    ]
+    priority: int = Field(default=1, ge=1)
+    reason: str
+    required_changes: list[str] = Field(default_factory=list)
+    completion_criteria: list[str] = Field(default_factory=list)
+    action_id: str = Field(default_factory=lambda: new_id("revision_action"))
+    status: Literal["pending", "in_progress", "completed", "skipped"] = "pending"
+
+
+class EvidenceRevisionTask(StrictModel):
+    task_id: str = Field(default_factory=lambda: new_id("evidence_revision_task"))
+    target_claim_ids: list[str] = Field(default_factory=list)
+    objective: str
+    required_source_types: list[str] = Field(default_factory=list)
+    minimum_verified_sources: int = Field(default=1, ge=0)
+    search_queries: list[str] = Field(default_factory=list)
+    completion_criteria: list[str] = Field(default_factory=list)
+
+
+class RevisionSnapshot(StrictModel):
+    iteration: int
+    evidence_coverage: float = 0.0
+    verified_source_count: int = 0
+    unverifiable_source_count: int = 0
+    primary_source_ratio: float = 0.0
+    unsupported_claim_count: int = 0
+    reviewer_min_score: float = 0.0
+    blocking_issue_signatures: list[str] = Field(default_factory=list)
+    unique_evidence_ids: list[str] = Field(default_factory=list)
+    pending_revision_targets: list[str] = Field(default_factory=list)
+    stagnation_detected: bool = False
+
+
+class SystematicReviewProtocol(StrictModel):
+    review_question: str = ""
+    databases: list[str] = Field(default_factory=list)
+    search_date_range: str = ""
+    languages: list[str] = Field(default_factory=list)
+    boolean_search_strings: list[str] = Field(default_factory=list)
+    inclusion_criteria: list[str] = Field(default_factory=list)
+    exclusion_criteria: list[str] = Field(default_factory=list)
+    screening_process: list[str] = Field(default_factory=list)
+    duplicate_screening: str = ""
+    conflict_resolution: str = ""
+    extraction_fields: list[str] = Field(default_factory=list)
+    risk_of_bias_tools: list[str] = Field(default_factory=list)
+    evidence_grading_method: str = ""
+    synthesis_strategy: str = ""
+    subgroup_strategy: str = ""
+    translation_protocol: str = ""
+    software: list[str] = Field(default_factory=list)
+    inter_rater_reliability_metric: str = ""
+    inter_rater_reliability_threshold: str = ""
+    protocol_registration_plan: str = ""
 
 
 class BudgetState(StrictModel):
@@ -444,6 +724,10 @@ class ResearchEvent(StrictModel):
     search_result_count: int | None = None
     extracted_page_count: int | None = None
     model_call_count: int | None = None
+    evidence_count: int | None = None
+    claim_count: int | None = None
+    link_count: int | None = None
+    invalid_reference_count: int | None = None
     started_at: datetime = Field(default_factory=utc_now)
     finished_at: datetime | None = None
     changed_fields: list[str] = Field(default_factory=list)
@@ -455,11 +739,16 @@ class ResearchEvent(StrictModel):
     invalidated_artifact_ids: list[str] = Field(default_factory=list)
     preserved_artifact_ids: list[str] = Field(default_factory=list)
     display_markdown: str = ""
+    visibility: Literal["internal", "user"] = "internal"
+    display_key: str | None = None
+    summary_markdown: str = ""
     attempted_calls: int = 0
     successful_calls: int = 0
     failed_calls: int = 0
     fallback_calls: int = 0
     failing_component: str | None = None
+    failure_category: str | None = None
+    artifact_type: str | None = None
     attempted_model: str | None = None
     fallback_attempted: bool = False
     tool_name: str | None = None
@@ -504,7 +793,10 @@ class ResearchProject(StrictModel):
     conclusion: Conclusion | None = None
     quality_metrics: ResearchQualityMetrics = Field(default_factory=ResearchQualityMetrics)
     artifacts: list[ArtifactRecord] = Field(default_factory=list)
+    active_artifact_versions: dict[str, int | None] = Field(default_factory=dict)
+    stale_artifacts: list[str] = Field(default_factory=list)
     events: list[str] = Field(default_factory=list)
+    user_event_keys: list[str] = Field(default_factory=list)
     iteration: int = 0
     max_iterations: int = 2
     budget: BudgetState = Field(default_factory=BudgetState)
@@ -525,6 +817,12 @@ class ResearchProject(StrictModel):
     conflicting_evidence: list[str] = Field(default_factory=list)
     revision_feedback: list[str] = Field(default_factory=list)
     pending_revision_target: str | None = None
+    pending_revision_actions: list[RevisionAction] = Field(default_factory=list)
+    completed_revision_actions: list[RevisionAction] = Field(default_factory=list)
+    current_revision_action: RevisionAction | None = None
+    evidence_revision_tasks: list[EvidenceRevisionTask] = Field(default_factory=list)
+    revision_snapshots: list[RevisionSnapshot] = Field(default_factory=list)
+    systematic_review_protocol: SystematicReviewProtocol | None = None
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 
@@ -632,6 +930,23 @@ class ResearchStartRequest(StrictModel):
 class RevisionRequest(StrictModel):
     target: Literal["question", "evidence", "hypothesis", "method", "design", "analysis"]
     feedback: str
+
+
+def _infer_claim_dimension(statement: str) -> ClaimDimension:
+    text = statement.lower()
+    if any(token in text for token in ["anatom", "structure", "structural", "existence", "解剖", "结构", "实体"]):
+        return "structural_existence"
+    if any(token in text for token in ["physiolog", "function", "conduction", "pathway", "生理", "传导", "通路"]):
+        return "physiological_function"
+    if any(token in text for token in ["mechanism", "biophysical", "机制", "生物物理"]):
+        return "biophysical_mechanism"
+    if any(token in text for token in ["clinical", "efficacy", "therapy", "treatment", "临床", "疗效", "治疗"]):
+        return "clinical_efficacy"
+    if any(token in text for token in ["safety", "adverse", "风险", "安全"]):
+        return "safety"
+    if any(token in text for token in ["theory", "concept", "理论", "概念"]):
+        return "theoretical_concept"
+    return "unspecified"
 
 
 class ProvideDataRequest(StrictModel):

@@ -26,7 +26,13 @@ from src.ai_scientist.claim_graph import ClaimGraph
 from src.ai_scientist.domain_resolution import resolve_domain
 from src.ai_scientist.domain_router import DomainRouter
 from src.ai_scientist.events import completed_event
-from src.ai_scientist.exceptions import AIScientistError, BudgetExceededError, InvalidTransitionError
+from src.ai_scientist.evidence_verifier import verify_evidence_collection
+from src.ai_scientist.exceptions import (
+    AIScientistError,
+    BudgetExceededError,
+    InvalidEvidenceReferenceError,
+    InvalidTransitionError,
+)
 from src.ai_scientist.method_selector import MethodSelector
 from src.ai_scientist.model_registry import ModelRegistry
 from src.ai_scientist.presentation import (
@@ -46,7 +52,10 @@ from src.ai_scientist.quality import apply_reviewer_quality_gates, compute_quali
 from src.ai_scientist.report_writer import build_research_plan_json, build_research_plan_markdown
 from src.ai_scientist.schemas import (
     AnalysisPlan,
+    Claim,
+    ClaimEvidenceMappingResult,
     DomainSelectionOutput,
+    EvidenceCollection,
     EvidenceResearchOutput,
     EvidenceItem,
     SearchAcquisitionResult,
@@ -57,11 +66,13 @@ from src.ai_scientist.schemas import (
     ResearchQuestion,
     ResearchProject,
     ReviewResult,
+    RevisionAction,
     StudyDesign,
     new_id,
     utc_now,
 )
 from src.ai_scientist.state_machine import ResearchStateMachine, TERMINAL_PHASES
+from src.ai_scientist.stagnation_detector import build_revision_snapshot, detect_stagnation
 from src.ai_scientist.structured_client import StructuredQwenClient, StructuredCallMetadata
 from src.ai_scientist.tools.execution_adapter import ExecutionAdapter
 from src.ai_scientist.tools.registry import ToolRegistry
@@ -126,6 +137,9 @@ class ResearchOrchestrator:
             raise InvalidTransitionError(f"Project in terminal phase {project.phase.value} cannot continue.")
         produced_artifacts: list[str] = []
         review_decision: str | None = None
+        revision_required = False
+        blocking_issues: list[str] = []
+        max_revision_exhausted = False
         stage_status = "completed"
         started_event = ResearchEvent(
             job_id=job_id,
@@ -184,30 +198,7 @@ class ResearchOrchestrator:
                 produced_artifacts += self._run_background_research(project, previous_phase)
                 self.state_machine.transition(project, "next")
             elif project.phase == ResearchPhase.CLAIM_EVIDENCE_MAPPING:
-                mapping, metadata = self._run_claim_mapping(project)
-                project.evidence = enrich_evidence_items(mapping.evidence or project.evidence)
-                project.claims = mapping.claims or project.claims
-                project.evidence_gaps = mapping.evidence_gaps or project.evidence_gaps
-                project.conflicting_evidence = mapping.conflicting_evidence or project.conflicting_evidence
-                graph = ClaimGraph(project.evidence, project.claims)
-                errors = graph.validate()
-                if errors:
-                    raise AIScientistError("Claim-evidence validation failed: " + "; ".join(errors))
-                self._refresh_quality_metrics(project)
-                produced_artifacts += self._record_structured_output(
-                    project,
-                    previous_phase,
-                    "evidence_researcher",
-                    {
-                        "claim_count": len(project.claims),
-                        "evidence_count": len(project.evidence),
-                        "unsupported_claim_ids": [item.claim_id for item in graph.find_unsupported_claims()],
-                    },
-                    "claim_evidence_validation",
-                    metadata=metadata,
-                    display_markdown=render_claim_mapping(project),
-                )
-                self.state_machine.transition(project, "next")
+                produced_artifacts += self._execute_claim_evidence_mapping(project, previous_phase)
             elif project.phase == ResearchPhase.HYPOTHESIS_GENERATION:
                 run = self._run_agent(project, HypothesisScientistAgent)
                 project.hypotheses = run.output.hypotheses
@@ -254,9 +245,14 @@ class ResearchOrchestrator:
                 )
                 produced_artifacts += self._record_agent_output(project, previous_phase, review, "independent_review")
                 review_decision = review.output.decision
-                self.state_machine.transition(project, review_decision)
+                blocking_issues = review.output.blocking_issues
+                review_flow = self._apply_review_decision(project, review.output)
+                revision_required = review_flow["revision_required"]
+                max_revision_exhausted = review_flow["max_revision_exhausted"]
             elif project.phase == ResearchPhase.HUMAN_APPROVAL:
                 stage_status = "awaiting_human_approval"
+            elif project.phase == ResearchPhase.HUMAN_INTERVENTION_REQUIRED:
+                stage_status = "waiting_for_human_intervention"
             elif project.phase == ResearchPhase.REVISION:
                 target = project.pending_revision_target
                 if not target:
@@ -281,7 +277,10 @@ class ResearchOrchestrator:
                 project.reviews.append(review.output)
                 produced_artifacts += self._record_agent_output(project, previous_phase, review, "critical_review")
                 review_decision = review.output.decision
-                self.state_machine.transition(project, review_decision)
+                blocking_issues = review.output.blocking_issues
+                review_flow = self._apply_review_decision(project, review.output)
+                revision_required = review_flow["revision_required"]
+                max_revision_exhausted = review_flow["max_revision_exhausted"]
             elif project.phase == ResearchPhase.SYNTHESIS:
                 run = self._run_agent(project, ScientificSynthesizerAgent)
                 project.conclusion = run.output
@@ -291,9 +290,12 @@ class ResearchOrchestrator:
                 self.state_machine.transition(project, "next")
             else:
                 raise InvalidTransitionError(f"No stage handler for phase {project.phase.value}")
+            self._advance_revision_queue_after_phase(project, previous_phase)
             self.store.save(project)
         except Exception as exc:
             stage_substep = self._substep_for_error(previous_phase, exc)
+            cause_type = getattr(exc, "cause_type", None) or type(exc).__name__
+            cause_message = getattr(exc, "cause_message", None) or str(exc)
             event = ResearchEvent(
                 job_id=job_id,
                 project_id=project.project_id,
@@ -305,7 +307,10 @@ class ResearchOrchestrator:
                 error_message=self._sanitize_error(exc),
                 schema_valid=False,
                 finished_at=utc_now(),
-                failing_component=self._failing_component_for_substep(stage_substep),
+                failing_component=getattr(exc, "failing_component", None)
+                or self._failing_component_for_substep(stage_substep),
+                failure_category=getattr(exc, "failure_category", None),
+                artifact_type=getattr(exc, "artifact_type", None),
                 stage_substep=stage_substep,
                 requested_model=getattr(exc, "requested_model", None),
                 actual_model=getattr(exc, "actual_model", None),
@@ -315,7 +320,7 @@ class ResearchOrchestrator:
                 tool_names=getattr(exc, "tool_names", []),
                 safe_traceback=self._sanitize_traceback(exc),
                 display_markdown=self._failure_display_message(previous_phase, stage_substep),
-                validation_errors=self._validation_errors(exc),
+                validation_errors=getattr(exc, "validation_errors", None) or self._validation_errors(exc),
                 attempted_calls=1 if previous_phase == ResearchPhase.BACKGROUND_RESEARCH else 0,
                 failed_calls=1,
                 status_code=getattr(exc, "status_code", None),
@@ -325,6 +330,8 @@ class ResearchOrchestrator:
                 endpoint_host=getattr(exc, "endpoint_host", None),
                 previous_response_id_present=getattr(exc, "previous_response_id_present", None),
             )
+            event.provider_error_code = event.provider_error_code or cause_type
+            event.provider_error_message = event.provider_error_message or self._sanitize_text(cause_message)
             project.stage_messages.append(event.display_markdown)
             self._append_event(project, event)
             project.phase = previous_phase
@@ -340,6 +347,10 @@ class ResearchOrchestrator:
             "produced_artifacts": produced_artifacts,
             "human_actions_required": list(dict.fromkeys(project.human_actions_required)),
             "review_decision": review_decision,
+            "revision_required": revision_required,
+            "blocking_issues": blocking_issues,
+            "iteration": project.iteration,
+            "max_revision_exhausted": max_revision_exhausted,
         }
 
     def approve_project(self, project_id: str) -> ResearchProject:
@@ -498,6 +509,202 @@ class ResearchOrchestrator:
             "human_actions_required": project.human_actions_required,
         }
 
+    def _apply_review_decision(self, project: ResearchProject, review: ReviewResult) -> dict[str, Any]:
+        if review.decision == "approve":
+            self.state_machine.transition(project, "approve")
+            return {"revision_required": False, "max_revision_exhausted": False}
+        if review.decision == "reject":
+            self.state_machine.transition(project, "reject")
+            return {"revision_required": False, "max_revision_exhausted": False}
+
+        actions = self._revision_actions_from_review(review)
+        project.pending_revision_actions = actions
+        project.current_revision_action = None
+        snapshot = build_revision_snapshot(project)
+        project.revision_snapshots.append(snapshot)
+        if detect_stagnation(project):
+            latest = project.revision_snapshots[-1]
+            project.revision_snapshots[-1] = latest.model_copy(update={"stagnation_detected": True})
+            project.quality_metrics = project.quality_metrics.model_copy(update={"stagnation_detected": True})
+            project.phase = ResearchPhase.HUMAN_INTERVENTION_REQUIRED
+            project.stage_messages.append(
+                "系统连续两轮未能获得新的可验证证据或质量改善，自动修订已暂停。请上传论文、提供 DOI/PMID/正式链接、调整范围，或接受当前证据不足的结论。"
+            )
+            return {"revision_required": True, "max_revision_exhausted": False}
+        if project.iteration >= project.max_iterations:
+            project.phase = ResearchPhase.HUMAN_INTERVENTION_REQUIRED
+            project.stage_messages.append(
+                "自动修订已达到上限，但项目并非失败。当前需要人工提供来源、调整范围，或确认接受证据不足结论。"
+            )
+            return {"revision_required": True, "max_revision_exhausted": True}
+        project.iteration += 1
+        project.budget.used_iterations += 1
+        self._start_next_revision_action(project)
+        return {"revision_required": True, "max_revision_exhausted": False}
+
+    def _revision_actions_from_review(self, review: ReviewResult) -> list[RevisionAction]:
+        actions = list(review.revision_plan)
+        if not actions and review.required_revision_target != "none":
+            actions.append(
+                RevisionAction(
+                    target=self._normalize_revision_target(review.required_revision_target),
+                    priority=1,
+                    reason="Reviewer requested a targeted revision.",
+                    required_changes=review.blocking_issues[:5],
+                    completion_criteria=["The targeted revision is completed and re-reviewed."],
+                )
+            )
+        if not actions:
+            actions.append(
+                RevisionAction(
+                    target="evidence",
+                    priority=1,
+                    reason="Reviewer requested revision but did not provide a target.",
+                    required_changes=review.blocking_issues[:5],
+                    completion_criteria=["Reviewer blocking issues are addressed."],
+                )
+            )
+        return sorted(
+            [item.model_copy(update={"target": self._normalize_revision_target(item.target), "status": "pending"}) for item in actions],
+            key=lambda item: item.priority,
+        )
+
+    def _start_next_revision_action(self, project: ResearchProject) -> None:
+        if not project.pending_revision_actions:
+            project.current_revision_action = None
+            project.phase = ResearchPhase.CRITICAL_REVIEW
+            return
+        action = project.pending_revision_actions.pop(0).model_copy(update={"status": "in_progress"})
+        project.current_revision_action = action
+        project.phase = self._phase_for_revision_target(action.target)
+        project.stage_messages.append(self._revision_action_message(action, len(project.pending_revision_actions) + 1))
+
+    def _advance_revision_queue_after_phase(self, project: ResearchProject, completed_phase: ResearchPhase) -> None:
+        action = project.current_revision_action
+        if action is None:
+            return
+        if self._completion_phase_for_revision_target(action.target) != completed_phase:
+            return
+        project.completed_revision_actions.append(action.model_copy(update={"status": "completed"}))
+        project.current_revision_action = None
+        self._start_next_revision_action(project)
+
+    @staticmethod
+    def _normalize_revision_target(target: str) -> str:
+        return {
+            "design": "study_design",
+            "analysis": "analysis_plan",
+            "method": "method",
+            "hypothesis": "hypothesis",
+        }.get(target, target)
+
+    @staticmethod
+    def _phase_for_revision_target(target: str) -> ResearchPhase:
+        return {
+            "question": ResearchPhase.QUESTION_FORMULATION,
+            "evidence": ResearchPhase.BACKGROUND_RESEARCH,
+            "hypothesis": ResearchPhase.HYPOTHESIS_GENERATION,
+            "method": ResearchPhase.METHOD_SELECTION,
+            "study_design": ResearchPhase.STUDY_DESIGN,
+            "analysis_plan": ResearchPhase.ANALYSIS_PLANNING,
+            "reproducibility_plan": ResearchPhase.FEASIBILITY_REVIEW,
+        }.get(target, ResearchPhase.BACKGROUND_RESEARCH)
+
+    @staticmethod
+    def _completion_phase_for_revision_target(target: str) -> ResearchPhase:
+        return {
+            "evidence": ResearchPhase.CLAIM_EVIDENCE_MAPPING,
+            "question": ResearchPhase.QUESTION_FORMULATION,
+            "hypothesis": ResearchPhase.HYPOTHESIS_GENERATION,
+            "method": ResearchPhase.METHOD_SELECTION,
+            "study_design": ResearchPhase.STUDY_DESIGN,
+            "analysis_plan": ResearchPhase.ANALYSIS_PLANNING,
+            "reproducibility_plan": ResearchPhase.FEASIBILITY_REVIEW,
+        }.get(target, ResearchPhase.BACKGROUND_RESEARCH)
+
+    @staticmethod
+    def _revision_action_message(action: RevisionAction, remaining_count: int) -> str:
+        target_label = {
+            "evidence": "补充可验证证据",
+            "reproducibility_plan": "完善研究与复现方案",
+            "analysis_plan": "修订分析方案",
+            "study_design": "修订研究设计",
+            "method": "修订方法选择",
+            "hypothesis": "修订假设",
+            "question": "修订研究问题",
+        }.get(action.target, action.target)
+        suffix = f" 后续还有 {remaining_count - 1} 项修订。" if remaining_count > 1 else ""
+        return f"独立审查要求定向修订：{target_label}。{action.reason}{suffix}"
+
+    def debug_claim_mapping(self, project_id: str) -> dict[str, Any]:
+        """Dry-run claim mapping validation without changing formal project state."""
+
+        project = self.get_project(project_id).model_copy(deep=True)
+        try:
+            collection = self._latest_evidence_collection(project)
+            self._validate_evidence_ids(collection)
+            mapping, metadata = self._run_claim_mapping(project, collection, track_failure_budget=False)
+            claims = self._canonicalize_claim_mapping(mapping, collection)
+            graph = ClaimGraph(collection.evidence_items, claims)
+            graph.validate_or_raise()
+            graph_errors = graph.validate()
+            if graph_errors:
+                raise AIScientistError(
+                    "Claim graph dry-run validation failed.",
+                    stage=ResearchPhase.CLAIM_EVIDENCE_MAPPING.value,
+                    substep="claim_graph_build",
+                    cause_type="ClaimGraphValidationError",
+                    cause_message="; ".join(graph_errors),
+                    validation_errors=[{"msg": item} for item in graph_errors],
+                    artifact_type="claim_graph",
+                    failure_category="orchestration_postprocess_error",
+                    failing_component="claim_graph_build",
+                )
+            unsupported = [item.claim_id for item in graph.find_unsupported_claims()]
+            links = graph.to_dict()["links"]
+            return {
+                "status": "ok",
+                "message": (
+                    f"已读取 {len(collection.evidence_items)} 条证据，生成 {len(claims)} 条主张，"
+                    f"建立 {len(links)} 条支持或反驳关系。其中 {len(unsupported)} 条主张缺少可靠证据。"
+                ),
+                "debug": {
+                    "evidence_version": project.active_artifact_versions.get("evidence"),
+                    "evidence_count": len(collection.evidence_items),
+                    "claim_count": len(claims),
+                    "link_count": len(links),
+                    "invalid_reference_count": 0,
+                    "schema_valid": True,
+                    "requested_model": metadata.requested_model,
+                    "actual_model": metadata.actual_model,
+                    "failing_component": None,
+                    "cause_type": None,
+                    "cause_message": None,
+                },
+            }
+        except Exception as exc:  # noqa: BLE001 - diagnostic endpoint returns safe details.
+            return {
+                "status": "error",
+                "message": self._failure_display_message(
+                    ResearchPhase.CLAIM_EVIDENCE_MAPPING,
+                    self._substep_for_error(ResearchPhase.CLAIM_EVIDENCE_MAPPING, exc),
+                ),
+                "debug": {
+                    "evidence_count": len(project.evidence),
+                    "claim_count": len(project.claims),
+                    "invalid_reference_count": 1 if isinstance(exc, InvalidEvidenceReferenceError) else 0,
+                    "schema_valid": False,
+                    "failing_component": getattr(exc, "failing_component", None)
+                    or self._failing_component_for_substep(
+                        self._substep_for_error(ResearchPhase.CLAIM_EVIDENCE_MAPPING, exc)
+                    ),
+                    "cause_type": getattr(exc, "cause_type", None) or type(exc).__name__,
+                    "cause_message": self._sanitize_text(getattr(exc, "cause_message", None) or str(exc)),
+                    "artifact_type": getattr(exc, "artifact_type", None),
+                    "validation_errors": getattr(exc, "validation_errors", None) or self._validation_errors(exc),
+                },
+            }
+
     def _run_background_research(self, project: ResearchProject, phase: ResearchPhase) -> list[str]:
         produced: list[str] = []
         agent = EvidenceResearcherAgent(client=self._structured_client_for_project(project))
@@ -629,13 +836,32 @@ class ResearchOrchestrator:
             project.budget.failed_model_calls += 1
             self.store.save(project)
             raise
-        project.evidence = enrich_evidence_items(run.output.evidence)
-        project.claims = run.output.claims
+        verified_collection = verify_evidence_collection(
+            EvidenceCollection(
+                evidence_items=run.output.evidence,
+                preliminary_claims=run.output.claims,
+                evidence_gaps=run.output.evidence_gaps,
+                conflicting_evidence=run.output.conflicting_evidence,
+                source_summary=run.output.confidence_summary,
+            )
+        )
+        project.evidence, evidence_id_map = self._canonicalize_evidence_ids(
+            enrich_evidence_items(verified_collection.evidence_items)
+        )
+        project.claims = self._remap_claim_evidence_refs(run.output.claims, evidence_id_map)
         project.evidence_gaps = run.output.evidence_gaps
         project.conflicting_evidence = run.output.conflicting_evidence
+        run.output = run.output.model_copy(
+            update={
+                "evidence": project.evidence,
+                "claims": project.claims,
+            }
+        )
         self._refresh_quality_metrics(project)
         checkpoint.normalization_completed = True
         produced += self._record_agent_output(project, phase, run, "evidence_map")
+        project.active_artifact_versions["evidence"] = self._latest_artifact_version(project, "evidence_map")
+        self._mark_downstream_artifacts_stale(project, from_artifact="evidence")
         self._append_event(
             project,
             completed_event(
@@ -646,9 +872,329 @@ class ResearchOrchestrator:
                 stage_substep="evidence_normalization",
                 search_result_count=len(acquisition.sources),
                 display_markdown=render_evidence_summary(project.evidence, project.evidence_gaps),
+                visibility="user",
+                display_key="background_research_completed",
+                summary_markdown=render_evidence_summary(project.evidence, project.evidence_gaps),
+                evidence_count=len(project.evidence),
             ),
         )
         return produced
+
+    def _execute_claim_evidence_mapping(self, project: ResearchProject, phase: ResearchPhase) -> list[str]:
+        produced: list[str] = []
+        current_substep = "load_latest_evidence"
+        current_artifact_type = "evidence_collection"
+        try:
+            self._claim_mapping_event(project, phase, "load_latest_evidence_started", current_substep)
+            evidence_collection = self._latest_evidence_collection(project)
+            self._claim_mapping_event(
+                project,
+                phase,
+                "load_latest_evidence_completed",
+                current_substep,
+                evidence_count=len(evidence_collection.evidence_items),
+            )
+
+            current_substep = "evidence_reference_validation"
+            self._claim_mapping_event(project, phase, "claim_mapping_validation_started", current_substep)
+            self._validate_evidence_ids(evidence_collection)
+            self._claim_mapping_event(project, phase, "claim_mapping_validation_completed", current_substep)
+
+            current_substep = "model_output_parse"
+            current_artifact_type = "claim_evidence_mapping"
+            self._claim_mapping_event(project, phase, "claim_mapping_model_started", current_substep)
+            self._ensure_budget(project, 1)
+            mapping, metadata = self._run_claim_mapping(project, evidence_collection)
+            self._claim_mapping_event(
+                project,
+                phase,
+                "claim_mapping_model_completed",
+                current_substep,
+                requested_model=metadata.requested_model,
+                actual_model=metadata.actual_model,
+                fallback_used=metadata.fallback_used,
+                attempted_calls=metadata.attempted_calls,
+                successful_calls=metadata.successful_calls,
+                model_call_count=metadata.successful_calls,
+            )
+
+            current_substep = "schema_validation"
+            self._claim_mapping_event(project, phase, "claim_mapping_validation_started", current_substep)
+            claims = self._canonicalize_claim_mapping(mapping, evidence_collection)
+            graph = ClaimGraph(evidence_collection.evidence_items, claims)
+            graph.validate_or_raise()
+            errors = graph.validate()
+            if errors:
+                raise AIScientistError(
+                    "Claim-evidence mapping schema validation failed.",
+                    stage=phase.value,
+                    substep=current_substep,
+                    cause_type="ClaimGraphValidationError",
+                    cause_message="; ".join(errors),
+                    validation_errors=[{"msg": item} for item in errors],
+                    artifact_type=current_artifact_type,
+                    failure_category="orchestration_postprocess_error",
+                    failing_component=current_substep,
+                )
+            self._claim_mapping_event(
+                project,
+                phase,
+                "claim_mapping_validation_completed",
+                current_substep,
+                claim_count=len(claims),
+                link_count=len(graph.to_dict()["links"]),
+            )
+
+            current_substep = "claim_graph_build"
+            current_artifact_type = "claim_graph"
+            self._claim_mapping_event(project, phase, "claim_graph_build_started", current_substep)
+            graph_payload = graph.to_dict()
+            self._claim_mapping_event(
+                project,
+                phase,
+                "claim_graph_build_completed",
+                current_substep,
+                claim_count=len(claims),
+                link_count=len(graph_payload["links"]),
+            )
+
+            current_substep = "artifact_save"
+            current_artifact_type = "claim_evidence_mapping"
+            self._claim_mapping_event(project, phase, "artifact_save_started", current_substep)
+            mapping_record = self.artifacts.save_json(
+                project.project_id,
+                "claim_evidence_mapping",
+                mapping.model_dump(mode="json"),
+                "evidence_researcher",
+            )
+            graph_record = self.artifacts.save_json(
+                project.project_id,
+                "claim_graph",
+                graph_payload,
+                "evidence_researcher",
+            )
+            produced.extend([mapping_record.artifact_id, graph_record.artifact_id])
+            self._claim_mapping_event(
+                project,
+                phase,
+                "artifact_save_completed",
+                current_substep,
+                output_artifact_ids=[mapping_record.artifact_id, graph_record.artifact_id],
+            )
+
+            current_substep = "project_state_update"
+            self._claim_mapping_event(project, phase, "project_state_update_started", current_substep)
+            project.evidence = evidence_collection.evidence_items
+            project.claims = claims
+            project.artifacts.extend([mapping_record, graph_record])
+            project.active_artifact_versions["claim_evidence_mapping"] = mapping_record.version
+            project.active_artifact_versions["claim_graph"] = graph_record.version
+            for artifact_type in ["claim_evidence_mapping", "claim_graph"]:
+                if artifact_type in project.stale_artifacts:
+                    project.stale_artifacts.remove(artifact_type)
+            self._refresh_quality_metrics(project)
+            if mapping.display_markdown:
+                project.stage_messages.append(mapping.display_markdown)
+            else:
+                project.stage_messages.append(render_claim_mapping(project))
+            project.budget.attempted_model_calls += metadata.attempted_calls
+            project.budget.successful_model_calls += metadata.successful_calls
+            project.budget.failed_model_calls += metadata.failed_calls
+            project.budget.fallback_model_calls += metadata.fallback_calls
+            project.budget.used_model_calls += metadata.successful_calls
+            self.store.save(project)
+            self._claim_mapping_event(
+                project,
+                phase,
+                "project_state_update_completed",
+                current_substep,
+                output_artifact_ids=[mapping_record.artifact_id, graph_record.artifact_id],
+                requested_model=metadata.requested_model,
+                actual_model=metadata.actual_model,
+                fallback_used=metadata.fallback_used,
+                attempted_calls=metadata.attempted_calls,
+                successful_calls=metadata.successful_calls,
+                model_call_count=metadata.successful_calls,
+                display_markdown=render_claim_mapping(project),
+                visibility="user",
+                display_key="claim_evidence_mapping_completed",
+                summary_markdown=render_claim_mapping(project),
+            )
+
+            current_substep = "phase_transition"
+            self._claim_mapping_event(project, phase, "phase_transition_started", current_substep)
+            self.state_machine.transition(project, "next")
+            self.store.save(project)
+            self._claim_mapping_event(project, phase, "phase_transition_completed", current_substep)
+            return produced
+        except InvalidEvidenceReferenceError:
+            raise
+        except AIScientistError:
+            raise
+        except Exception as exc:
+            raise AIScientistError(
+                "Claim-evidence mapping post-processing failed.",
+                stage=phase.value,
+                substep=current_substep,
+                cause_type=type(exc).__name__,
+                cause_message=str(exc),
+                validation_errors=self._validation_errors(exc),
+                artifact_type=current_artifact_type,
+                failure_category="orchestration_postprocess_error",
+                failing_component=current_substep,
+            ) from exc
+
+    def _claim_mapping_event(
+        self,
+        project: ResearchProject,
+        phase: ResearchPhase,
+        status: str,
+        stage_substep: str,
+        **kwargs: Any,
+    ) -> None:
+        self._append_event(
+            project,
+            completed_event(
+                project.project_id,
+                phase,
+                "evidence_researcher",
+                status=status,
+                stage_substep=stage_substep,
+                failing_component=None,
+                **kwargs,
+            ),
+        )
+
+    def _latest_evidence_collection(self, project: ResearchProject) -> EvidenceCollection:
+        return EvidenceCollection(
+            evidence_items=project.evidence,
+            preliminary_claims=project.claims,
+            evidence_gaps=project.evidence_gaps,
+            conflicting_evidence=project.conflicting_evidence,
+            source_summary=f"{len(project.evidence)} active evidence records are available.",
+        )
+
+    @staticmethod
+    def _validate_evidence_ids(collection: EvidenceCollection) -> None:
+        seen: set[str] = set()
+        for index, item in enumerate(collection.evidence_items, start=1):
+            if not item.evidence_id:
+                raise AIScientistError(
+                    f"Evidence item {index} has an empty evidence_id.",
+                    stage=ResearchPhase.CLAIM_EVIDENCE_MAPPING.value,
+                    substep="evidence_reference_validation",
+                    cause_type="MissingEvidenceId",
+                    cause_message=f"Evidence item {index} has an empty evidence_id.",
+                    artifact_type="evidence_collection",
+                    failure_category="orchestration_postprocess_error",
+                    failing_component="evidence_reference_validation",
+                )
+            if item.evidence_id in seen:
+                raise AIScientistError(
+                    f"Duplicate evidence_id in active evidence collection: {item.evidence_id}",
+                    stage=ResearchPhase.CLAIM_EVIDENCE_MAPPING.value,
+                    substep="evidence_reference_validation",
+                    cause_type="DuplicateEvidenceId",
+                    cause_message=item.evidence_id,
+                    artifact_type="evidence_collection",
+                    failure_category="orchestration_postprocess_error",
+                    failing_component="evidence_reference_validation",
+                )
+            seen.add(item.evidence_id)
+
+    @staticmethod
+    def _canonicalize_evidence_ids(evidence: list[EvidenceItem]) -> tuple[list[EvidenceItem], dict[str, str]]:
+        canonical: list[EvidenceItem] = []
+        id_map: dict[str, str] = {}
+        for index, item in enumerate(evidence, start=1):
+            canonical_id = f"EVD-{index:03d}"
+            id_map[item.evidence_id] = canonical_id
+            if item.title:
+                id_map[item.title] = canonical_id
+            if item.source_url:
+                id_map[item.source_url] = canonical_id
+            canonical.append(item.model_copy(update={"evidence_id": canonical_id}))
+        return canonical, id_map
+
+    @staticmethod
+    def _remap_claim_evidence_refs(claims: list[Claim], evidence_id_map: dict[str, str]) -> list[Claim]:
+        remapped: list[Claim] = []
+        for claim in claims:
+            remapped.append(
+                claim.model_copy(
+                    update={
+                        "supporting_evidence_ids": [
+                            evidence_id_map.get(item, item) for item in claim.supporting_evidence_ids
+                        ],
+                        "contradicting_evidence_ids": [
+                            evidence_id_map.get(item, item) for item in claim.contradicting_evidence_ids
+                        ],
+                    }
+                )
+            )
+        return remapped
+
+    @staticmethod
+    def _canonicalize_claim_mapping(
+        mapping: ClaimEvidenceMappingResult,
+        collection: EvidenceCollection,
+    ) -> list[Claim]:
+        evidence_ids = {item.evidence_id for item in collection.evidence_items}
+        temporary_claim_ids: dict[str, str] = {}
+        claims: list[Claim] = []
+        for index, item in enumerate(mapping.claims, start=1):
+            canonical_id = f"CLM-{index:03d}"
+            if item.claim_id:
+                temporary_claim_ids[item.claim_id] = canonical_id
+            temporary_claim_ids[item.statement] = canonical_id
+            claim_type = item.claim_type if item.claim_type in {"observation", "reported_fact", "inference", "hypothesis", "prediction", "conclusion"} else "reported_fact"
+            status = item.status if item.status in {"supported", "partially_supported", "disputed", "unsupported", "unknown"} else "unknown"
+            claims.append(
+                Claim(
+                    claim_id=canonical_id,
+                    statement=item.statement,
+                    claim_type=claim_type,  # type: ignore[arg-type]
+                    status=status,  # type: ignore[arg-type]
+                    assumptions=item.assumptions,
+                    limitations=item.limitations,
+                    supporting_evidence_ids=[],
+                    contradicting_evidence_ids=[],
+                )
+            )
+        claim_by_id = {claim.claim_id: claim for claim in claims}
+        for link in mapping.links:
+            claim_id = temporary_claim_ids.get(link.claim_id, link.claim_id)
+            evidence_id = link.evidence_id
+            if claim_id not in claim_by_id:
+                raise AIScientistError(
+                    f"Claim-evidence link references unknown claim {link.claim_id}.",
+                    stage=ResearchPhase.CLAIM_EVIDENCE_MAPPING.value,
+                    substep="evidence_reference_validation",
+                    cause_type="InvalidClaimReferenceError",
+                    cause_message=f"Unknown claim_id: {link.claim_id}",
+                    artifact_type="claim_evidence_mapping",
+                    failure_category="orchestration_postprocess_error",
+                    failing_component="evidence_reference_validation",
+                )
+            if evidence_id not in evidence_ids:
+                raise InvalidEvidenceReferenceError(claim_id, evidence_id)
+            claim = claim_by_id[claim_id]
+            if link.relation == "supports" and evidence_id not in claim.supporting_evidence_ids:
+                claim.supporting_evidence_ids.append(evidence_id)
+            elif link.relation == "contradicts" and evidence_id not in claim.contradicting_evidence_ids:
+                claim.contradicting_evidence_ids.append(evidence_id)
+        for item, claim in zip(mapping.claims, claims, strict=False):
+            for evidence_id in item.supporting_evidence_ids:
+                if evidence_id not in evidence_ids:
+                    raise InvalidEvidenceReferenceError(claim.claim_id, evidence_id)
+                if evidence_id not in claim.supporting_evidence_ids:
+                    claim.supporting_evidence_ids.append(evidence_id)
+            for evidence_id in item.contradicting_evidence_ids:
+                if evidence_id not in evidence_ids:
+                    raise InvalidEvidenceReferenceError(claim.claim_id, evidence_id)
+                if evidence_id not in claim.contradicting_evidence_ids:
+                    claim.contradicting_evidence_ids.append(evidence_id)
+        return claims
 
     def _run_agent(self, project: ResearchProject, agent_class: type) -> AgentRun:
         self._ensure_budget(project, 1)
@@ -690,30 +1236,36 @@ class ResearchOrchestrator:
             self.store.save(project)
             raise
 
-    def _run_claim_mapping(self, project: ResearchProject) -> tuple[EvidenceResearchOutput, StructuredCallMetadata]:
+    def _run_claim_mapping(
+        self,
+        project: ResearchProject,
+        evidence_collection: EvidenceCollection,
+        track_failure_budget: bool = True,
+    ) -> tuple[ClaimEvidenceMappingResult, StructuredCallMetadata]:
         payload = {
             "question": project.question.model_dump(mode="json") if project.question else None,
-            "evidence": [item.model_dump(mode="json") for item in project.evidence],
-            "claims": [item.model_dump(mode="json") for item in project.claims],
-            "evidence_gaps": project.evidence_gaps,
-            "conflicting_evidence": project.conflicting_evidence,
+            "project_id": project.project_id,
+            "evidence_collection": evidence_collection.model_dump(mode="json"),
             "task": (
-                "Refine the claim-evidence mapping using only the provided evidence records. "
-                "Do not invent new URLs or citations. Keep unsupported claims explicitly marked."
+                "Build a claim-evidence mapping using only the current EvidenceCollection. "
+                "Use only provided evidence_ids in links and evidence ID lists. "
+                "Do not invent new evidence, URLs, DOI, authors, or citations. "
+                "Mark unsupported or disputed claims explicitly."
             ),
         }
         try:
             result = self._structured_client_for_project(project).call(
                 "evidence_researcher",
-                "You are an AI Scientist evidence researcher. Return validated evidence and claim mapping only.",
+                "You are an AI Scientist evidence mapper. Return claim-evidence mapping JSON only.",
                 payload,
-                EvidenceResearchOutput,
+                ClaimEvidenceMappingResult,
             )
             return result.value, result.metadata
         except Exception:
-            project.budget.attempted_model_calls += 1
-            project.budget.failed_model_calls += 1
-            self.store.save(project)
+            if track_failure_budget:
+                project.budget.attempted_model_calls += 1
+                project.budget.failed_model_calls += 1
+                self.store.save(project)
             raise
 
     def _record_agent_output(
@@ -922,7 +1474,7 @@ class ResearchOrchestrator:
     def _artifact_ids_from_phase(target_phase: ResearchPhase, project: ResearchProject) -> list[str]:
         phase_artifacts = {
             ResearchPhase.QUESTION_FORMULATION: {"research_question", "research_mode_selection", "domain_selection"},
-            ResearchPhase.BACKGROUND_RESEARCH: {"evidence_map", "claim_evidence_validation"},
+            ResearchPhase.BACKGROUND_RESEARCH: {"evidence_map", "claim_evidence_mapping", "claim_graph"},
             ResearchPhase.HYPOTHESIS_GENERATION: {"hypotheses"},
             ResearchPhase.METHOD_SELECTION: {"methodology"},
             ResearchPhase.STUDY_DESIGN: {"study_design"},
@@ -930,6 +1482,31 @@ class ResearchOrchestrator:
         }
         affected = phase_artifacts.get(target_phase, set())
         return [item.artifact_id for item in project.artifacts if item.artifact_type in affected]
+
+    @staticmethod
+    def _latest_artifact_version(project: ResearchProject, artifact_type: str) -> int | None:
+        versions = [item.version for item in project.artifacts if item.artifact_type == artifact_type]
+        return max(versions, default=None)
+
+    @staticmethod
+    def _mark_downstream_artifacts_stale(project: ResearchProject, from_artifact: str) -> None:
+        downstream = {
+            "evidence": [
+                "claim_evidence_mapping",
+                "claim_graph",
+                "hypotheses",
+                "methodology",
+                "study_design",
+                "analysis_plan",
+                "independent_review",
+                "critical_review",
+                "research_plan",
+            ]
+        }
+        for artifact_type in downstream.get(from_artifact, []):
+            project.active_artifact_versions[artifact_type] = None
+            if artifact_type not in project.stale_artifacts:
+                project.stale_artifacts.append(artifact_type)
 
     def _transition_event(self, project: ResearchProject, outcome: str) -> None:
         previous = project.phase
@@ -958,6 +1535,11 @@ class ResearchOrchestrator:
         }.get(phase, "orchestrator")
 
     def _append_event(self, project: ResearchProject, event: ResearchEvent) -> None:
+        if event.visibility == "user" and event.display_key:
+            dedupe_key = f"{project.project_id}:{event.phase.value}:{project.iteration}:{event.display_key}"
+            if dedupe_key in project.user_event_keys:
+                return
+            project.user_event_keys.append(dedupe_key)
         project.events.append(event.event_id)
         self.store.append_event(event)
         self.store.save(project)
@@ -992,6 +1574,11 @@ class ResearchOrchestrator:
         api_key = os.getenv("DASHSCOPE_API_KEY", "")
         return message.replace(api_key, "[REDACTED_API_KEY]") if api_key else message
 
+    @staticmethod
+    def _sanitize_text(text: str) -> str:
+        api_key = os.getenv("DASHSCOPE_API_KEY", "")
+        return text.replace(api_key, "[REDACTED_API_KEY]") if api_key else text
+
     @classmethod
     def _sanitize_traceback(cls, exc: Exception) -> str:
         text = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
@@ -1000,6 +1587,8 @@ class ResearchOrchestrator:
 
     @staticmethod
     def _substep_for_error(phase: ResearchPhase, exc: Exception) -> str:
+        if getattr(exc, "substep", None):
+            return str(getattr(exc, "substep"))
         if phase == ResearchPhase.BACKGROUND_RESEARCH:
             message = str(exc).lower()
             if "search" in message or "responses api" in message:
@@ -1008,6 +1597,17 @@ class ResearchOrchestrator:
                 return "evidence_schema_validation"
             if "source" in message or "evidence" in message:
                 return "evidence_normalization"
+        if phase == ResearchPhase.CLAIM_EVIDENCE_MAPPING:
+            message = str(exc).lower()
+            if "evidence_id" in message or "evidence reference" in message:
+                return "evidence_reference_validation"
+            if "schema" in message or "validation" in message:
+                return "schema_validation"
+            if "artifact" in message or "save" in message:
+                return "artifact_save"
+            if "transition" in message:
+                return "phase_transition"
+            return "orchestration_postprocess"
         return "model_call"
 
     @staticmethod
@@ -1017,6 +1617,15 @@ class ResearchOrchestrator:
             "search_acquisition": "search_acquisition",
             "evidence_normalization": "evidence_normalization",
             "evidence_schema_validation": "evidence_schema_validation",
+            "load_latest_evidence": "load_latest_evidence",
+            "model_output_parse": "model_output_parse",
+            "schema_validation": "schema_validation",
+            "evidence_reference_validation": "evidence_reference_validation",
+            "claim_graph_build": "claim_graph_build",
+            "artifact_save": "artifact_save",
+            "project_state_update": "project_state_update",
+            "phase_transition": "phase_transition",
+            "orchestration_postprocess": "orchestration_postprocess",
         }.get(stage_substep, "model_call")
 
     @staticmethod
@@ -1028,6 +1637,16 @@ class ResearchOrchestrator:
                 "evidence_normalization": "证据已经检索完成，但整理为研究证据时出现问题，可以直接重试整理，无需重新搜索。",
                 "evidence_schema_validation": "部分证据信息不完整，系统未将不可靠内容写入正式研究记录。",
             }.get(stage_substep, "证据研究阶段执行失败，项目已保留在上一个完整阶段，可以重试。")
+        if phase == ResearchPhase.CLAIM_EVIDENCE_MAPPING:
+            return {
+                "model_output_parse": "主张整理结果未能通过格式检查，项目已保留现有证据。",
+                "schema_validation": "主张整理结果未能通过结构校验，项目已保留现有证据。",
+                "evidence_reference_validation": "部分主张引用了不存在或已失效的证据，系统未写入不一致结果。",
+                "claim_graph_build": "主张与证据关系图构建失败，系统未写入半成品结果。",
+                "artifact_save": "主张与证据已经整理完成，但保存研究产物时失败。",
+                "project_state_update": "主张与证据已经整理完成，但项目状态更新失败，可以安全重试。",
+                "phase_transition": "研究内容已经生成，但流程状态未能推进，可以安全重试。",
+            }.get(stage_substep, "主张与证据映射阶段执行失败，项目已保留在当前阶段，可以重试。")
         return f"{phase.value} 阶段执行失败，项目已保留在上一个完整阶段。"
 
     @staticmethod
