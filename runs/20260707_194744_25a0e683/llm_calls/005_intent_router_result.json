@@ -1,8 +1,0 @@
-{
-  "intent": "research_consultation",
-  "qwen_intent": "experiment_planning",
-  "confidence": 0.95,
-  "reason": "用户请求设计 CFD/FreeFlow adapter 的数据接口，这属于实验规划的一部分，涉及具体的技术实现方案，但未明确要求执行工具或提供结果分析。",
-  "rule_corrected": true,
-  "timestamp": "2026-07-07T11:50:05.942174+00:00"
-}

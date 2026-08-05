@@ -1,8 +1,0 @@
-{
-  "intent": "casual_chat",
-  "qwen_intent": "research_consultation",
-  "confidence": 0.3,
-  "reason": "eval default",
-  "rule_corrected": true,
-  "timestamp": "2026-07-09T06:34:05.203552+00:00"
-}

@@ -1,8 +1,0 @@
-{
-  "intent": "casual_chat",
-  "qwen_intent": "casual_chat",
-  "confidence": 0.95,
-  "reason": "The user is asking about the weather, which is a common small talk topic and does not relate to any specific research or experimental intent.",
-  "rule_corrected": false,
-  "timestamp": "2026-07-07T11:48:15.342679+00:00"
-}

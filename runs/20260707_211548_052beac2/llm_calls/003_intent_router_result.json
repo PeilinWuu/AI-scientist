@@ -1,8 +1,0 @@
-{
-  "intent": "web_research",
-  "qwen_intent": "web_research",
-  "confidence": 0.9,
-  "reason": "The user explicitly asks to search online for an experimental paper, which matches the 'web_research' intent.",
-  "rule_corrected": false,
-  "timestamp": "2026-07-07T13:24:40.796705+00:00"
-}

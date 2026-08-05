@@ -1,8 +1,0 @@
-{
-  "intent": "casual_chat",
-  "qwen_intent": "casual_chat",
-  "confidence": 0.95,
-  "reason": "用户的问题'你能理解我的问题吗？'是一个典型的问候或确认性问题，用于检查沟通是否有效，属于非正式交流的范畴。",
-  "rule_corrected": false,
-  "timestamp": "2026-07-06T08:48:47.110808+00:00"
-}

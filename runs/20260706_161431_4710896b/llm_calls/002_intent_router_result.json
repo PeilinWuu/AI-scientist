@@ -1,8 +1,0 @@
-{
-  "intent": "research_consultation",
-  "qwen_intent": "research_consultation",
-  "confidence": 0.95,
-  "reason": "用户提供了详细的研究任务描述，包括物理背景、优化数学模型和约束条件，但并未明确请求执行实验或生成报告，而是可能希望获得研究方向上的建议或分析。",
-  "rule_corrected": false,
-  "timestamp": "2026-07-06T08:15:40.916221+00:00"
-}

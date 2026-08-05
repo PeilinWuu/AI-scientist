@@ -72,11 +72,34 @@ The current release does not connect a real laboratory, simulation, code-executi
 
 ## Installation
 
-```bash
-pip install -r requirements.txt
+Create an isolated environment, install the declared dependencies, and run the
+test suite before starting the services. The commands below are verified with
+Python 3.13.
+
+Windows PowerShell:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python -m pip install --upgrade pip
+.\.venv\Scripts\python -m pip install -r requirements.lock.txt
+.\.venv\Scripts\python -m pytest -q
 ```
 
-Create `.env` from `.env.example` and set your API key:
+macOS or Linux:
+
+```bash
+python3 -m venv .venv
+./.venv/bin/python -m pip install --upgrade pip
+./.venv/bin/python -m pip install -r requirements.lock.txt
+./.venv/bin/python -m pytest -q
+```
+
+`requirements.lock.txt` is the exact dependency set used for verification.
+Use `requirements.txt` only when intentionally resolving newer compatible
+versions, then refresh and retest the lock file.
+
+Copy `.env.example` to `.env` and set your API key before making a real model
+request. The API and UI can start, and the local tests can run, without a key.
 
 ```env
 DASHSCOPE_API_KEY=
@@ -110,7 +133,7 @@ AI_SCIENTIST_STRUCTURED_RETRY=1
 AI_SCIENTIST_DEFAULT_PLANNING_ONLY=true
 ```
 
-Do not assume every account supports the same model IDs. If a role variable is empty, the registry uses `AI_SCIENTIST_FALLBACK_MODEL`, then `LLM_MODEL`. Configuration or runtime fallback is recorded in the event log through `requested_model`, `actual_model`, and `fallback_used`; it is never silent.
+Do not assume every account supports the same model IDs. If a role variable is empty, the registry uses `AI_SCIENTIST_FALLBACK_MODEL`, then `LLM_MODEL`, and finally the built-in `qwen-turbo` default. Configuration or runtime fallback is recorded in the event log through `requested_model`, `actual_model`, and `fallback_used`; it is never silent.
 
 The Streamlit UI no longer uses a fixed model dropdown. Pure Qwen, Qwen Search, and every AI Scientist role accept a free-form model ID. Values in `.env` are defaults only; frontend edits affect the current browser session, and AI Scientist model overrides are saved into the project at creation time. Updating `.env` later does not silently change an existing research project.
 

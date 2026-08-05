@@ -1,8 +1,0 @@
-{
-  "intent": "research_consultation",
-  "qwen_intent": "research_consultation",
-  "confidence": 0.95,
-  "reason": "用户重复了之前提供的任务背景信息，这表明他们希望确认或回顾研究的上下文和目标。这种行为通常与研究咨询相关，而不是直接请求执行实验或分析结果。",
-  "rule_corrected": false,
-  "timestamp": "2026-07-06T09:50:52.137080+00:00"
-}
