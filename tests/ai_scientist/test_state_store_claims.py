@@ -125,9 +125,37 @@ def test_orchestrator_waits_for_execution_and_supports_planning_only(tmp_path: P
     orchestrator = ResearchOrchestrator(tmp_path)
     item = orchestrator.create_project("Plan a study", planning_only=True)
     item.phase = ResearchPhase.HUMAN_APPROVAL
+    item.reviews.append(
+        ReviewResult(
+            evidence_quality_score=8,
+            methodological_validity_score=8,
+            feasibility_score=8,
+            reproducibility_score=8,
+            claim_support_score=8,
+            uncertainty_handling_score=8,
+            decision="approve",
+        )
+    )
+    item.active_artifact_versions.update(
+        {
+            "research_question": 1,
+            "evidence_map": 1,
+            "claim_evidence_mapping": 1,
+            "hypotheses": 1,
+            "study_design": 1,
+            "analysis_plan": 1,
+            "reproducibility_plan": 1,
+            "independent_review": 1,
+        }
+    )
     orchestrator.store.save(item)
 
-    approved = orchestrator.approve_project(item.project_id)
+    package = orchestrator.get_review_package(item.project_id)
+    approved = orchestrator.approve_project(
+        item.project_id,
+        acknowledged=True,
+        expected_versions=package.artifact_versions,
+    )
     assert approved.phase == ResearchPhase.SYNTHESIS
 
     waiting = orchestrator.create_project("Wait for real execution", planning_only=False)

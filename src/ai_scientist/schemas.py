@@ -798,6 +798,7 @@ class ResearchEvent(StrictModel):
     display_markdown: str = ""
     visibility: Literal["internal", "user"] = "internal"
     display_key: str | None = None
+    iteration: int = Field(default=0, ge=0)
     summary_markdown: str = ""
     attempted_calls: int = 0
     successful_calls: int = 0
@@ -836,6 +837,40 @@ class BackgroundResearchCheckpoint(StrictModel):
     elapsed_seconds: float = Field(default=0.0, ge=0.0)
 
 
+class ReviewPackage(StrictModel):
+    """Frozen artifact-version manifest presented for human approval."""
+
+    package_id: str = Field(default_factory=lambda: new_id("review_package"))
+    project_id: str
+    created_at: datetime = Field(default_factory=utc_now)
+    artifact_versions: dict[str, int | None] = Field(default_factory=dict)
+    artifact_snapshots: dict[str, Any] = Field(default_factory=dict)
+    blocking_issue_count: int = Field(default=0, ge=0)
+    reviewer_decision: str = ""
+    ready_for_approval: bool = False
+
+
+class HumanApprovalRecord(StrictModel):
+    """Auditable approval tied to the exact versions a reviewer inspected."""
+
+    approval_id: str = Field(default_factory=lambda: new_id("approval"))
+    project_id: str
+    package_id: str
+    approved_at: datetime = Field(default_factory=utc_now)
+    approved_versions: dict[str, int | None] = Field(default_factory=dict)
+    acknowledgment: bool = False
+    status: Literal["valid", "stale"] = "valid"
+
+
+class HumanRevisionRecord(StrictModel):
+    revision_id: str = Field(default_factory=lambda: new_id("human_revision"))
+    project_id: str
+    target: str
+    feedback: str
+    requested_at: datetime = Field(default_factory=utc_now)
+    artifact_versions: dict[str, int | None] = Field(default_factory=dict)
+
+
 class ResearchProject(StrictModel):
     project_id: str = Field(default_factory=lambda: new_id("project"))
     title: str
@@ -860,6 +895,12 @@ class ResearchProject(StrictModel):
     quality_metrics: ResearchQualityMetrics = Field(default_factory=ResearchQualityMetrics)
     artifacts: list[ArtifactRecord] = Field(default_factory=list)
     active_artifact_versions: dict[str, int | None] = Field(default_factory=dict)
+    review_package: ReviewPackage | None = None
+    human_approval_history: list[HumanApprovalRecord] = Field(default_factory=list)
+    human_revision_history: list[HumanRevisionRecord] = Field(default_factory=list)
+    approval_valid_for_versions: dict[str, int | None] = Field(default_factory=dict)
+    approval_status: Literal["not_requested", "pending", "valid", "stale", "deferred"] = "not_requested"
+    version_change_summaries: list[str] = Field(default_factory=list)
     stale_artifacts: list[str] = Field(default_factory=list)
     events: list[str] = Field(default_factory=list)
     user_event_keys: list[str] = Field(default_factory=list)
@@ -994,8 +1035,17 @@ class ResearchStartRequest(StrictModel):
 
 
 class RevisionRequest(StrictModel):
-    target: Literal["question", "evidence", "hypothesis", "method", "design", "analysis"]
+    target: Literal["question", "evidence", "hypothesis", "method", "design", "analysis", "reproducibility"]
     feedback: str
+
+
+class ApprovalRequest(StrictModel):
+    acknowledged: bool
+    expected_versions: dict[str, int | None] = Field(default_factory=dict)
+
+
+class DeferApprovalRequest(StrictModel):
+    reason: str = ""
 
 
 def _infer_claim_dimension(statement: str) -> ClaimDimension:

@@ -11,7 +11,13 @@ import requests
 import streamlit as st
 from dotenv import load_dotenv
 
-from src.ai_scientist.presentation import PHASE_LABELS, render_event_dict, render_project_overview
+from src.ai_scientist.presentation import (
+    PHASE_LABELS,
+    dedupe_user_events,
+    render_event_dict,
+    render_project_overview,
+)
+from src.ui_time import format_local_datetime, format_utc_datetime
 from src.model_utils import normalize_model_name
 
 
@@ -473,48 +479,79 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
         events = get_json(backend_url, f"/api/research/{project['project_id']}/events")
     except BackendAPIError:
         events = []
-    visible_events = [
-        event
-        for event in events
-        if isinstance(events, list) and (show_debug or event.get("visibility") == "user")
-    ]
+    visible_events = dedupe_user_events(events if isinstance(events, list) else [])
     if visible_events:
         for event in visible_events[-8:]:
-            st.markdown(render_event_dict(event))
+            rendered = render_event_dict(event)
+            if rendered:
+                st.markdown(rendered)
     else:
         st.info("运行一个研究阶段后，这里将显示用户可见的进度。")
     active_job = _render_research_job_status(backend_url, project, show_debug)
     job_running = bool(active_job and active_job.get("status") in {"queued", "running"})
 
-    action_columns = st.columns(5)
+    action_columns = st.columns(3)
     if action_columns[0].button("运行下一阶段", type="primary", disabled=job_running):
         _start_research_step_job(backend_url, project["project_id"])
-    if action_columns[1].button("批准", disabled=job_running or project.get("phase") != "HUMAN_APPROVAL"):
-        _research_action(backend_url, f"/api/research/{project['project_id']}/approve")
-    if action_columns[2].button("刷新"):
+    if action_columns[1].button("刷新"):
         refresh_research_project(backend_url)
         st.rerun()
-    if action_columns[3].button(
+    if action_columns[2].button(
         "取消项目",
         disabled=job_running or project.get("phase") in {"COMPLETED", "FAILED", "CANCELLED"},
     ):
         _research_action(backend_url, f"/api/research/{project['project_id']}/cancel")
-    try:
-        report_md = get_text(backend_url, f"/api/research/{project['project_id']}/report.md")
-        action_columns[4].download_button(
-            "下载研究计划",
-            data=report_md,
-            file_name="research_plan.md",
-            mime="text/markdown",
-        )
-    except BackendAPIError:
-        action_columns[4].button("下载研究计划", disabled=True)
+
+    if project.get("phase") == "HUMAN_APPROVAL":
+        st.subheader("人工审查包")
+        try:
+            review_package = get_json(
+                backend_url, f"/api/research/{project['project_id']}/review-package"
+            )
+        except BackendAPIError as exc:
+            review_package = None
+            st.error("无法加载人工审查包，当前方案不能批准。")
+            if show_debug:
+                render_debug_object(exc.detail)
+        if isinstance(review_package, dict):
+            if review_package.get("ready_for_approval"):
+                st.success("独立审查已通过且没有阻断问题，请核对下方各项研究产物后决定是否批准。")
+            else:
+                st.warning("当前审查包尚未满足批准条件，请先处理独立审查提出的问题。")
+            versions = review_package.get("artifact_versions") or {}
+            st.caption("本次审批将冻结：" + "；".join(f"{key} v{value}" for key, value in versions.items()))
+            acknowledged = st.checkbox(
+                "我已审阅研究问题、证据、主张映射、假设、方法、设计、分析、可复现性方案和独立审查结果。",
+                key=f"approval_ack_{project['project_id']}_{review_package.get('package_id')}",
+            )
+            approval_columns = st.columns(2)
+            if approval_columns[0].button(
+                "批准当前版本",
+                type="primary",
+                disabled=job_running or not acknowledged or not review_package.get("ready_for_approval"),
+                key=f"approve_package_{review_package.get('package_id')}",
+            ):
+                _research_action(
+                    backend_url,
+                    f"/api/research/{project['project_id']}/approve",
+                    {"acknowledged": True, "expected_versions": versions},
+                )
+            if approval_columns[1].button(
+                "暂不批准",
+                disabled=job_running,
+                key=f"defer_package_{review_package.get('package_id')}",
+            ):
+                _research_action(
+                    backend_url,
+                    f"/api/research/{project['project_id']}/defer-approval",
+                    {"reason": "审查者选择稍后继续核对。"},
+                )
 
     with st.expander("请求修订"):
         target = st.selectbox(
             "修订目标",
-            ["question", "evidence", "hypothesis", "method", "design"],
-            format_func=lambda value: {"question": "研究问题", "evidence": "证据", "hypothesis": "假设", "method": "研究方法", "design": "研究设计"}[value],
+            ["question", "evidence", "hypothesis", "method", "design", "analysis", "reproducibility"],
+            format_func=lambda value: {"question": "研究问题", "evidence": "证据", "hypothesis": "假设", "method": "研究方法", "design": "研究设计", "analysis": "分析方案", "reproducibility": "可复现性"}[value],
         )
         feedback = st.text_area("反馈意见", key="revision_feedback")
         if st.button("提交修订请求", disabled=job_running or project.get("phase") != "HUMAN_APPROVAL"):
@@ -524,7 +561,8 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
                 {"target": target, "feedback": feedback},
             )
 
-    with st.expander("结构化人工编辑"):
+    if show_debug:
+      with st.expander("结构化人工编辑（开发者）"):
         edit_target = st.selectbox(
             "编辑目标",
             ["question", "hypothesis", "study_design", "analysis_plan"],
@@ -584,7 +622,10 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
         st.write("**原始能力 ID**")
         render_debug_object({"available_tools": project.get("available_tools") or [], "missing_capabilities": project.get("missing_capabilities") or []})
 
-    tabs = st.tabs(["研究问题", "证据与假设", "规划与审查", "研究计划", "事件日志"])
+    tabs = st.tabs([
+        "研究问题", "证据与来源", "主张与证据", "假设与竞争性解释", "研究方法",
+        "研究设计", "分析方案", "可复现性", "独立审查", "最终综合",
+    ])
     with tabs[0]:
         question = project.get("question") or {}
         if question:
@@ -596,25 +637,54 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
             st.info("研究总监尚未完成研究问题形式化。")
     with tabs[1]:
         evidence = project.get("evidence") or []
-        claims = project.get("claims") or []
-        hypotheses = project.get("hypotheses") or []
-        st.markdown(f"已保留证据：**{len(evidence)}** 条；已映射关键主张：**{len(claims)}** 条。")
-        st.markdown(f"候选假设：**{len(hypotheses)}** 个。")
-        source_levels = {"A": 0, "B": 0, "C": 0, "D": 0, "E": 0}
+        st.markdown(f"已保留 **{len(evidence)}** 条来源，其中可验证唯一来源 **{metrics.get('verified_evidence_count', 0)}** 条。")
         for item in evidence:
-            level = item.get("source_level", "E")
-            source_levels[level] = source_levels.get(level, 0) + 1
-        st.markdown("来源等级分布：" + "；".join(f"{k}:{v}" for k, v in source_levels.items()))
-        verified_count = len([item for item in evidence if item.get("verification_status") == "verified" and not item.get("duplicate_of")])
-        unique_count = len([item for item in evidence if not item.get("duplicate_of")])
-        st.markdown(f"已验证的唯一来源：**{verified_count}/{unique_count}**")
-        if show_debug:
-            rows = [{"title": item.get("title", ""), "level": item.get("source_level", "E"), "verification_status": item.get("verification_status", "unverified"), "verification_method": item.get("verification_method", "none"), "doi": item.get("doi"), "pmid": item.get("pmid"), "url": item.get("source_url")} for item in evidence]
-            if rows:
-                st.dataframe(rows, use_container_width=True, hide_index=True)
+            title = item.get("title") or "未命名来源"
+            url = item.get("source_url")
+            with st.expander(f"{title} · 等级 {item.get('source_level', 'E')}"):
+                st.markdown(item.get("summary") or "暂无摘要。")
+                st.write(f"验证状态：{'已验证' if item.get('verified') else '待验证'}")
+                if url:
+                    st.markdown(f"[查看原始来源]({url})")
     with tabs[2]:
+        claims = project.get("claims") or []
+        if not claims:
+            st.info("尚未形成主张与证据映射。")
+        for claim in claims:
+            st.markdown(f"**{claim.get('statement', '未命名主张')}**")
+            st.caption(f"状态：{claim.get('status', 'unknown')}；支持证据：{', '.join(claim.get('supporting_evidence_ids') or []) or '无'}；反驳证据：{', '.join(claim.get('contradicting_evidence_ids') or []) or '无'}")
+    with tabs[3]:
+        hypotheses = project.get("hypotheses") or []
+        if not hypotheses:
+            st.info("尚未形成可检验假设。")
+        for hypothesis in hypotheses:
+            with st.expander(hypothesis.get("statement") or "未命名假设"):
+                st.markdown(f"**机制：** {hypothesis.get('mechanism') or '尚未明确'}")
+                _render_named_list("预测", hypothesis.get("predictions") or [])
+                _render_named_list("可证伪条件", hypothesis.get("falsification_conditions") or [])
+                _render_named_list("竞争性解释", hypothesis.get("alternative_explanations") or [])
+    with tabs[4]:
         st.markdown(f"**研究模式：** {project.get('research_mode') or '尚未选择'}")
         st.markdown(f"**方法选择依据：** {project.get('method_rationale') or '尚未生成'}")
+        _render_named_list("有效性威胁", project.get("validity_threats") or [])
+        _render_named_list("必要控制", project.get("required_controls") or [])
+    with tabs[5]:
+        _render_mapping_sections(project.get("study_design") or {}, {
+            "objective": "研究目标", "population_or_system": "研究对象或系统", "hypotheses_tested": "待检验假设",
+            "variables": "变量", "controls": "控制条件", "comparison_groups": "比较组", "sampling_plan": "采样方案",
+            "data_collection_plan": "数据收集", "measurement_plan": "测量方案", "quality_controls": "质量控制",
+            "stopping_rules": "停止规则", "risks": "风险", "ethical_considerations": "伦理事项",
+        })
+    with tabs[6]:
+        _render_mapping_sections(project.get("analysis_plan") or {}, {
+            "objectives": "分析目标", "input_data": "输入数据", "preprocessing": "预处理", "metrics": "评价指标",
+            "statistical_assumptions": "统计假设", "statistical_methods": "统计方法", "robustness_checks": "稳健性检查",
+            "sensitivity_analysis": "敏感性分析", "uncertainty_quantification": "不确定性量化",
+            "visualization_plan": "可视化方案", "success_criteria": "成功判据", "failure_criteria": "失败判据",
+        })
+    with tabs[7]:
+        _render_mapping_sections(project.get("reproducibility_plan") or {}, {})
+    with tabs[8]:
         reviews = project.get("reviews") or []
         if reviews:
             review = reviews[-1]
@@ -625,24 +695,33 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
             else:
                 st.warning("独立审查要求进行定向修订。")
             issues = review.get("blocking_issues") or []
-            st.markdown("阻断问题：" + ("；".join(issues) if issues else "无"))
+            _render_named_list("阻断问题", issues)
+            _render_named_list("非阻断问题", review.get("non_blocking_issues") or [])
+            _render_named_list("改进建议", review.get("recommendations") or [])
+            score_columns = st.columns(3)
+            score_columns[0].metric("证据质量", review.get("evidence_quality_score", 0))
+            score_columns[1].metric("方法有效性", review.get("methodological_validity_score", 0))
+            score_columns[2].metric("可复现性", review.get("reproducibility_score", 0))
         else:
             st.info("尚未运行独立审查。")
-    with tabs[3]:
+    with tabs[9]:
         conclusion = project.get("conclusion")
         if conclusion:
-            st.markdown("科学综合报告已生成，可下载 Markdown 报告查看完整内容。")
+            _render_mapping_sections(conclusion, {
+                "supported_findings": "有证据支持的发现", "unsupported_or_inconclusive": "尚无定论",
+                "uncertainties": "不确定性", "limitations": "局限", "next_questions": "后续问题",
+            })
         else:
             st.info("最终研究计划尚未生成。")
-    with tabs[4]:
+        render_research_downloads(backend_url, project)
+
+    with st.expander("研究事件时间线"):
         events = get_json(backend_url, f"/api/research/{project['project_id']}/events")
-        visible_events = [
-            event
-            for event in events if isinstance(events, list)
-            if show_debug or event.get("visibility") == "user"
-        ]
+        visible_events = dedupe_user_events(events if isinstance(events, list) else [])
         for event in visible_events:
-            st.markdown(render_event_dict(event))
+            rendered = render_event_dict(event)
+            if rendered:
+                st.markdown(rendered)
         if show_debug:
             debug_rows = [
                 {
@@ -654,6 +733,8 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
                     "successful": event.get("successful_calls"),
                     "failed": event.get("failed_calls"),
                     "error_type": event.get("error_type"),
+                    "local_time": format_local_datetime(event.get("started_at")),
+                    "utc_time": format_utc_datetime(event.get("started_at")),
                 }
                 for event in events if isinstance(events, list)
             ]
@@ -664,16 +745,56 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
             artifact_rows = [{"type": item.get("artifact_type"), "file": item.get("filename"), "version": item.get("version")} for item in normalize_records(artifacts)]
             if artifact_rows:
                 st.dataframe(artifact_rows, use_container_width=True, hide_index=True)
-        try:
-            report_md = get_text(backend_url, f"/api/research/{project['project_id']}/report.md")
-            st.download_button(
-                "下载研究计划",
-                data=report_md,
-                file_name="research_plan.md",
-                mime="text/markdown",
-            )
-        except BackendAPIError:
-            st.info("研究计划尚未生成。")
+
+
+def _render_named_list(title: str, items: list) -> None:
+    st.markdown(f"**{title}**")
+    if items:
+        st.markdown("\n".join(f"- {item}" for item in items))
+    else:
+        st.caption("尚未明确。")
+
+
+def _render_mapping_sections(data: dict, labels: dict[str, str]) -> None:
+    if not data:
+        st.info("该研究产物尚未生成。")
+        return
+    default_labels = {
+        "environment_specification": "运行环境",
+        "software_and_versions": "软件与版本",
+        "randomness_controls": "随机性控制",
+        "data_provenance": "数据来源与谱系",
+        "artifact_retention": "产物留存",
+        "reproduction_steps": "复现步骤",
+        "validation_checks": "验证检查",
+        "reproducibility_plan": "复现计划",
+        "missing_reproducibility_information": "尚缺信息",
+        "assumptions": "假设条件",
+        "limitations": "局限",
+    }
+    for key, value in data.items():
+        if key in {"research_mode", "feasibility"}:
+            st.markdown(f"**{labels.get(key, key.replace('_', ' '))}：** {value}")
+            continue
+        title = labels.get(key, default_labels.get(key, "其他说明"))
+        values = value if isinstance(value, list) else [value]
+        _render_named_list(title, [item for item in values if item not in (None, "", [], {})])
+
+
+def render_research_downloads(backend_url: str, project: dict) -> None:
+    """Render the project's one canonical Markdown download control."""
+
+    try:
+        report_md = get_text(backend_url, f"/api/research/{project['project_id']}/report.md")
+        st.download_button(
+            "下载研究计划",
+            data=report_md,
+            file_name="research_plan.md",
+            mime="text/markdown",
+            key=f"research_plan_download_{project['project_id']}",
+        )
+    except BackendAPIError:
+        st.info("研究计划尚未生成。")
 
 
 def _render_research_job_status(backend_url: str, project: dict, show_debug: bool) -> dict | None:

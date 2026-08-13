@@ -14,6 +14,8 @@ from src.ai_scientist.job_store import ResearchJobStore, fail_job
 from src.ai_scientist.model_registry import ModelRegistry
 from src.ai_scientist.orchestrator import ResearchOrchestrator
 from src.ai_scientist.schemas import (
+    ApprovalRequest,
+    DeferApprovalRequest,
     EvidenceCreateRequest,
     HumanEditRequest,
     ProvideDataRequest,
@@ -496,10 +498,31 @@ def _run_research_job(project_id: str, job_id: str) -> None:
 
 
 @app.post("/api/research/{project_id}/approve")
-def research_approve(project_id: str) -> dict:
+def research_approve(project_id: str, request: ApprovalRequest) -> dict:
     try:
-        project = research_orchestrator.approve_project(project_id)
+        project = research_orchestrator.approve_project(
+            project_id,
+            acknowledged=request.acknowledged,
+            expected_versions=request.expected_versions,
+        )
         return {"project_id": project.project_id, "phase": project.phase.value, "status": "approved"}
+    except Exception as exc:  # noqa: BLE001
+        raise _research_http_error(exc) from exc
+
+
+@app.get("/api/research/{project_id}/review-package")
+def research_review_package(project_id: str) -> dict:
+    try:
+        return research_orchestrator.get_review_package(project_id).model_dump(mode="json")
+    except Exception as exc:  # noqa: BLE001
+        raise _research_http_error(exc) from exc
+
+
+@app.post("/api/research/{project_id}/defer-approval")
+def research_defer_approval(project_id: str, request: DeferApprovalRequest) -> dict:
+    try:
+        project = research_orchestrator.defer_approval(project_id, request.reason)
+        return {"project_id": project.project_id, "phase": project.phase.value, "status": "deferred"}
     except Exception as exc:  # noqa: BLE001
         raise _research_http_error(exc) from exc
 

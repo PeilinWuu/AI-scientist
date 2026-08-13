@@ -30,6 +30,7 @@ REVISION_TARGET_PHASES = {
     ResearchPhase.METHOD_SELECTION,
     ResearchPhase.STUDY_DESIGN,
     ResearchPhase.ANALYSIS_PLANNING,
+    ResearchPhase.FEASIBILITY_REVIEW,
 }
 
 

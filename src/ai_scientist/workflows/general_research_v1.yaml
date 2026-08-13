@@ -37,6 +37,7 @@ transitions:
     method: METHOD_SELECTION
     design: STUDY_DESIGN
     analysis: ANALYSIS_PLANNING
+    reproducibility: FEASIBILITY_REVIEW
   EXECUTION_WAITING:
     data_provided: DATA_ANALYSIS
     execution_tool_available: EXECUTION

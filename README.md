@@ -289,6 +289,8 @@ POST /api/chat_search
 
 ## Tests
 
+AI Scientist 项目的时间戳始终以 UTC 持久化。前端通过 `UI_TIMEZONE` 转换显示，默认值为 `Asia/Shanghai`；开发者调试区会同时显示本地时间和 UTC，便于审计。
+
 ```bash
 pytest -q
 ```

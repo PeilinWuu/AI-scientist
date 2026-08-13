@@ -64,12 +64,15 @@ from src.ai_scientist.schemas import (
     SearchPlan,
     SearchQueryRecord,
     Hypothesis,
+    HumanApprovalRecord,
+    HumanRevisionRecord,
     MethodologyOutput,
     ResearchEvent,
     ResearchPhase,
     ResearchQuestion,
     ResearchProject,
     ReviewResult,
+    ReviewPackage,
     RevisionAction,
     StudyDesign,
     new_id,
@@ -131,6 +134,9 @@ class ResearchOrchestrator:
             ResearchPhase.INTAKE,
             "orchestrator",
             status="created",
+            visibility="user",
+            display_key="project_created",
+            display_markdown="研究项目已创建，可以开始逐阶段形成科研方案。",
         )
         self._append_event(project, event)
         return project
@@ -291,8 +297,8 @@ class ResearchOrchestrator:
                 project.conclusion = run.output
                 self._refresh_quality_metrics(project)
                 produced_artifacts += self._record_agent_output(project, previous_phase, run, "research_plan_synthesis")
-                produced_artifacts += self._write_research_plan(project)
                 self.state_machine.transition(project, "next")
+                produced_artifacts += self._write_research_plan(project)
             else:
                 raise InvalidTransitionError(f"No stage handler for phase {project.phase.value}")
             self._advance_revision_queue_after_phase(project, previous_phase)
@@ -325,6 +331,8 @@ class ResearchOrchestrator:
                 tool_names=getattr(exc, "tool_names", []),
                 safe_traceback=self._sanitize_traceback(exc),
                 display_markdown=self._failure_display_message(previous_phase, stage_substep),
+                visibility="user",
+                display_key=f"{previous_phase.value.lower()}_failed",
                 validation_errors=getattr(exc, "validation_errors", None) or self._validation_errors(exc),
                 attempted_calls=1 if previous_phase == ResearchPhase.BACKGROUND_RESEARCH else 0,
                 failed_calls=1,
@@ -358,10 +366,53 @@ class ResearchOrchestrator:
             "max_revision_exhausted": max_revision_exhausted,
         }
 
-    def approve_project(self, project_id: str) -> ResearchProject:
+    def approve_project(
+        self,
+        project_id: str,
+        acknowledged: bool = False,
+        expected_versions: dict[str, int | None] | None = None,
+    ) -> ResearchProject:
         project = self.get_project(project_id)
         if project.phase != ResearchPhase.HUMAN_APPROVAL:
             raise InvalidTransitionError("Project can only be approved from HUMAN_APPROVAL.")
+        package = self._ensure_review_package(project)
+        latest_review = project.reviews[-1] if project.reviews else None
+        if not acknowledged:
+            raise InvalidTransitionError("Human approval requires explicit reviewer acknowledgment.")
+        if latest_review is None or latest_review.decision != "approve":
+            raise InvalidTransitionError("The independent reviewer has not approved this research package.")
+        if latest_review.blocking_issues or package.blocking_issue_count:
+            raise InvalidTransitionError("Blocking review issues must be resolved before approval.")
+        if not package.ready_for_approval:
+            raise InvalidTransitionError("The review package is incomplete and cannot be approved.")
+        current_versions = self._review_artifact_versions(project)
+        submitted_versions = expected_versions or package.artifact_versions
+        if submitted_versions != package.artifact_versions or current_versions != package.artifact_versions:
+            project.approval_status = "stale"
+            self.store.save(project)
+            raise InvalidTransitionError("The review package is stale because active artifact versions changed.")
+        project.human_approval_history.append(
+            HumanApprovalRecord(
+                project_id=project.project_id,
+                package_id=package.package_id,
+                approved_versions=dict(package.artifact_versions),
+                acknowledgment=True,
+            )
+        )
+        project.approval_valid_for_versions = dict(package.artifact_versions)
+        project.approval_status = "valid"
+        self._append_event(
+            project,
+            completed_event(
+                project.project_id,
+                ResearchPhase.HUMAN_APPROVAL,
+                "human_reviewer",
+                status="approved",
+                visibility="user",
+                display_key="human_approval_granted",
+                display_markdown="人工审查已确认当前版本的研究方案，项目将进入科学综合阶段。",
+            ),
+        )
         self._transition_event(project, "approve")
         if project.planning_only and project.phase == ResearchPhase.EXECUTION_WAITING:
             self._transition_event(project, "planning_only")
@@ -372,13 +423,55 @@ class ResearchOrchestrator:
         project = self.get_project(project_id)
         if project.phase != ResearchPhase.HUMAN_APPROVAL:
             raise InvalidTransitionError("Revision can only be requested from HUMAN_APPROVAL.")
-        if target_phase not in {"question", "evidence", "hypothesis", "method", "design", "analysis"}:
+        if target_phase not in {"question", "evidence", "hypothesis", "method", "design", "analysis", "reproducibility"}:
             raise ValueError(f"Unsupported revision target: {target_phase}")
+        if not feedback.strip():
+            raise ValueError("Revision feedback must describe the requested change.")
         project.revision_feedback.append(feedback)
+        project.human_revision_history.append(
+            HumanRevisionRecord(
+                project_id=project.project_id,
+                target=target_phase,
+                feedback=feedback,
+                artifact_versions=self._review_artifact_versions(project),
+            )
+        )
         project.pending_revision_target = target_phase
+        self._invalidate_approval(project, f"人工审查要求修订：{feedback}")
         self._targeted_rollback(project, target_phase, feedback, changed_fields=[])
         self.store.save(project)
         return project
+
+    def defer_approval(self, project_id: str, reason: str = "") -> ResearchProject:
+        """Record a non-terminal human decision without invoking models or revisions."""
+
+        project = self.get_project(project_id)
+        if project.phase != ResearchPhase.HUMAN_APPROVAL:
+            raise InvalidTransitionError("Approval can only be deferred from HUMAN_APPROVAL.")
+        self._ensure_review_package(project)
+        project.approval_status = "deferred"
+        self._append_event(
+            project,
+            completed_event(
+                project.project_id,
+                ResearchPhase.HUMAN_APPROVAL,
+                "human_reviewer",
+                status="approval_deferred",
+                visibility="user",
+                display_key="human_approval_deferred",
+                display_markdown=f"人工审查选择暂不批准。{reason.strip() or '项目保留在当前阶段。'}",
+            ),
+        )
+        self.store.save(project)
+        return project
+
+    def get_review_package(self, project_id: str) -> ReviewPackage:
+        project = self.get_project(project_id)
+        if project.phase != ResearchPhase.HUMAN_APPROVAL:
+            raise InvalidTransitionError("Review package is available only during HUMAN_APPROVAL.")
+        package = self._ensure_review_package(project)
+        self.store.save(project)
+        return package
 
     def patch_question(self, project_id: str, patch: dict[str, Any], reason: str = "") -> ResearchProject:
         project = self.get_project(project_id)
@@ -517,6 +610,7 @@ class ResearchOrchestrator:
     def _apply_review_decision(self, project: ResearchProject, review: ReviewResult) -> dict[str, Any]:
         if review.decision == "approve":
             self.state_machine.transition(project, "approve")
+            self._ensure_review_package(project)
             return {"revision_required": False, "max_revision_exhausted": False}
         if review.decision == "reject":
             self.state_machine.transition(project, "reject")
@@ -1593,6 +1687,9 @@ class ResearchOrchestrator:
             run.metadata.agent_name,
         )
         project.artifacts.append(record)
+        project.active_artifact_versions[artifact_type] = record.version
+        if artifact_type in project.stale_artifacts:
+            project.stale_artifacts.remove(artifact_type)
         display_markdown = self._stage_display_markdown(project, artifact_type, run.output)
         if display_markdown:
             project.stage_messages.append(display_markdown)
@@ -1617,6 +1714,8 @@ class ResearchOrchestrator:
             search_result_count=_optional_int(run.auxiliary.get("search_result_count")),
             extracted_page_count=_optional_int(run.auxiliary.get("extracted_page_count")),
             model_call_count=successful_calls,
+            visibility="user" if display_markdown else "internal",
+            display_key=f"{artifact_type}_completed" if display_markdown else None,
         )
         self._append_event(project, event)
         self.store.save(project)
@@ -1658,6 +1757,9 @@ class ResearchOrchestrator:
         content = output.model_dump(mode="json") if hasattr(output, "model_dump") else output
         record = self.artifacts.save_json(project.project_id, artifact_type, content, created_by)
         project.artifacts.append(record)
+        project.active_artifact_versions[artifact_type] = record.version
+        if artifact_type in project.stale_artifacts:
+            project.stale_artifacts.remove(artifact_type)
         if metadata:
             project.budget.attempted_model_calls += metadata.attempted_calls
             project.budget.successful_model_calls += metadata.successful_calls
@@ -1681,6 +1783,8 @@ class ResearchOrchestrator:
             failed_calls=metadata.failed_calls if metadata else 0,
             fallback_calls=metadata.fallback_calls if metadata else 0,
             model_call_count=metadata.successful_calls if metadata else None,
+            visibility="user" if display_markdown else "internal",
+            display_key=f"{artifact_type}_completed" if display_markdown else None,
         )
         self._append_event(project, event)
         return [record.artifact_id]
@@ -1694,6 +1798,8 @@ class ResearchOrchestrator:
     ) -> list[str]:
         record = self.artifacts.save_json(project.project_id, artifact_type, content, "human")
         project.artifacts.append(record)
+        project.active_artifact_versions[artifact_type] = record.version
+        self._invalidate_approval(project, f"人工修改了 {artifact_type} v{record.version}。")
         event = completed_event(
             project.project_id,
             project.phase,
@@ -1703,6 +1809,9 @@ class ResearchOrchestrator:
             changed_fields=list(content) if isinstance(content, dict) else [artifact_type],
             reason=reason,
             feedback=reason,
+            visibility="user",
+            display_key=f"human_edit_{artifact_type}_{record.version}",
+            display_markdown=f"人工已更新{artifact_type}，原因：{reason or '未填写'}。",
         )
         self._append_event(project, event)
         return [record.artifact_id]
@@ -1721,6 +1830,7 @@ class ResearchOrchestrator:
             "method": ResearchPhase.METHOD_SELECTION,
             "design": ResearchPhase.STUDY_DESIGN,
             "analysis": ResearchPhase.ANALYSIS_PLANNING,
+            "reproducibility": ResearchPhase.FEASIBILITY_REVIEW,
         }
         target_phase = target_map[target]
         previous_phase = project.phase
@@ -1738,6 +1848,9 @@ class ResearchOrchestrator:
             changed_fields=changed_fields,
             invalidated_artifact_ids=invalidated,
             preserved_artifact_ids=preserved,
+            visibility="user",
+            display_key=f"human_revision_{target}_{len(project.human_revision_history)}",
+            display_markdown=f"人工审查要求修订{target}。{reason or '请按审查意见更新。'}",
         )
         self._append_event(project, event)
 
@@ -1767,6 +1880,9 @@ class ResearchOrchestrator:
             ResearchPhase.SYNTHESIS,
             "report_writer",
             output_artifact_ids=[md_record.artifact_id, json_record.artifact_id],
+            visibility="user",
+            display_key="final_research_plan_generated",
+            display_markdown="科学综合与最终研究计划已生成。",
         )
         self._append_event(project, event)
         return [md_record.artifact_id, json_record.artifact_id]
@@ -1836,6 +1952,7 @@ class ResearchOrchestrator:
         }.get(phase, "orchestrator")
 
     def _append_event(self, project: ResearchProject, event: ResearchEvent) -> None:
+        event.iteration = project.iteration
         if event.visibility == "user" and event.display_key:
             dedupe_key = f"{project.project_id}:{event.phase.value}:{project.iteration}:{event.display_key}"
             if dedupe_key in project.user_event_keys:
@@ -1864,17 +1981,78 @@ class ResearchOrchestrator:
         event_type: str,
     ) -> None:
         checkpoint.last_activity_at = utc_now()
-        self._append_event(
-            project,
-            completed_event(
-                project.project_id,
-                phase,
-                "evidence_researcher",
-                status="source_extraction_progress",
-                stage_substep="source_extraction",
-                reason=event_type,
-            ),
+        self.store.save(project)
+
+    def _review_artifact_versions(self, project: ResearchProject) -> dict[str, int | None]:
+        keys = [
+            "research_question",
+            "evidence_map",
+            "claim_evidence_mapping",
+            "hypotheses",
+            "methodology",
+            "study_design",
+            "analysis_plan",
+            "reproducibility_plan",
+            "independent_review",
+        ]
+        return {
+            key: project.active_artifact_versions.get(key, self._latest_artifact_version(project, key))
+            for key in keys
+        }
+
+    def _ensure_review_package(self, project: ResearchProject) -> ReviewPackage:
+        versions = self._review_artifact_versions(project)
+        review = project.reviews[-1] if project.reviews else None
+        if project.review_package and project.review_package.artifact_versions == versions:
+            return project.review_package
+        required = {
+            "research_question", "evidence_map", "claim_evidence_mapping", "hypotheses",
+            "study_design", "analysis_plan", "reproducibility_plan", "independent_review",
+        }
+        ready = review is not None and review.decision == "approve" and not review.blocking_issues
+        ready = ready and all(versions.get(key) is not None for key in required)
+        package = ReviewPackage(
+            project_id=project.project_id,
+            artifact_versions=versions,
+            artifact_snapshots=self._review_artifact_snapshots(project),
+            blocking_issue_count=len(review.blocking_issues) if review else 0,
+            reviewer_decision=review.decision if review else "",
+            ready_for_approval=ready,
         )
+        project.review_package = package
+        project.approval_status = "pending"
+        return package
+
+    @staticmethod
+    def _review_artifact_snapshots(project: ResearchProject) -> dict[str, Any]:
+        """Freeze display-safe scientific products without prompts or provider payloads."""
+
+        return {
+            "research_question": project.question.model_dump(mode="json") if project.question else None,
+            "evidence": [item.model_dump(mode="json") for item in project.evidence],
+            "claims": [item.model_dump(mode="json") for item in project.claims],
+            "hypotheses": [item.model_dump(mode="json") for item in project.hypotheses],
+            "method": {
+                "research_mode": project.research_mode.value if project.research_mode else None,
+                "rationale": project.method_rationale,
+                "validity_threats": project.validity_threats,
+                "required_controls": project.required_controls,
+            },
+            "study_design": project.study_design.model_dump(mode="json") if project.study_design else None,
+            "analysis_plan": project.analysis_plan.model_dump(mode="json") if project.analysis_plan else None,
+            "reproducibility_plan": project.reproducibility_plan,
+            "independent_review": project.reviews[-1].model_dump(mode="json") if project.reviews else None,
+        }
+
+    @staticmethod
+    def _invalidate_approval(project: ResearchProject, summary: str) -> None:
+        if project.approval_status == "valid" and project.human_approval_history:
+            project.human_approval_history[-1].status = "stale"
+        if project.approval_status in {"valid", "pending", "deferred"}:
+            project.approval_status = "stale"
+        project.review_package = None
+        project.approval_valid_for_versions = {}
+        project.version_change_summaries.append(summary)
 
     @staticmethod
     def _is_timeout_error(exc: Exception) -> bool:

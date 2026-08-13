@@ -5,6 +5,15 @@ from __future__ import annotations
 from typing import Any
 
 from src.ai_scientist.quality import source_level_distribution
+from src.ai_scientist.report_renderer import (
+    render_analysis_plan_markdown,
+    render_claims_markdown,
+    render_evidence_markdown,
+    render_reproducibility_markdown,
+    render_review_markdown,
+    render_study_design_markdown,
+    render_todos_markdown,
+)
 from src.ai_scientist.schemas import ResearchProject
 
 
@@ -76,10 +85,10 @@ def build_research_plan_markdown(project: ResearchProject) -> str:
         _bullet_list(project.question.measurable_success_criteria if project.question else []),
         "",
         "## 5. Background Evidence",
-        _evidence_table(project),
+        render_evidence_markdown(project),
         "",
         "## 6. Claim-Evidence Mapping",
-        _claim_table(project),
+        render_claims_markdown(project),
         "",
         "## 7. Evidence Quality Metrics",
         "\n".join(
@@ -101,25 +110,25 @@ def build_research_plan_markdown(project: ResearchProject) -> str:
         f"{project.method_rationale or 'Not yet selected.'}",
         "",
         "## 11. Study Design",
-        _json_block(project.study_design.model_dump(mode="json") if project.study_design else {}),
+        render_study_design_markdown(project.study_design),
         "",
         "## 12. Analysis Plan",
-        _json_block(project.analysis_plan.model_dump(mode="json") if project.analysis_plan else {}),
+        render_analysis_plan_markdown(project.analysis_plan),
         "",
         "## 13. Reproducibility Plan",
-        _json_block(project.reproducibility_plan),
+        render_reproducibility_markdown(project.reproducibility_plan),
         "",
         "## 14. Risks, Bias, and Ethics",
         _bullet_list((project.validity_threats or []) + (project.study_design.ethical_considerations if project.study_design else [])),
         "",
         "## 15. Reviewer Scores and Comments",
-        _json_block(project.reviews[-1].model_dump(mode="json") if project.reviews else {}),
+        render_review_markdown(project.reviews[-1] if project.reviews else None),
         "",
         "## 16. Unknown Questions",
         _bullet_list(project.question.unknowns if project.question else []),
         "",
         "## 17. Human or External Tool To-Dos",
-        _bullet_list(project.human_actions_required + project.missing_capabilities),
+        render_todos_markdown(project),
         "",
         "## 18. Research Status Statement",
         NO_EXECUTION_STATEMENT,
@@ -183,8 +192,3 @@ def _hypothesis_table(project: ResearchProject) -> str:
 def _bullet_list(items: list[str]) -> str:
     return "\n".join(f"- {item}" for item in items) if items else "- Not specified."
 
-
-def _json_block(data: Any) -> str:
-    import json
-
-    return "```json\n" + json.dumps(data, ensure_ascii=False, indent=2, default=str) + "\n```"

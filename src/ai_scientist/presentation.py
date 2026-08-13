@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Any
 
 from src.ai_scientist.quality import source_level_distribution
@@ -20,6 +19,7 @@ from src.ai_scientist.schemas import (
     ReviewResult,
     StudyDesign,
 )
+from src.ui_time import format_local_time
 
 
 PHASE_LABELS = {
@@ -124,24 +124,30 @@ def render_synthesis(conclusion: Conclusion | None) -> str:
 
 
 def render_event(event: ResearchEvent) -> str:
-    time_text = _time(event.started_at)
+    if event.visibility != "user":
+        return ""
+    time_text = format_local_time(event.started_at)
     phase = PHASE_LABELS.get(event.phase.value, event.phase.value)
-    if event.status == "running":
+    if event.status == "running" and event.display_key:
         return f"{time_text}　{phase}开始。"
     if event.status == "failed":
         detail = event.error_message or event.error or "阶段执行失败，项目保留在上一完整阶段。"
         return f"{time_text}　{phase}失败：{detail}"
     if event.display_markdown:
         return f"{time_text}　{event.display_markdown}"
-    return f"{time_text}　{phase}完成。"
+    if event.summary_markdown:
+        return f"{time_text}　{event.summary_markdown}"
+    return ""
 
 
 def render_event_dict(event: dict[str, Any]) -> str:
+    if event.get("visibility") != "user":
+        return ""
     phase_value = str(event.get("phase", ""))
-    time_text = _time_from_string(event.get("started_at"))
+    time_text = format_local_time(event.get("started_at"))
     phase = PHASE_LABELS.get(phase_value, phase_value)
     status = event.get("status")
-    if status == "running":
+    if status == "running" and event.get("display_key"):
         return f"{time_text}　{phase}开始。"
     if status == "failed":
         detail = event.get("display_markdown") or event.get("error_message") or "阶段执行失败，项目保留在上一完整阶段。"
@@ -150,7 +156,26 @@ def render_event_dict(event: dict[str, Any]) -> str:
         return f"{time_text}　{event['summary_markdown']}"
     if event.get("display_markdown"):
         return f"{time_text}　{event['display_markdown']}"
-    return f"{time_text}　{phase}完成。"
+    return ""
+
+
+def dedupe_user_events(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Return stable user events once, including legacy logs with duplicates."""
+
+    seen: set[str] = set()
+    result: list[dict[str, Any]] = []
+    for event in events:
+        if event.get("visibility") != "user":
+            continue
+        key = str(event.get("display_key") or "").strip()
+        if not key:
+            continue
+        dedupe_key = f"{event.get('phase')}:{event.get('iteration', 0)}:{key}"
+        if dedupe_key in seen:
+            continue
+        seen.add(dedupe_key)
+        result.append(event)
+    return result
 
 
 def render_capabilities(debug: bool = False, raw: dict[str, Any] | None = None) -> str:
@@ -195,16 +220,3 @@ def _domain_label(domain: str) -> str:
         "engineering": "工程",
         "general": "通用研究",
     }.get(domain, domain)
-
-
-def _time(value: datetime | None) -> str:
-    return value.strftime("%H:%M") if value else "--:--"
-
-
-def _time_from_string(value: Any) -> str:
-    if not isinstance(value, str) or not value:
-        return "--:--"
-    try:
-        return datetime.fromisoformat(value.replace("Z", "+00:00")).strftime("%H:%M")
-    except ValueError:
-        return "--:--"
