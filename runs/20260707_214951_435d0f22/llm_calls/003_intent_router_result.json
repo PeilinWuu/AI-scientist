@@ -1,8 +1,0 @@
-{
-  "intent": "casual_chat",
-  "qwen_intent": "casual_chat",
-  "confidence": 0.95,
-  "reason": "The user's message is a simple greeting ('你好'), which falls under casual chat.",
-  "rule_corrected": false,
-  "timestamp": "2026-07-07T13:51:10.847402+00:00"
-}

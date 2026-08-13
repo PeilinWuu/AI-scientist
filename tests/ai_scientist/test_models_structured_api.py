@@ -81,6 +81,16 @@ def test_structured_client_fails_after_one_repair(monkeypatch: pytest.MonkeyPatc
         client.call("research_director", "instructions", {}, TinyOutput)
 
 
+def test_structured_client_defers_missing_api_key_until_provider_call(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("DASHSCOPE_API_KEY", raising=False)
+    client = StructuredQwenClient(registry=ModelRegistry({"research_director": "test-model"}))
+
+    with pytest.raises(RuntimeError, match="DASHSCOPE_API_KEY is missing"):
+        client.call("research_director", "instructions", {}, TinyOutput)
+
+
 def test_structured_client_records_runtime_model_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("DASHSCOPE_API_KEY", "test-key")
     monkeypatch.setenv("AI_SCIENTIST_DIRECTOR_MODEL", "unavailable-model")

@@ -1,8 +1,0 @@
-{
-  "intent": "current_info_lookup",
-  "qwen_intent": "current_info_lookup",
-  "confidence": 0.95,
-  "reason": "The user is asking for the current weather in Hefei, which is a request for up-to-date information. This matches the 'current_info_lookup' intent.",
-  "rule_corrected": false,
-  "timestamp": "2026-07-08T11:56:33.089149+00:00"
-}

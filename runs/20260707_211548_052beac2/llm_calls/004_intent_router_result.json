@@ -1,8 +1,0 @@
-{
-  "intent": "web_research",
-  "qwen_intent": "web_research",
-  "confidence": 0.95,
-  "reason": "The user explicitly asks to search online for the latest research on Kármán vortex street simulation, which matches the 'web_research' intent.",
-  "rule_corrected": false,
-  "timestamp": "2026-07-07T13:25:34.319900+00:00"
-}

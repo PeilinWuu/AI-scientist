@@ -5,7 +5,6 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
-from src.ai_scientist.exceptions import ModelConfigurationError
 from src.model_utils import normalize_model_overrides
 
 
@@ -88,7 +87,8 @@ class ModelRegistry:
             selected = llm_default
             source = "llm_default"
         else:
-            raise ModelConfigurationError(f"No valid model is configured for {agent_name}.")
+            selected = self.fallback_model
+            source = "builtin_default"
         return ModelResolution(
             agent_name=agent_name,
             role=agent_name,

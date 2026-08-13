@@ -1,8 +1,0 @@
-{
-  "intent": "experiment_planning",
-  "qwen_intent": "experiment_planning",
-  "confidence": 0.95,
-  "reason": "用户明确请求规划一个实验，符合experiment_planning的定义，即询问设计实验计划、参数空间或下一步计划，但未授权执行。",
-  "rule_corrected": false,
-  "timestamp": "2026-07-06T09:48:22.179964+00:00"
-}

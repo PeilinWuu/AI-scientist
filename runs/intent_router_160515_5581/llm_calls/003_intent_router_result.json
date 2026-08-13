@@ -1,8 +1,0 @@
-{
-  "intent": "experiment_planning",
-  "qwen_intent": "research_consultation",
-  "confidence": 0.0,
-  "reason": "",
-  "rule_corrected": true,
-  "timestamp": "2026-07-06T08:05:15.510245+00:00"
-}

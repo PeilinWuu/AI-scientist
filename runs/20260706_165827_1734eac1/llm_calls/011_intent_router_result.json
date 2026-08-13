@@ -1,8 +1,0 @@
-{
-  "intent": "tool_execution",
-  "qwen_intent": "tool_execution",
-  "confidence": 0.95,
-  "reason": "用户多次输入'确认'，表明其明确授权运行实验。虽然当前工具执行权限被限制，但用户的意图是直接运行内置的soft-swimmer轻量示例工具。",
-  "rule_corrected": false,
-  "timestamp": "2026-07-06T09:52:18.683207+00:00"
-}

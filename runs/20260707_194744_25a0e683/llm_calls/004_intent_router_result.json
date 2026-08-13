@@ -1,8 +1,0 @@
-{
-  "intent": "research_consultation",
-  "qwen_intent": "research_consultation",
-  "confidence": 0.9,
-  "reason": "用户提出了一个关于防洪堤坝设计的问题，但没有明确要求执行实验或生成具体计划，而是询问如何开始，这属于研究咨询的范畴。",
-  "rule_corrected": false,
-  "timestamp": "2026-07-07T11:49:05.770678+00:00"
-}

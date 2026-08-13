@@ -51,23 +51,10 @@ class StructuredQwenClient:
     """Call Qwen, validate one schema, and allow one explicit repair attempt."""
 
     def __init__(self, registry: ModelRegistry | None = None) -> None:
-        api_key = os.getenv("DASHSCOPE_API_KEY", "")
-        if not api_key:
-            raise RuntimeError("DASHSCOPE_API_KEY is missing. Please set it in .env.")
         self.registry = registry or ModelRegistry()
         self.retry_count = min(1, max(0, int(os.getenv("AI_SCIENTIST_STRUCTURED_RETRY", "1"))))
-        self.http_client = httpx.Client(
-            timeout=float(os.getenv("AI_SCIENTIST_MODEL_TIMEOUT", os.getenv("LLM_TIMEOUT", "300"))),
-            trust_env=False,
-        )
-        self.client = OpenAI(
-            api_key=api_key,
-            base_url=os.getenv(
-                "AI_SCIENTIST_BASE_URL",
-                os.getenv("LLM_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
-            ),
-            http_client=self.http_client,
-        )
+        self.http_client: httpx.Client | None = None
+        self.client: OpenAI | None = None
 
     def call(
         self,
@@ -179,7 +166,8 @@ class StructuredQwenClient:
             return content, usage, fallback_model, True
 
     def _request(self, model: str, messages: list[dict[str, str]]) -> tuple[str, dict[str, int]]:
-        response = self.client.chat.completions.create(
+        client = self._get_client()
+        response = client.chat.completions.create(
             model=model,
             messages=messages,
             response_format={"type": "json_object"},
@@ -192,6 +180,28 @@ class StructuredQwenClient:
             if key in {"prompt_tokens", "completion_tokens", "total_tokens"} and isinstance(value, int)
         }
         return content, usage
+
+    def _get_client(self) -> OpenAI:
+        """Create the provider client only when a real model call is attempted."""
+
+        if self.client is not None:
+            return self.client
+        api_key = os.getenv("DASHSCOPE_API_KEY", "")
+        if not api_key:
+            raise RuntimeError("DASHSCOPE_API_KEY is missing. Please set it in .env.")
+        self.http_client = httpx.Client(
+            timeout=float(os.getenv("AI_SCIENTIST_MODEL_TIMEOUT", os.getenv("LLM_TIMEOUT", "300"))),
+            trust_env=False,
+        )
+        self.client = OpenAI(
+            api_key=api_key,
+            base_url=os.getenv(
+                "AI_SCIENTIST_BASE_URL",
+                os.getenv("LLM_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
+            ),
+            http_client=self.http_client,
+        )
+        return self.client
 
     @staticmethod
     def _validate(content: str, output_model: type[OutputT]) -> OutputT:
