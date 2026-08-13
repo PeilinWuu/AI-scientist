@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import time
 import traceback
 from contextvars import ContextVar
 from pathlib import Path
@@ -59,6 +60,9 @@ from src.ai_scientist.schemas import (
     EvidenceResearchOutput,
     EvidenceItem,
     SearchAcquisitionResult,
+    SearchCandidate,
+    SearchPlan,
+    SearchQueryRecord,
     Hypothesis,
     MethodologyOutput,
     ResearchEvent,
@@ -73,6 +77,7 @@ from src.ai_scientist.schemas import (
 )
 from src.ai_scientist.state_machine import ResearchStateMachine, TERMINAL_PHASES
 from src.ai_scientist.stagnation_detector import build_revision_snapshot, detect_stagnation
+from src.ai_scientist.source_selector import select_sources
 from src.ai_scientist.structured_client import StructuredQwenClient, StructuredCallMetadata
 from src.ai_scientist.tools.execution_adapter import ExecutionAdapter
 from src.ai_scientist.tools.registry import ToolRegistry
@@ -706,6 +711,8 @@ class ResearchOrchestrator:
             }
 
     def _run_background_research(self, project: ResearchProject, phase: ResearchPhase) -> list[str]:
+        if not hasattr(EvidenceResearcherAgent, "search_one_query"):
+            return self._run_background_research_legacy(project, phase)
         produced: list[str] = []
         agent = EvidenceResearcherAgent(client=self._structured_client_for_project(project))
         resolution = project.domain_resolution or resolve_domain(project.domain, project.secondary_domains)
@@ -736,88 +743,316 @@ class ResearchOrchestrator:
         )
 
         checkpoint = project.background_research_checkpoint
-        if checkpoint.search_completed and checkpoint.search_payload:
-            acquisition = SearchAcquisitionResult.model_validate(checkpoint.search_payload)
-        else:
+        invocation_started = time.monotonic()
+        elapsed_before_invocation = checkpoint.elapsed_seconds
+        total_budget = float(os.getenv("AI_SCIENTIST_SEARCH_TOTAL_BUDGET", "600"))
+        max_results = max(1, int(os.getenv("AI_SCIENTIST_MAX_SEARCH_RESULTS_PER_QUERY", "5")))
+        max_sources = max(1, int(os.getenv("AI_SCIENTIST_MAX_EXTRACTED_SOURCES", "8")))
+        min_usable = max(1, int(os.getenv("AI_SCIENTIST_MIN_USABLE_SOURCES", "3")))
+        search_resolution = ModelRegistry(project.model_overrides).resolve_model("evidence_researcher")
+        requested_search_model = os.getenv(
+            "AI_SCIENTIST_SEARCH_ACQUISITION_MODEL", search_resolution.resolved_model
+        ).strip() or search_resolution.resolved_model
+        fallback_search_model = os.getenv("AI_SCIENTIST_SEARCH_FALLBACK_MODEL", "").strip()
+        if checkpoint.started_at is None:
+            checkpoint.started_at = utc_now()
+
+        if checkpoint.search_plan is None:
             self._ensure_budget(project, 1)
-            search_model_resolution = ModelRegistry(project.model_overrides).resolve_model("evidence_researcher")
             self._append_event(
                 project,
                 completed_event(
                     project.project_id,
                     phase,
                     "evidence_researcher",
-                    status="search_acquisition_started",
-                    stage_substep="search_acquisition",
-                    requested_model=search_model_resolution.resolved_model,
-                    actual_model=search_model_resolution.resolved_model,
-                    fallback_used=search_model_resolution.fallback_used,
-                    tool_names=["web_search", "web_extractor"],
-                    tool_name="web_search",
-                    attempted_calls=1,
-                    model_call_count=1,
-                    endpoint_host=self._responses_endpoint_host(),
-                    previous_response_id_present=False,
+                    status="search_plan_started",
+                    stage_substep="search_planning",
+                    visibility="user",
+                    display_key="background_search_started",
+                    summary_markdown="开始检索背景证据。",
                 ),
             )
-            project.budget.attempted_model_calls += 1
-            self.store.save(project)
             try:
-                acquisition = agent.acquire_search(project, search_model_resolution.resolved_model)
-            except Exception as exc:
-                self._attach_search_model_diagnostics(exc, search_model_resolution)
+                plan_run = agent.plan_search(project)
+            except Exception:
+                project.budget.attempted_model_calls += 1
                 project.budget.failed_model_calls += 1
                 self.store.save(project)
                 raise
-            project.budget.successful_model_calls += 1
-            project.budget.used_model_calls += 1
-            if acquisition.response_id:
-                project.previous_response_ids["evidence_search"] = acquisition.response_id
-            search_record = self.artifacts.save_json(
-                project.project_id,
-                "search_acquisition",
-                acquisition.model_dump(mode="json"),
-                "evidence_researcher",
-            )
-            project.artifacts.append(search_record)
-            checkpoint.search_artifact_id = search_record.artifact_id
-            checkpoint.search_completed = True
-            checkpoint.normalization_completed = False
-            checkpoint.search_payload = acquisition.model_dump(mode="json")
-            produced.append(search_record.artifact_id)
+            self._apply_call_metadata(project, plan_run.metadata)
+            checkpoint.search_plan = plan_run.output
             self._append_event(
                 project,
                 completed_event(
                     project.project_id,
                     phase,
                     "evidence_researcher",
-                    status="search_acquisition_completed",
-                    stage_substep="search_acquisition",
-                    output_artifact_ids=[search_record.artifact_id],
-                    requested_model=search_model_resolution.resolved_model,
-                    actual_model=search_model_resolution.resolved_model,
-                    fallback_used=search_model_resolution.fallback_used,
-                    tool_names=["web_search", "web_extractor"],
+                    status="search_plan_completed",
+                    stage_substep="search_planning",
+                    query_count=len(plan_run.output.queries),
+                    requested_model=plan_run.metadata.requested_model,
+                    actual_model=plan_run.metadata.actual_model,
+                    fallback_used=plan_run.metadata.fallback_used,
+                ),
+            )
+            produced += self._save_search_checkpoint(project, checkpoint)
+
+        records_by_query = {item.query: item for item in checkpoint.query_records}
+        for query in checkpoint.search_plan.queries:
+            if records_by_query.get(query) and records_by_query[query].status == "completed":
+                continue
+            if elapsed_before_invocation + (time.monotonic() - invocation_started) >= total_budget:
+                break
+            self._append_event(
+                project,
+                completed_event(
+                    project.project_id,
+                    phase,
+                    "evidence_researcher",
+                    status="search_query_started",
+                    stage_substep="search_query",
+                    requested_model=requested_search_model,
+                    actual_model=requested_search_model,
+                    tool_names=["web_search"],
                     tool_name="web_search",
-                    query_count=1,
-                    search_result_count=len(acquisition.sources),
-                    display_markdown="Search acquisition completed and checkpoint was saved.",
-                    successful_calls=1,
+                ),
+            )
+            started = time.monotonic()
+            actual_model = requested_search_model
+            fallback_reason = ""
+            original_error = ""
+            try:
+                result = agent.search_one_query(query, requested_search_model)
+                status = "completed"
+            except Exception as exc:
+                original_error = self._sanitize_text(str(exc))
+                if self._is_timeout_error(exc) and fallback_search_model and fallback_search_model != requested_search_model:
+                    actual_model = fallback_search_model
+                    fallback_reason = "Primary search query timed out."
+                    try:
+                        result = agent.search_one_query(query, fallback_search_model)
+                        status = "completed"
+                    except Exception as fallback_exc:
+                        original_error = self._sanitize_text(str(fallback_exc))
+                        status = "timeout" if self._is_timeout_error(fallback_exc) else "failed"
+                        result = {"candidates": []}
+                else:
+                    status = "timeout" if self._is_timeout_error(exc) else "failed"
+                    result = {"candidates": []}
+            discovered = [
+                SearchCandidate.model_validate(item)
+                for item in (result.get("candidates") or [])[:max_results]
+            ]
+            checkpoint.candidates.extend(discovered)
+            record = SearchQueryRecord(
+                query=query,
+                status=status,
+                candidate_count=len(discovered),
+                requested_model=requested_search_model,
+                actual_model=actual_model,
+                fallback_reason=fallback_reason,
+                original_error=original_error,
+                elapsed_seconds=time.monotonic() - started,
+            )
+            checkpoint.query_records = [item for item in checkpoint.query_records if item.query != query] + [record]
+            project.budget.attempted_model_calls += 1 + int(bool(fallback_reason))
+            if status == "completed":
+                project.budget.successful_model_calls += 1
+                project.budget.used_model_calls += 1
+            else:
+                project.budget.failed_model_calls += 1
+            checkpoint.elapsed_seconds += time.monotonic() - started
+            produced += self._save_search_checkpoint(project, checkpoint)
+            self._append_event(
+                project,
+                completed_event(
+                    project.project_id,
+                    phase,
+                    "evidence_researcher",
+                    status=f"search_query_{status}",
+                    stage_substep="search_query",
+                    requested_model=requested_search_model,
+                    actual_model=actual_model,
+                    fallback_used=actual_model != requested_search_model,
+                    tool_names=["web_search"],
+                    tool_name="web_search",
+                    search_result_count=len(discovered),
+                    successful_calls=int(status == "completed"),
+                    failed_calls=int(status != "completed"),
                     attempted_calls=1,
                     model_call_count=1,
                 ),
             )
+
+        completed_queries = [item for item in checkpoint.query_records if item.status == "completed"]
+        if not completed_queries:
+            raise RuntimeError("All bounded evidence search queries failed or timed out.")
+        self._append_event(
+            project,
+            completed_event(
+                project.project_id,
+                phase,
+                "evidence_researcher",
+                status="search_acquisition_completed",
+                stage_substep="search_acquisition",
+                query_count=len(checkpoint.search_plan.queries),
+                search_result_count=len(checkpoint.candidates),
+                visibility="user",
+                display_key="bounded_search_completed",
+                summary_markdown=(
+                    f"完成{len(checkpoint.search_plan.queries)}条检索式中的{len(completed_queries)}条，"
+                    f"共发现{len(checkpoint.candidates)}个候选来源。"
+                ),
+            ),
+        )
+
+        if not checkpoint.source_selection_completed:
+            checkpoint.selected_candidates = select_sources(checkpoint.candidates, max_sources)
+            checkpoint.source_selection_completed = True
+            produced += self._save_search_checkpoint(project, checkpoint)
             self._append_event(
                 project,
                 completed_event(
                     project.project_id,
                     phase,
                     "evidence_researcher",
-                    status="artifact_save_completed",
-                    stage_substep="search_acquisition",
-                    output_artifact_ids=[search_record.artifact_id],
+                    status="source_selection_completed",
+                    stage_substep="source_selection",
+                    search_result_count=len(checkpoint.selected_candidates),
+                    visibility="user",
+                    display_key="source_selection_completed",
+                    summary_markdown=f"筛选出{len(checkpoint.selected_candidates)}个优先来源。",
                 ),
             )
+
+        extracted_texts: list[str] = []
+        pending = [item for item in checkpoint.selected_candidates if item.extraction_status == "pending"]
+        for offset in range(0, len(pending), 3):
+            if elapsed_before_invocation + (time.monotonic() - invocation_started) >= total_budget:
+                break
+            batch = pending[offset : offset + 3]
+            self._append_event(
+                project,
+                completed_event(
+                    project.project_id,
+                    phase,
+                    "evidence_researcher",
+                    status="source_extraction_started",
+                    stage_substep="source_extraction",
+                    tool_names=["web_search", "web_extractor"],
+                    display_markdown=(
+                        f"正在读取选定文献来源（{min(offset + len(batch), len(pending))}/{len(pending)}）……"
+                    ),
+                ),
+            )
+            started = time.monotonic()
+            try:
+                result = agent.extract_candidate_batch(
+                    batch,
+                    requested_search_model,
+                    lambda event_type: self._source_extraction_progress(
+                        project, phase, checkpoint, event_type
+                    ),
+                )
+                text = str(result.get("final_text") or "")
+                extracted_texts.append(text)
+                status = "completed"
+                error = ""
+            except Exception as exc:
+                status = "timeout" if self._is_timeout_error(exc) else "failed"
+                error = self._sanitize_text(str(exc))
+            for candidate in batch:
+                updated = candidate.model_copy(
+                    update={
+                        "extraction_status": status,
+                        "extracted_text": text if status == "completed" else "",
+                        "extraction_error": error,
+                    }
+                )
+                checkpoint.selected_candidates[checkpoint.selected_candidates.index(candidate)] = updated
+            checkpoint.elapsed_seconds += time.monotonic() - started
+            project.budget.attempted_model_calls += 1
+            if status == "completed":
+                project.budget.successful_model_calls += 1
+                project.budget.used_model_calls += 1
+            else:
+                project.budget.failed_model_calls += 1
+            produced += self._save_search_checkpoint(project, checkpoint)
+            self._append_event(
+                project,
+                completed_event(
+                    project.project_id,
+                    phase,
+                    "evidence_researcher",
+                    status=f"source_extraction_{status}",
+                    stage_substep="source_extraction",
+                    successful_calls=int(status == "completed"),
+                    failed_calls=int(status != "completed"),
+                    extracted_page_count=len(batch) if status == "completed" else 0,
+                ),
+            )
+
+        usable = [item for item in checkpoint.selected_candidates if item.extraction_status == "completed"]
+        checkpoint.extraction_completed = not any(
+            item.extraction_status == "pending" for item in checkpoint.selected_candidates
+        )
+        warnings = []
+        if len(usable) < min_usable:
+            warnings.append(
+                f"Only {len(usable)} sources were extracted; the configured minimum is {min_usable}. Supplementary search is recommended."
+            )
+        if not usable:
+            warnings.append("No source extraction completed; normalization will use selected source metadata only.")
+        acquisition = SearchAcquisitionResult(
+            final_text="\n\n".join(
+                item.extracted_text for item in checkpoint.selected_candidates if item.extracted_text
+            ),
+            sources=[
+                {
+                    "title": item.title,
+                    "url": item.url,
+                    "site_name": item.source_domain,
+                    "snippet": item.snippet,
+                }
+                for item in checkpoint.selected_candidates
+            ],
+            search_used=True,
+            warnings=warnings,
+            search_plan=checkpoint.search_plan,
+            query_records=checkpoint.query_records,
+            candidates=checkpoint.candidates,
+            selected_candidates=checkpoint.selected_candidates,
+            usable_source_count=len(usable),
+            requested_model=requested_search_model,
+            actual_model=requested_search_model,
+        )
+        search_record = self.artifacts.save_json(
+            project.project_id, "search_acquisition", acquisition.model_dump(mode="json"), "evidence_researcher"
+        )
+        project.artifacts.append(search_record)
+        checkpoint.search_artifact_id = search_record.artifact_id
+        checkpoint.search_completed = True
+        checkpoint.normalization_completed = False
+        checkpoint.search_payload = acquisition.model_dump(mode="json")
+        produced.append(search_record.artifact_id)
+        self.store.save(project)
+        self._append_event(
+            project,
+            completed_event(
+                project.project_id,
+                phase,
+                "evidence_researcher",
+                status="source_extraction_completed",
+                stage_substep="source_extraction",
+                extracted_page_count=len(usable),
+                visibility="user",
+                display_key="source_extraction_summary",
+                summary_markdown=(
+                    f"成功读取{len(usable)}个来源，"
+                    f"{len(checkpoint.selected_candidates) - len(usable)}个来源读取失败或未完成。"
+                ),
+            ),
+        )
 
         self._append_event(
             project,
@@ -870,11 +1105,77 @@ class ResearchOrchestrator:
                 "evidence_researcher",
                 status="evidence_normalization_completed",
                 stage_substep="evidence_normalization",
-                search_result_count=len(acquisition.sources),
+                search_result_count=len(acquisition.selected_candidates),
                 display_markdown=render_evidence_summary(project.evidence, project.evidence_gaps),
                 visibility="user",
                 display_key="background_research_completed",
                 summary_markdown=render_evidence_summary(project.evidence, project.evidence_gaps),
+                evidence_count=len(project.evidence),
+            ),
+        )
+        return produced
+
+    def _run_background_research_legacy(self, project: ResearchProject, phase: ResearchPhase) -> list[str]:
+        """Compatibility path for test doubles and projects created before bounded acquisition."""
+
+        resolution = project.domain_resolution or resolve_domain(project.domain, project.secondary_domains)
+        project.domain_resolution = resolution
+        project.domain = resolution.canonical_primary_domain
+        project.secondary_domains = resolution.canonical_secondary_domains
+        agent = EvidenceResearcherAgent(client=self._structured_client_for_project(project))
+        search_resolution = ModelRegistry(project.model_overrides).resolve_model("evidence_researcher")
+        project.budget.attempted_model_calls += 1
+        try:
+            acquisition = agent.acquire_search(project, search_resolution.resolved_model)
+        except Exception as exc:
+            self._attach_search_model_diagnostics(exc, search_resolution)
+            project.budget.failed_model_calls += 1
+            self.store.save(project)
+            raise
+        project.budget.successful_model_calls += 1
+        project.budget.used_model_calls += 1
+        checkpoint = project.background_research_checkpoint
+        record = self.artifacts.save_json(
+            project.project_id, "search_acquisition", acquisition.model_dump(mode="json"), "evidence_researcher"
+        )
+        project.artifacts.append(record)
+        checkpoint.search_artifact_id = record.artifact_id
+        checkpoint.search_completed = True
+        checkpoint.search_payload = acquisition.model_dump(mode="json")
+        run = agent.normalize_search_result(project, acquisition)
+        verified = verify_evidence_collection(
+            EvidenceCollection(
+                evidence_items=run.output.evidence,
+                preliminary_claims=run.output.claims,
+                evidence_gaps=run.output.evidence_gaps,
+                conflicting_evidence=run.output.conflicting_evidence,
+                source_summary=run.output.confidence_summary,
+            )
+        )
+        project.evidence = enrich_evidence_items(verified.evidence_items)
+        project.claims = run.output.claims
+        project.evidence_gaps = run.output.evidence_gaps
+        project.conflicting_evidence = run.output.conflicting_evidence
+        checkpoint.normalization_completed = True
+        produced = [record.artifact_id] + self._record_agent_output(project, phase, run, "evidence_map")
+        self._append_event(
+            project,
+            completed_event(
+                project.project_id,
+                phase,
+                "evidence_researcher",
+                status="search_acquisition_completed",
+                stage_substep="search_acquisition",
+            ),
+        )
+        self._append_event(
+            project,
+            completed_event(
+                project.project_id,
+                phase,
+                "evidence_researcher",
+                status="evidence_normalization_completed",
+                stage_substep="evidence_normalization",
                 evidence_count=len(project.evidence),
             ),
         )
@@ -1543,6 +1844,54 @@ class ResearchOrchestrator:
         project.events.append(event.event_id)
         self.store.append_event(event)
         self.store.save(project)
+
+    def _save_search_checkpoint(self, project: ResearchProject, checkpoint: Any) -> list[str]:
+        record = self.artifacts.save_json(
+            project.project_id,
+            "search_checkpoint",
+            checkpoint.model_dump(mode="json"),
+            "evidence_researcher",
+        )
+        project.artifacts.append(record)
+        self.store.save(project)
+        return [record.artifact_id]
+
+    def _source_extraction_progress(
+        self,
+        project: ResearchProject,
+        phase: ResearchPhase,
+        checkpoint: Any,
+        event_type: str,
+    ) -> None:
+        checkpoint.last_activity_at = utc_now()
+        self._append_event(
+            project,
+            completed_event(
+                project.project_id,
+                phase,
+                "evidence_researcher",
+                status="source_extraction_progress",
+                stage_substep="source_extraction",
+                reason=event_type,
+            ),
+        )
+
+    @staticmethod
+    def _is_timeout_error(exc: Exception) -> bool:
+        names = {type(exc).__name__.lower()}
+        cause = exc.__cause__ or exc.__context__
+        if cause:
+            names.add(type(cause).__name__.lower())
+        message = str(exc).lower()
+        return any("timeout" in name for name in names) or "timed out" in message or "timeout" in message
+
+    @staticmethod
+    def _apply_call_metadata(project: ResearchProject, metadata: StructuredCallMetadata) -> None:
+        project.budget.attempted_model_calls += metadata.attempted_calls
+        project.budget.successful_model_calls += metadata.successful_calls
+        project.budget.failed_model_calls += metadata.failed_calls
+        project.budget.fallback_model_calls += metadata.fallback_calls
+        project.budget.used_model_calls += metadata.successful_calls
 
     @staticmethod
     def _ensure_budget(project: ResearchProject, required_calls: int) -> None:

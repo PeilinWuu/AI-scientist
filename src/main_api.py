@@ -22,7 +22,7 @@ from src.ai_scientist.schemas import (
 )
 from src.pure_qwen_client import PureQwenClient, pure_qwen_metadata
 from src.pure_schemas import DebugPayloadResponse, PureChatRequest, PureChatResponse
-from src.search_qwen_client import SEARCH_TOOLS, SearchQwenClient, search_qwen_metadata
+from src.search_qwen_client import SearchQwenClient, resolve_search_tools, search_qwen_metadata
 from src.search_schemas import SearchChatRequest, SearchChatResponse, SearchDebugPayloadResponse
 from src.model_utils import normalize_model_name
 
@@ -111,9 +111,9 @@ def debug_payload(request: PureChatRequest) -> DebugPayloadResponse:
 def qwen_ping() -> dict:
     """Direct Qwen connectivity check using the same client as /api/chat."""
 
-    model = "qwen-turbo"
     try:
         client = PureQwenClient()
+        model = client.model
         reply = client.chat(messages=[{"role": "user", "content": "ping"}], model=model)
         return {
             "status": "ok",
@@ -125,6 +125,7 @@ def qwen_ping() -> dict:
         return {
             "status": "error",
             "mode": "pure_qwen",
+            "model": str(pure_qwen_metadata()["model"]),
             **_error_payload(exc),
         }
 
@@ -140,6 +141,25 @@ def search_ping() -> dict:
             message="请联网搜索合肥市今天的天气，并说明信息是否来自实时搜索。",
             model=model,
         )
+        if not result["search_used"]:
+            return {
+                "status": "error",
+                "mode": "qwen_search",
+                "model": model,
+                "error_type": "SearchToolNotUsedError",
+                "error_message": (
+                    "The gateway accepted the Responses API request but the selected model "
+                    "did not invoke web_search."
+                ),
+                "search_used": False,
+                "sources": result["sources"],
+                "tool_usage": result["tool_usage"],
+                "reply": result["reply"],
+                "hint": (
+                    "Use a provider and model route that explicitly supports Responses API "
+                    "built-in web_search tools."
+                ),
+            }
         return {
             "status": "ok",
             "mode": "qwen_search",
@@ -160,7 +180,7 @@ def search_ping() -> dict:
             **_error_payload(exc),
             "hint": (
                 "Responses API search failed. Check whether the selected model supports the "
-                "web_search and web_extractor tools, the region/base_url, and account permissions."
+                "configured search tools, the region/base_url, and account permissions."
             ),
         }
 
@@ -196,7 +216,7 @@ def debug_search_payload(request: SearchChatRequest) -> SearchDebugPayloadRespon
         model=normalize_model_name(request.model) or str(search_qwen_metadata()["model"]),
         input=request.message,
         previous_response_id=request.previous_response_id,
-        tools=[tool.copy() for tool in SEARCH_TOOLS],
+        tools=resolve_search_tools(),
     )
 
 
@@ -217,7 +237,7 @@ def chat_search(request: SearchChatRequest) -> SearchChatResponse:
             **_error_payload(exc),
             "hint": (
                 "Responses API search failed. Check whether the selected model supports the "
-                "web_search and web_extractor tools, the region/base_url, and account permissions."
+                "configured search tools, the region/base_url, and account permissions."
             ),
         }
         status_code = 500 if isinstance(exc, ValueError) else 502

@@ -25,6 +25,32 @@ SEARCH_TOOLS = [
 ]
 
 
+def resolve_search_tools(base_url: str | None = None) -> list[dict[str, str]]:
+    """Select search tools supported by the configured Responses API gateway."""
+
+    resolved_base_url = (
+        base_url
+        or os.getenv("RESPONSES_BASE_URL")
+        or os.getenv("LLM_BASE_URL", DEFAULT_BASE_URL)
+    ).rstrip("/")
+    setting = os.getenv("QWEN_SEARCH_ENABLE_WEB_EXTRACTOR", "auto").strip().lower()
+    if setting in {"1", "true", "yes", "on"}:
+        enable_extractor = True
+    elif setting in {"0", "false", "no", "off"}:
+        enable_extractor = False
+    elif setting == "auto":
+        enable_extractor = urlparse(resolved_base_url).hostname == "dashscope.aliyuncs.com"
+    else:
+        raise ValueError(
+            "QWEN_SEARCH_ENABLE_WEB_EXTRACTOR must be auto, true, or false."
+        )
+
+    tools = [{"type": "web_search"}]
+    if enable_extractor:
+        tools.append({"type": "web_extractor"})
+    return tools
+
+
 class SearchQwenClient:
     """Call Qwen's Responses API with built-in web tools."""
 
@@ -39,6 +65,7 @@ class SearchQwenClient:
             os.getenv("RESPONSES_BASE_URL")
             or os.getenv("LLM_BASE_URL", DEFAULT_BASE_URL)
         ).rstrip("/")
+        self.tools = resolve_search_tools(self.base_url)
         if timeout_env:
             self.timeout = float(os.getenv(timeout_env, os.getenv("LLM_TIMEOUT", "120")))
         else:
@@ -62,7 +89,7 @@ class SearchQwenClient:
         """Send the current user text and optionally continue a Responses conversation."""
 
         resolved_model = normalize_model_name(model) or self.default_model
-        tools = [tool.copy() for tool in SEARCH_TOOLS]
+        tools = [tool.copy() for tool in self.tools]
         validate_search_request(resolved_model, message, tools)
         kwargs: dict[str, object] = {
             "model": resolved_model,
@@ -195,7 +222,7 @@ def search_qwen_metadata() -> dict[str, object]:
         "base_url": base_url.rstrip("/"),
         "api_key_configured": bool(os.getenv("DASHSCOPE_API_KEY", "")),
         "search_method": "responses_api_builtin_tools",
-        "tools": [tool.copy() for tool in SEARCH_TOOLS],
+        "tools": resolve_search_tools(base_url),
     }
 
 

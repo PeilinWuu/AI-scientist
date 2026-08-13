@@ -18,6 +18,7 @@ from src.search_qwen_client import (
     extract_final_text,
     extract_sources,
     extract_tool_usage,
+    resolve_search_tools,
 )
 from src.search_schemas import SearchChatRequest
 
@@ -112,7 +113,7 @@ def test_debug_search_payload_is_clean_responses_request() -> None:
         "mode": "qwen_search",
         "input": "今天杭州天气怎么样？",
         "previous_response_id": "resp_previous",
-        "tools": SEARCH_TOOLS,
+        "tools": resolve_search_tools(),
     }
 
 
@@ -144,11 +145,25 @@ def test_search_sends_original_input_and_previous_id(monkeypatch: pytest.MonkeyP
     assert captured == {
         "model": "qwen3.7-plus",
         "input": user_text,
-        "tools": SEARCH_TOOLS,
+        "tools": client.tools,
         "previous_response_id": "resp_previous",
     }
     assert result["reply"] == "干净的最终回答"
     assert "raw_response" not in result
+
+
+def test_non_dashscope_gateway_uses_web_search_only(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("QWEN_SEARCH_ENABLE_WEB_EXTRACTOR", raising=False)
+
+    assert resolve_search_tools("https://api.llm.ustc.edu.cn/v1") == [
+        {"type": "web_search"}
+    ]
+
+
+def test_dashscope_gateway_keeps_web_extractor(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("QWEN_SEARCH_ENABLE_WEB_EXTRACTOR", raising=False)
+
+    assert resolve_search_tools("https://dashscope.aliyuncs.com/compatible-mode/v1") == SEARCH_TOOLS
 
 
 def test_output_text_has_priority_over_all_output_items() -> None:

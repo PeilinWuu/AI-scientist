@@ -237,6 +237,55 @@ class SearchSource(StrictModel):
         }
 
 
+class SearchPlan(StrictModel):
+    """Bounded, offline plan for discovering relevant sources."""
+
+    queries: list[str] = Field(default_factory=list)
+    target_source_types: list[str] = Field(default_factory=list)
+    preferred_databases: list[str] = Field(default_factory=list)
+    date_constraints: list[str] = Field(default_factory=list)
+    maximum_queries: int = Field(default=4, ge=1)
+    rationale: str = ""
+
+    @model_validator(mode="after")
+    def bound_queries(self) -> "SearchPlan":
+        configured = max(1, int(os.getenv("AI_SCIENTIST_MAX_SEARCH_QUERIES", "4")))
+        maximum = min(self.maximum_queries, configured)
+        unique = list(dict.fromkeys(item.strip() for item in self.queries if item.strip()))[:maximum]
+        self.maximum_queries = maximum
+        self.queries = unique
+        return self
+
+
+class SearchCandidate(StrictModel):
+    """One source discovered by one bounded web-search query."""
+
+    title: str = ""
+    url: str
+    query: str
+    rank: int = Field(ge=1)
+    source_domain: str = ""
+    snippet: str = ""
+    doi: str | None = None
+    pmid: str | None = None
+    discovered_at: datetime = Field(default_factory=utc_now)
+    selection_score: int = 0
+    extraction_status: Literal["pending", "completed", "timeout", "failed", "skipped"] = "pending"
+    extracted_text: str = ""
+    extraction_error: str = ""
+
+
+class SearchQueryRecord(StrictModel):
+    query: str
+    status: Literal["pending", "completed", "timeout", "failed"] = "pending"
+    candidate_count: int = 0
+    requested_model: str = ""
+    actual_model: str = ""
+    fallback_reason: str = ""
+    original_error: str = ""
+    elapsed_seconds: float = Field(default=0.0, ge=0.0)
+
+
 class SearchAcquisitionResult(StrictModel):
     final_text: str = ""
     sources: list[SearchSource] = Field(default_factory=list)
@@ -244,6 +293,14 @@ class SearchAcquisitionResult(StrictModel):
     request_id: str | None = None
     search_used: bool = False
     warnings: list[str] = Field(default_factory=list)
+    search_plan: SearchPlan | None = None
+    query_records: list[SearchQueryRecord] = Field(default_factory=list)
+    candidates: list[SearchCandidate] = Field(default_factory=list)
+    selected_candidates: list[SearchCandidate] = Field(default_factory=list)
+    usable_source_count: int = 0
+    requested_model: str = ""
+    actual_model: str = ""
+    fallback_reason: str = ""
 
 
 class EvidenceCollection(StrictModel):
@@ -768,6 +825,15 @@ class BackgroundResearchCheckpoint(StrictModel):
     search_completed: bool = False
     normalization_completed: bool = False
     search_payload: dict[str, Any] | None = None
+    search_plan: SearchPlan | None = None
+    query_records: list[SearchQueryRecord] = Field(default_factory=list)
+    candidates: list[SearchCandidate] = Field(default_factory=list)
+    selected_candidates: list[SearchCandidate] = Field(default_factory=list)
+    source_selection_completed: bool = False
+    extraction_completed: bool = False
+    started_at: datetime | None = None
+    last_activity_at: datetime | None = None
+    elapsed_seconds: float = Field(default=0.0, ge=0.0)
 
 
 class ResearchProject(StrictModel):

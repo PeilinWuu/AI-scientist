@@ -68,6 +68,8 @@ The current release can:
 - run independent review;
 - synthesize an approved planning-only research report.
 
+Evidence acquisition is bounded and resumable. Evidence Researcher first creates an offline `SearchPlan`, runs each query independently with `web_search` only, deterministically selects a limited source set, extracts selected URLs in small streaming batches, and finally normalizes evidence without network tools. Versioned `search_checkpoint_vN.json` artifacts prevent completed queries from being repeated after interruption.
+
 The current release does not connect a real laboratory, simulation, code-execution, or statistical-analysis backend. `ExecutionAdapter.execute()` raises `NotImplementedError`. Without a real backend, projects wait for human data or execution and do not generate experimental data, analysis results, or scientific conclusions. Planning-only synthesis explicitly states that the plan has not been executed.
 
 ## Installation
@@ -84,8 +86,11 @@ LLM_MODEL=qwen-turbo
 LLM_SEARCH_MODEL=qwen3.7-plus
 LLM_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 RESPONSES_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+QWEN_SEARCH_ENABLE_WEB_EXTRACTOR=auto
 LLM_TIMEOUT=120
 ```
+
+Search tool compatibility depends on the API gateway. With `QWEN_SEARCH_ENABLE_WEB_EXTRACTOR=auto`, the official DashScope endpoint sends both `web_search` and `web_extractor`; other OpenAI-compatible gateways send only `web_search`. Set the value explicitly to `true` or `false` only when the gateway documentation confirms its supported Responses API tools.
 
 ## Configure AI Scientist Models
 
@@ -108,6 +113,15 @@ AI_SCIENTIST_MAX_ITERATIONS=2
 AI_SCIENTIST_PROJECTS_DIR=data/research_projects
 AI_SCIENTIST_STRUCTURED_RETRY=1
 AI_SCIENTIST_DEFAULT_PLANNING_ONLY=true
+AI_SCIENTIST_SEARCH_QUERY_TIMEOUT=120
+AI_SCIENTIST_EXTRACTION_TIMEOUT=300
+AI_SCIENTIST_SEARCH_TOTAL_BUDGET=600
+AI_SCIENTIST_MAX_SEARCH_QUERIES=4
+AI_SCIENTIST_MAX_SEARCH_RESULTS_PER_QUERY=5
+AI_SCIENTIST_MAX_EXTRACTED_SOURCES=8
+AI_SCIENTIST_MIN_USABLE_SOURCES=3
+AI_SCIENTIST_SEARCH_ACQUISITION_MODEL=
+AI_SCIENTIST_SEARCH_FALLBACK_MODEL=
 ```
 
 Do not assume every account supports the same model IDs. If a role variable is empty, the registry uses `AI_SCIENTIST_FALLBACK_MODEL`, then `LLM_MODEL`. Configuration or runtime fallback is recorded in the event log through `requested_model`, `actual_model`, and `fallback_used`; it is never silent.
