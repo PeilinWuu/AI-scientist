@@ -9,6 +9,7 @@ from src.ai_scientist.report_renderer import (
     render_analysis_plan_markdown,
     render_claims_markdown,
     render_evidence_markdown,
+    render_evidence_curation_markdown,
     render_reproducibility_markdown,
     render_review_markdown,
     render_study_design_markdown,
@@ -38,6 +39,16 @@ def build_research_plan_json(project: ResearchProject) -> dict[str, Any]:
         "operational_definitions": project.question.operational_definitions if project.question else [],
         "success_criteria": project.question.measurable_success_criteria if project.question else [],
         "evidence": [item.model_dump(mode="json") for item in project.evidence],
+        "evidence_curation": {
+            "review_mode": project.evidence_review_mode,
+            "search_plan_versions": len(project.search_plan_history),
+            "candidate_count": len(project.source_candidate_collections[-1].candidates)
+            if project.source_candidate_collections else 0,
+            "selection_snapshots": [
+                item.model_dump(mode="json") for item in project.source_selection_snapshots
+            ],
+            "feedback_summary": project.source_review_feedback.model_dump(mode="json"),
+        },
         "claims": [item.model_dump(mode="json") for item in project.claims],
         "quality_metrics": project.quality_metrics.model_dump(mode="json"),
         "source_level_distribution": source_level_distribution(project.evidence),
@@ -86,6 +97,9 @@ def build_research_plan_markdown(project: ResearchProject) -> str:
         "",
         "## 5. Background Evidence",
         render_evidence_markdown(project),
+        "",
+        "## Evidence Curation",
+        render_evidence_curation_markdown(project),
         "",
         "## 6. Claim-Evidence Mapping",
         render_claims_markdown(project),
@@ -191,4 +205,3 @@ def _hypothesis_table(project: ResearchProject) -> str:
 
 def _bullet_list(items: list[str]) -> str:
     return "\n".join(f"- {item}" for item in items) if items else "- Not specified."
-

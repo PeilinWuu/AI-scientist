@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from src.ai_scientist.agents.base_agent import AgentRun
+from src.ai_scientist.evidence_curation import compute_question_hash
 from src.ai_scientist.orchestrator import ResearchOrchestrator
 from src.ai_scientist.schemas import (
     EvidenceItem,
@@ -15,6 +16,7 @@ from src.ai_scientist.schemas import (
     SearchCandidate,
     SearchPlan,
     SearchQueryRecord,
+    SourceDecisionInput,
     utc_now,
 )
 from src.ai_scientist.source_selector import select_sources
@@ -127,7 +129,7 @@ def test_partial_query_timeout_and_extraction_failure_still_advance(
             return {"final_text": "RCT metadata and bounded outcome extraction."}
 
         def normalize_search_result(self, project_arg, acquisition):
-            assert acquisition.query_records[1].status == "timeout"
+            assert any(item.status == "timeout" for item in acquisition.query_records)
             return AgentRun(
                 output=EvidenceResearchOutput(
                     evidence=[
@@ -145,6 +147,16 @@ def test_partial_query_timeout_and_extraction_failure_still_advance(
 
     monkeypatch.setattr("src.ai_scientist.orchestrator.EvidenceResearcherAgent", FakeEvidenceResearcher)
 
+    plan_result = orchestrator.run_next_step(project.project_id)
+    assert plan_result["current_phase"] == ResearchPhase.SEARCH_PLAN_REVIEW.value
+    orchestrator.approve_search_plan(project.project_id)
+    search_result = orchestrator.run_next_step(project.project_id)
+    assert search_result["current_phase"] == ResearchPhase.HUMAN_SOURCE_REVIEW.value
+    candidates = orchestrator.get_project(project.project_id).background_research_checkpoint.candidates
+    orchestrator.submit_source_selection(
+        project.project_id,
+        [SourceDecisionInput(candidate_id=item.candidate_id, decision="keep") for item in candidates],
+    )
     result = orchestrator.run_next_step(project.project_id)
     updated = orchestrator.get_project(project.project_id)
 
@@ -163,8 +175,14 @@ def test_completed_checkpoint_query_is_not_repeated(tmp_path: Path, monkeypatch)
     project = _project(orchestrator)
     query = "completed PubMed query"
     project.background_research_checkpoint.search_plan = SearchPlan(
-        queries=[query], maximum_queries=1, rationale="resume"
+        project_id=project.project_id,
+        question_hash=compute_question_hash(project),
+        queries=[query], maximum_queries=1, rationale="resume", approved_by="human", approved_at=utc_now()
     )
+    project.background_research_checkpoint.project_id = project.project_id
+    project.background_research_checkpoint.question_hash = project.background_research_checkpoint.search_plan.question_hash
+    project.background_research_checkpoint.search_plan_id = project.background_research_checkpoint.search_plan.search_plan_id
+    project.background_research_checkpoint.search_plan_approved = True
     project.background_research_checkpoint.query_records = [
         SearchQueryRecord(query=query, status="completed", candidate_count=1)
     ]
@@ -196,7 +214,7 @@ def test_completed_checkpoint_query_is_not_repeated(tmp_path: Path, monkeypatch)
 
     result = orchestrator.run_next_step(project.project_id)
 
-    assert result["current_phase"] == ResearchPhase.CLAIM_EVIDENCE_MAPPING.value
+    assert result["current_phase"] == ResearchPhase.HUMAN_SOURCE_REVIEW.value
 
 
 def test_source_selection_deduplicates_and_prioritizes_formal_records() -> None:

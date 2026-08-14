@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import base64
 import threading
 import time
 from urllib.parse import urlparse
@@ -18,9 +19,13 @@ from src.ai_scientist.schemas import (
     DeferApprovalRequest,
     EvidenceCreateRequest,
     HumanEditRequest,
+    HumanSourceRequest,
     ProvideDataRequest,
     ResearchStartRequest,
+    ResearchAssetUploadRequest,
     RevisionRequest,
+    SearchPlanReviewRequest,
+    SourceSelectionRequest,
 )
 from src.pure_qwen_client import PureQwenClient, pure_qwen_metadata
 from src.pure_schemas import DebugPayloadResponse, PureChatRequest, PureChatResponse
@@ -339,6 +344,7 @@ def research_start(request: ResearchStartRequest) -> dict:
             model_overrides=request.model_overrides,
             max_iterations=request.max_iterations,
             planning_only=request.planning_only,
+            evidence_review_mode=request.evidence_review_mode,
         )
         return {
             "project_id": project.project_id,
@@ -506,6 +512,91 @@ def research_approve(project_id: str, request: ApprovalRequest) -> dict:
             expected_versions=request.expected_versions,
         )
         return {"project_id": project.project_id, "phase": project.phase.value, "status": "approved"}
+    except Exception as exc:  # noqa: BLE001
+        raise _research_http_error(exc) from exc
+
+
+@app.get("/api/research/{project_id}/search-plan")
+def research_search_plan(project_id: str) -> dict:
+    try:
+        project = research_orchestrator.get_project(project_id)
+        plan = project.background_research_checkpoint.search_plan
+        return {
+            "phase": project.phase.value,
+            "research_question": project.question.normalized_question if project.question else project.objective,
+            "search_plan": plan.model_dump(mode="json") if plan else None,
+        }
+    except Exception as exc:  # noqa: BLE001
+        raise _research_http_error(exc) from exc
+
+
+@app.post("/api/research/{project_id}/search-plan/approve")
+def research_approve_search_plan(project_id: str, request: SearchPlanReviewRequest) -> dict:
+    try:
+        project = research_orchestrator.approve_search_plan(
+            project_id, request.queries, request.auto_approve_future
+        )
+        return project.model_dump(mode="json")
+    except Exception as exc:  # noqa: BLE001
+        raise _research_http_error(exc) from exc
+
+
+@app.post("/api/research/{project_id}/search-plan/regenerate")
+def research_regenerate_search_plan(project_id: str) -> dict:
+    try:
+        return research_orchestrator.regenerate_search_plan(project_id).model_dump(mode="json")
+    except Exception as exc:  # noqa: BLE001
+        raise _research_http_error(exc) from exc
+
+
+@app.get("/api/research/{project_id}/source-candidates")
+def research_source_candidates(project_id: str) -> dict:
+    try:
+        project = research_orchestrator.get_project(project_id)
+        checkpoint = project.background_research_checkpoint
+        latest = project.source_selection_snapshots[-1] if project.source_selection_snapshots else None
+        return {
+            "phase": project.phase.value,
+            "review_mode": project.evidence_review_mode,
+            "candidates": [item.model_dump(mode="json") for item in checkpoint.candidates],
+            "latest_selection": latest.model_dump(mode="json") if latest else None,
+            "formal_evidence_count": len(project.evidence),
+        }
+    except Exception as exc:  # noqa: BLE001
+        raise _research_http_error(exc) from exc
+
+
+@app.post("/api/research/{project_id}/source-selection")
+def research_source_selection(project_id: str, request: SourceSelectionRequest) -> dict:
+    try:
+        project = research_orchestrator.submit_source_selection(
+            project_id, request.decisions, request.selection_note
+        )
+        return project.model_dump(mode="json")
+    except Exception as exc:  # noqa: BLE001
+        raise _research_http_error(exc) from exc
+
+
+@app.post("/api/research/{project_id}/human-sources")
+def research_human_sources(project_id: str, request: HumanSourceRequest) -> dict:
+    try:
+        return research_orchestrator.add_human_sources(project_id, request.entries).model_dump(mode="json")
+    except Exception as exc:  # noqa: BLE001
+        raise _research_http_error(exc) from exc
+
+
+@app.post("/api/research/{project_id}/research-assets")
+def research_upload_asset(project_id: str, request: ResearchAssetUploadRequest) -> dict:
+    try:
+        content = base64.b64decode(request.content_base64, validate=True)
+        project = research_orchestrator.register_research_asset(
+            project_id, request.filename, request.content_type, content
+        )
+        return {
+            "project_id": project.project_id,
+            "asset": project.research_assets[-1].model_dump(mode="json"),
+            "message": "文件已保存，但当前版本尚未自动解析内容。",
+        }
     except Exception as exc:  # noqa: BLE001
         raise _research_http_error(exc) from exc
 

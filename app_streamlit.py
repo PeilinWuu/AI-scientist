@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import base64
 import os
 import time
 from pathlib import Path
@@ -417,6 +418,16 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
         )
         max_iterations = st.number_input("最大修订次数", min_value=0, max_value=10, value=2)
         planning_only = st.checkbox("仅规划模式", value=True)
+        evidence_review_mode = st.selectbox(
+            "证据审查模式",
+            options=["ASSISTED", "MANUAL", "AUTO"],
+            format_func=lambda value: {
+                "ASSISTED": "辅助审查（推荐）：AI 推荐，人工决定",
+                "MANUAL": "人工审查：所有候选来源均由人工明确决定",
+                "AUTO": "自动审查：用于低风险开发验证",
+            }[value],
+            index=0,
+        )
         if st.button("创建项目", type="primary"):
             try:
                 created = post_json(
@@ -430,6 +441,7 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
                         "model_overrides": scientist_model_overrides(model_defaults),
                         "max_iterations": int(max_iterations),
                         "planning_only": planning_only,
+                        "evidence_review_mode": evidence_review_mode,
                     },
                 )
                 st.session_state.research_project_id = created["project_id"]
@@ -490,8 +502,11 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
     active_job = _render_research_job_status(backend_url, project, show_debug)
     job_running = bool(active_job and active_job.get("status") in {"queued", "running"})
 
+    _render_evidence_curation_gate(backend_url, project, job_running, show_debug)
+
     action_columns = st.columns(3)
-    if action_columns[0].button("运行下一阶段", type="primary", disabled=job_running):
+    human_gate = project.get("phase") in {"SEARCH_PLAN_REVIEW", "HUMAN_SOURCE_REVIEW", "HUMAN_APPROVAL"}
+    if action_columns[0].button("运行下一阶段", type="primary", disabled=job_running or human_gate):
         _start_research_step_job(backend_url, project["project_id"])
     if action_columns[1].button("刷新"):
         refresh_research_project(backend_url)
@@ -637,7 +652,27 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
             st.info("研究总监尚未完成研究问题形式化。")
     with tabs[1]:
         evidence = project.get("evidence") or []
-        st.markdown(f"已保留 **{len(evidence)}** 条来源，其中可验证唯一来源 **{metrics.get('verified_evidence_count', 0)}** 条。")
+        checkpoint = project.get("background_research_checkpoint") or {}
+        candidates = checkpoint.get("candidates") or []
+        snapshots = project.get("source_selection_snapshots") or []
+        latest_selection = snapshots[-1] if snapshots else {}
+        summary_columns = st.columns(3)
+        summary_columns[0].metric("搜索候选资料", len(candidates))
+        summary_columns[1].metric("用户保留资料", len(latest_selection.get("kept_candidate_ids") or []))
+        summary_columns[2].metric("正式证据", len(evidence))
+        st.markdown("### A. 搜索候选资料")
+        st.caption("候选资料仍不是正式科研证据，必须经过人工选择、内容提取和来源验证。")
+        for item in candidates:
+            st.markdown(f"- {item.get('title') or item.get('url') or '未命名来源'}")
+        st.markdown("### B. 用户保留资料")
+        kept_ids = set(latest_selection.get("kept_candidate_ids") or [])
+        kept_candidates = [item for item in candidates if item.get("candidate_id") in kept_ids]
+        if kept_candidates:
+            for item in kept_candidates:
+                st.markdown(f"- {item.get('title') or item.get('url') or '未命名来源'}")
+        else:
+            st.caption("尚未提交人工来源选择。")
+        st.markdown("### C. 正式证据")
         for item in evidence:
             title = item.get("title") or "未命名来源"
             url = item.get("source_url")
@@ -646,6 +681,8 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
                 st.write(f"验证状态：{'已验证' if item.get('verified') else '待验证'}")
                 if url:
                     st.markdown(f"[查看原始来源]({url})")
+        if not evidence:
+            st.caption("尚未形成经过验证的正式 Evidence。")
     with tabs[2]:
         claims = project.get("claims") or []
         if not claims:
@@ -745,6 +782,226 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
             artifact_rows = [{"type": item.get("artifact_type"), "file": item.get("filename"), "version": item.get("version")} for item in normalize_records(artifacts)]
             if artifact_rows:
                 st.dataframe(artifact_rows, use_container_width=True, hide_index=True)
+
+
+def _render_evidence_curation_gate(
+    backend_url: str, project: dict, job_running: bool, show_debug: bool
+) -> None:
+    phase = project.get("phase")
+    project_id = project.get("project_id")
+    if phase == "SEARCH_PLAN_REVIEW":
+        checkpoint = project.get("background_research_checkpoint") or {}
+        plan = checkpoint.get("search_plan") or {}
+        st.subheader("检索方案审查")
+        st.markdown(f"**当前研究问题：** {(project.get('question') or {}).get('normalized_question') or project.get('objective')}")
+        status = plan.get("relevance_status")
+        if status == "irrelevant":
+            st.error("系统检测到检索方案可能偏离研究问题。请修改检索式或重新生成。")
+        elif status == "partially_relevant":
+            st.warning("检索方案只覆盖了部分核心概念，请重点核对。")
+        else:
+            st.info("AI 建议使用以下检索方案。联网搜索尚未开始。")
+        _render_named_list("目标来源类型", plan.get("target_source_types") or [])
+        _render_named_list("目标数据库", plan.get("preferred_databases") or [])
+        _render_named_list("时间范围", plan.get("date_constraints") or [])
+        st.markdown(f"**设计理由：** {plan.get('rationale') or '尚未说明'}")
+        queries_text = st.text_area(
+            "检索式（每行一条，可直接修改）",
+            value="\n".join(plan.get("queries") or []),
+            key=f"search_plan_queries_{project_id}_{plan.get('search_plan_id')}",
+            height=160,
+        )
+        auto_future = st.checkbox(
+            "以后本项目自动批准相关性检查通过的检索方案",
+            value=bool(project.get("auto_approve_search_plan")),
+            key=f"search_plan_auto_{project_id}",
+        )
+        columns = st.columns(2)
+        if columns[0].button(
+            "批准并开始检索",
+            type="primary",
+            disabled=job_running,
+            key=f"approve_search_plan_{project_id}",
+        ):
+            _research_action(
+                backend_url,
+                f"/api/research/{project_id}/search-plan/approve",
+                {
+                    "queries": [line.strip() for line in queries_text.splitlines() if line.strip()],
+                    "auto_approve_future": auto_future,
+                },
+            )
+        if columns[1].button(
+            "重新生成检索计划", disabled=job_running, key=f"regenerate_search_plan_{project_id}"
+        ):
+            _research_action(backend_url, f"/api/research/{project_id}/search-plan/regenerate", {})
+        if show_debug:
+            with st.expander("检索方案绑定信息（开发者）"):
+                render_debug_object(
+                    {
+                        "project_id": plan.get("project_id"),
+                        "question_hash": plan.get("question_hash"),
+                        "version": plan.get("version"),
+                        "planner_model": plan.get("planner_model"),
+                        "relevance_note": plan.get("relevance_note"),
+                    }
+                )
+
+    if phase == "HUMAN_SOURCE_REVIEW":
+        checkpoint = project.get("background_research_checkpoint") or {}
+        candidates = checkpoint.get("candidates") or []
+        recommended = [item for item in candidates if item.get("ai_recommendation") == "keep"]
+        excluded = [item for item in candidates if item.get("ai_recommendation") == "reject"]
+        st.subheader("候选资料审查")
+        summary = st.columns(3)
+        summary[0].metric("候选来源", len(candidates))
+        summary[1].metric("AI 初步推荐", len(recommended))
+        summary[2].metric("正式证据", len(project.get("evidence") or []))
+        st.info("AI 负责发现和说明资料，最终是否采用由你决定。只有保留的来源才会进入正式提取和验证。")
+        for item in [*recommended, *[x for x in candidates if x not in recommended and x not in excluded]]:
+            _render_source_candidate_card(project_id, item, initially_expanded=item in recommended)
+        if excluded:
+            with st.expander(f"AI 建议排除（{len(excluded)}）"):
+                for item in excluded:
+                    _render_source_candidate_card(project_id, item, initially_expanded=False)
+
+        with st.expander("添加我自己的资料"):
+            source_entries = st.text_area(
+                "每行输入一个 DOI、PMID、arXiv ID、URL、论文标题或正式引用",
+                key=f"human_sources_{project_id}",
+            )
+            if st.button("登记人工来源", key=f"add_human_sources_{project_id}"):
+                _research_action(
+                    backend_url,
+                    f"/api/research/{project_id}/human-sources",
+                    {"entries": [line.strip() for line in source_entries.splitlines() if line.strip()]},
+                )
+            upload = st.file_uploader(
+                "上传 PDF / Markdown / TXT",
+                type=["pdf", "md", "txt"],
+                key=f"research_asset_upload_{project_id}",
+            )
+            if upload and st.button("保存文件", key=f"save_research_asset_{project_id}"):
+                try:
+                    result = post_json(
+                        backend_url,
+                        f"/api/research/{project_id}/research-assets",
+                        {
+                            "filename": upload.name,
+                            "content_type": upload.type or "application/octet-stream",
+                            "content_base64": base64.b64encode(upload.getvalue()).decode("ascii"),
+                        },
+                    )
+                    st.success(result.get("message", "文件已保存。"))
+                    refresh_research_project(backend_url)
+                except BackendAPIError as exc:
+                    st.error(exc.detail)
+
+        note = st.text_area("本次资料筛选说明（可选）", key=f"source_selection_note_{project_id}")
+        action_columns = st.columns(3)
+        if action_columns[0].button(
+            "保留选中资料并继续",
+            type="primary",
+            disabled=job_running or not candidates,
+            key=f"submit_source_selection_{project_id}",
+        ):
+            decisions = []
+            for item in candidates:
+                candidate_id = item.get("candidate_id")
+                decision = st.session_state.get(
+                    f"source_decision_{project_id}_{candidate_id}",
+                    _source_default_decision(item),
+                )
+                decisions.append(
+                    {
+                        "candidate_id": candidate_id,
+                        "decision": decision,
+                        "note": st.session_state.get(f"source_note_{project_id}_{candidate_id}", ""),
+                        "rejection_reason": st.session_state.get(
+                            f"source_rejection_{project_id}_{candidate_id}", ""
+                        ) if decision == "reject" else "",
+                    }
+                )
+            _research_action(
+                backend_url,
+                f"/api/research/{project_id}/source-selection",
+                {"decisions": decisions, "selection_note": note},
+            )
+        if action_columns[1].button(
+            "重新检索", disabled=job_running, key=f"research_sources_again_{project_id}"
+        ):
+            _research_action(backend_url, f"/api/research/{project_id}/search-plan/regenerate", {})
+        if action_columns[2].button(
+            "暂时停止研究", disabled=job_running, key=f"pause_source_review_{project_id}"
+        ):
+            st.info("项目保持在候选资料审查阶段，不会自动继续。")
+        if show_debug:
+            with st.expander("候选来源内部结构（开发者）"):
+                render_debug_object(candidates)
+
+
+def _render_source_candidate_card(project_id: str, item: dict, initially_expanded: bool) -> None:
+    candidate_id = item.get("candidate_id")
+    title = item.get("title") or item.get("url") or "未命名来源"
+    with st.expander(title, expanded=initially_expanded):
+        metadata = [
+            item.get("journal_or_publisher") or item.get("source_domain") or "来源待核对",
+            item.get("publication_year") or "年份未知",
+            item.get("source_type") or "类型未知",
+        ]
+        st.caption(" · ".join(metadata))
+        identifiers = []
+        if item.get("doi"):
+            identifiers.append(f"DOI: {item['doi']}")
+        if item.get("pmid"):
+            identifiers.append(f"PMID: {item['pmid']}")
+        if item.get("arxiv_id"):
+            identifiers.append(f"arXiv: {item['arxiv_id']}")
+        if identifiers:
+            st.write("；".join(identifiers))
+        st.markdown(f"**AI 摘要：** {item.get('ai_summary') or item.get('snippet') or '暂无摘要'}")
+        recommendation_label = {"keep": "建议保留", "reject": "建议排除", "uncertain": "需要人工判断"}.get(
+            item.get("ai_recommendation"), "需要人工判断"
+        )
+        st.markdown(f"**AI 判断：** {recommendation_label}")
+        st.markdown(f"**为什么：** {item.get('recommendation_reason') or '尚未说明'}")
+        st.caption(
+            f"相关性：{_relevance_label(item.get('relevance_score', 0))}；"
+            f"验证状态：{_verification_label(item.get('verification_status'))}"
+        )
+        if item.get("url"):
+            st.markdown(f"[打开来源]({item['url']})")
+        decision = st.radio(
+            "处理决定",
+            ["keep", "reject", "defer"],
+            index=["keep", "reject", "defer"].index(_source_default_decision(item)),
+            format_func=lambda value: {"keep": "保留", "reject": "不保留", "defer": "暂缓决定"}[value],
+            horizontal=True,
+            key=f"source_decision_{project_id}_{candidate_id}",
+        )
+        if decision == "reject":
+            st.selectbox(
+                "排除原因",
+                ["主题无关", "来源不可信", "不是一级研究", "重复来源", "不符合PICO", "内容不可访问", "用户认为质量不足", "其他"],
+                key=f"source_rejection_{project_id}_{candidate_id}",
+            )
+        st.text_input("备注（可选）", key=f"source_note_{project_id}_{candidate_id}")
+
+
+def _source_default_decision(item: dict) -> str:
+    return {"keep": "keep", "reject": "reject", "uncertain": "defer"}.get(
+        item.get("ai_recommendation"), "defer"
+    )
+
+
+def _relevance_label(value: float) -> str:
+    return "高" if value >= 0.66 else "中" if value >= 0.33 else "低"
+
+
+def _verification_label(value: str | None) -> str:
+    return {"verified": "已验证", "partially_verified": "部分验证", "unverified": "待验证"}.get(
+        value or "", "待核对"
+    )
 
 
 def _render_named_list(title: str, items: list) -> None:

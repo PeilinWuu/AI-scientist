@@ -5,6 +5,7 @@ import pytest
 from src.ai_scientist.agents.base_agent import AgentRun
 from src.ai_scientist.agents.evidence_researcher import EvidenceResearcherAgent
 from src.ai_scientist.domain_resolution import resolve_domain
+from src.ai_scientist.exceptions import AIScientistError
 from src.ai_scientist.orchestrator import ResearchOrchestrator
 from src.ai_scientist.schemas import (
     Claim,
@@ -14,6 +15,7 @@ from src.ai_scientist.schemas import (
     ResearchPhase,
     ResearchQuestion,
     SearchAcquisitionResult,
+    SearchPlan,
 )
 from src.ai_scientist.skill_loader import SkillLoader
 from src.ai_scientist.structured_client import StructuredCallMetadata, StructuredCallResult
@@ -169,7 +171,7 @@ def test_evidence_search_uses_explicit_model_and_no_previous_response_id() -> No
     assert captured["previous_response_id"] is None
 
 
-def test_background_research_checkpoint_reaches_claim_mapping(
+def test_legacy_background_research_cannot_bypass_human_curation(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
@@ -220,21 +222,17 @@ def test_background_research_checkpoint_reaches_claim_mapping(
 
     monkeypatch.setattr("src.ai_scientist.orchestrator.EvidenceResearcherAgent", FakeEvidenceResearcher)
 
-    result = orchestrator.run_next_step(project.project_id)
+    with pytest.raises(AIScientistError, match="human-curation interface"):
+        orchestrator.run_next_step(project.project_id)
     updated = orchestrator.get_project(project.project_id)
-    events = orchestrator.list_events(project.project_id)
-
-    assert result["current_phase"] == ResearchPhase.CLAIM_EVIDENCE_MAPPING.value
-    assert updated.domain == "biology"
-    assert updated.background_research_checkpoint.search_completed is True
-    assert updated.background_research_checkpoint.normalization_completed is True
-    assert updated.background_research_checkpoint.search_artifact_id
-    assert FakeEvidenceResearcher.acquire_calls == 1
-    assert "search_acquisition_completed" in {event.status for event in events}
-    assert "evidence_normalization_completed" in {event.status for event in events}
+    assert updated.phase == ResearchPhase.BACKGROUND_RESEARCH
+    assert updated.domain == "molecular_biology"
+    assert updated.background_research_checkpoint.search_completed is False
+    assert FakeEvidenceResearcher.acquire_calls == 0
 
 
 def test_bad_request_records_attempted_and_resolved_model(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("AI_SCIENTIST_SEARCH_ACQUISITION_MODEL", "bad-search-model")
     orchestrator = ResearchOrchestrator(tmp_path)
     project = orchestrator.create_project(
         "Bad request diagnostics",
@@ -249,7 +247,13 @@ def test_bad_request_records_attempted_and_resolved_model(tmp_path: Path, monkey
         def __init__(self, *args, **kwargs):
             pass
 
-        def acquire_search(self, project_arg, search_model):
+        def plan_search(self, project_arg):
+            return AgentRun(
+                output=SearchPlan(queries=["bad request diagnostics evidence"]),
+                metadata=metadata(),
+            )
+
+        def search_one_query(self, query, search_model):
             exc = RuntimeError("BadRequestError: unsupported model/tool")
             exc.requested_model = search_model
             exc.actual_model = search_model
@@ -263,13 +267,16 @@ def test_bad_request_records_attempted_and_resolved_model(tmp_path: Path, monkey
 
     monkeypatch.setattr("src.ai_scientist.orchestrator.EvidenceResearcherAgent", FakeEvidenceResearcher)
 
+    orchestrator.run_next_step(project.project_id)
+    orchestrator.approve_search_plan(project.project_id)
     with pytest.raises(RuntimeError):
         orchestrator.run_next_step(project.project_id)
     updated = orchestrator.get_project(project.project_id)
     events = orchestrator.list_events(project.project_id)
     failed = events[-1]
 
-    assert updated.budget.attempted_model_calls == 1
+    assert updated.budget.attempted_model_calls == 2
+    assert updated.budget.successful_model_calls == 1
     assert updated.budget.failed_model_calls == 1
     assert failed.requested_model == "bad-search-model"
     assert failed.actual_model == "bad-search-model"

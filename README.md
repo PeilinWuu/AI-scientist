@@ -68,7 +68,9 @@ The current release can:
 - run independent review;
 - synthesize an approved planning-only research report.
 
-Evidence acquisition is bounded and resumable. Evidence Researcher first creates an offline `SearchPlan`, runs each query independently with `web_search` only, deterministically selects a limited source set, extracts selected URLs in small streaming batches, and finally normalizes evidence without network tools. Versioned `search_checkpoint_vN.json` artifacts prevent completed queries from being repeated after interruption.
+Evidence acquisition is bounded, resumable, and human-curated. Evidence Researcher first creates an offline `SearchPlan` bound to the project and active research-question hash. In the default `ASSISTED` mode, the researcher must approve or edit that plan before any network request. Bounded queries then create `SourceCandidate` records, not evidence. The UI shows source metadata, AI recommendations, relevance, and verification signals; a human decides which candidates to keep, reject, or defer. Only kept candidates are extracted in small streaming batches, verified, and normalized into formal `EvidenceItem` records. Versioned checkpoints are bound to `project_id`, `question_hash`, and `search_plan_id`, so a plan or checkpoint cannot cross projects or questions.
+
+The governing rule is: **AI discovers sources, the researcher decides whether to adopt them, and the system verifies and builds the evidence chain.** Search results never become evidence automatically in `ASSISTED` or `MANUAL` mode. Uploaded PDF, Markdown, and TXT files are currently registered as research assets only; this release does not pretend to parse or analyze them.
 
 The current release does not connect a real laboratory, simulation, code-execution, or statistical-analysis backend. `ExecutionAdapter.execute()` raises `NotImplementedError`. Without a real backend, projects wait for human data or execution and do not generate experimental data, analysis results, or scientific conclusions. Planning-only synthesis explicitly states that the plan has not been executed.
 
@@ -143,6 +145,8 @@ AI_SCIENTIST_MAX_SEARCH_QUERIES=4
 AI_SCIENTIST_MAX_SEARCH_RESULTS_PER_QUERY=5
 AI_SCIENTIST_MAX_EXTRACTED_SOURCES=8
 AI_SCIENTIST_MIN_USABLE_SOURCES=3
+AI_SCIENTIST_MIN_CURATED_SOURCES=1
+AI_SCIENTIST_MIN_VERIFIED_EVIDENCE=1
 AI_SCIENTIST_SEARCH_ACQUISITION_MODEL=
 AI_SCIENTIST_SEARCH_FALLBACK_MODEL=
 ```
@@ -226,6 +230,13 @@ Inspect or control the project:
 ```text
 GET  /api/research/{project_id}
 POST /api/research/{project_id}/approve
+GET  /api/research/{project_id}/search-plan
+POST /api/research/{project_id}/search-plan/approve
+POST /api/research/{project_id}/search-plan/regenerate
+GET  /api/research/{project_id}/source-candidates
+POST /api/research/{project_id}/source-selection
+POST /api/research/{project_id}/human-sources
+POST /api/research/{project_id}/research-assets
 POST /api/research/{project_id}/revise
 POST /api/research/{project_id}/provide-data
 POST /api/research/{project_id}/cancel

@@ -28,11 +28,24 @@ from src.ai_scientist.domain_resolution import resolve_domain
 from src.ai_scientist.domain_router import DomainRouter
 from src.ai_scientist.events import completed_event
 from src.ai_scientist.evidence_verifier import verify_evidence_collection
+from src.ai_scientist.evidence_curation import (
+    bind_search_plan,
+    compute_question_hash,
+    deterministic_plan_relevance,
+    enrich_candidates,
+    parse_human_source,
+    research_question_version,
+    summarize_source_feedback,
+    validate_checkpoint_binding,
+    validate_search_plan_binding,
+)
 from src.ai_scientist.exceptions import (
     AIScientistError,
     BudgetExceededError,
     InvalidEvidenceReferenceError,
     InvalidTransitionError,
+    InsufficientEvidenceForClaimMapping,
+    StaleSearchPlanError,
 )
 from src.ai_scientist.method_selector import MethodSelector
 from src.ai_scientist.model_registry import ModelRegistry
@@ -53,16 +66,24 @@ from src.ai_scientist.quality import apply_reviewer_quality_gates, compute_quali
 from src.ai_scientist.report_writer import build_research_plan_json, build_research_plan_markdown
 from src.ai_scientist.schemas import (
     AnalysisPlan,
+    BackgroundResearchCheckpoint,
     Claim,
     ClaimEvidenceMappingResult,
     DomainSelectionOutput,
     EvidenceCollection,
+    EvidenceReviewMode,
     EvidenceResearchOutput,
     EvidenceItem,
     SearchAcquisitionResult,
     SearchCandidate,
     SearchPlan,
     SearchQueryRecord,
+    CuratedSource,
+    ResearchAsset,
+    SourceCandidateCollection,
+    SourceDecisionInput,
+    SourceSelectionSnapshot,
+    SelectionProvenance,
     Hypothesis,
     HumanApprovalRecord,
     HumanRevisionRecord,
@@ -111,6 +132,7 @@ class ResearchOrchestrator:
         model_overrides: dict[str, str | None] | None = None,
         max_iterations: int = 2,
         planning_only: bool = True,
+        evidence_review_mode: EvidenceReviewMode = "ASSISTED",
     ) -> ResearchProject:
         max_calls = int(os.getenv("AI_SCIENTIST_MAX_MODEL_CALLS", "50"))
         project = ResearchProject(
@@ -121,6 +143,7 @@ class ResearchOrchestrator:
             model_overrides=normalize_model_overrides(model_overrides),
             max_iterations=max_iterations,
             planning_only=planning_only,
+            evidence_review_mode=evidence_review_mode,
             budget={
                 "max_model_calls": max_calls,
                 "max_iterations": max_iterations,
@@ -207,7 +230,16 @@ class ResearchOrchestrator:
                 self.state_machine.transition(project, "next")
             elif project.phase == ResearchPhase.BACKGROUND_RESEARCH:
                 produced_artifacts += self._run_background_research(project, previous_phase)
-                self.state_machine.transition(project, "next")
+                if project.phase == ResearchPhase.BACKGROUND_RESEARCH:
+                    self.state_machine.transition(project, "next")
+                elif project.phase == ResearchPhase.SEARCH_PLAN_REVIEW:
+                    stage_status = "awaiting_search_plan_review"
+                elif project.phase == ResearchPhase.HUMAN_SOURCE_REVIEW:
+                    stage_status = "awaiting_human_source_review"
+            elif project.phase == ResearchPhase.SEARCH_PLAN_REVIEW:
+                stage_status = "awaiting_search_plan_review"
+            elif project.phase == ResearchPhase.HUMAN_SOURCE_REVIEW:
+                stage_status = "awaiting_human_source_review"
             elif project.phase == ResearchPhase.CLAIM_EVIDENCE_MAPPING:
                 produced_artifacts += self._execute_claim_evidence_mapping(project, previous_phase)
             elif project.phase == ResearchPhase.HYPOTHESIS_GENERATION:
@@ -365,6 +397,226 @@ class ResearchOrchestrator:
             "iteration": project.iteration,
             "max_revision_exhausted": max_revision_exhausted,
         }
+
+    def approve_search_plan(
+        self,
+        project_id: str,
+        queries: list[str] | None = None,
+        auto_approve_future: bool = False,
+    ) -> ResearchProject:
+        project = self.get_project(project_id)
+        if project.phase != ResearchPhase.SEARCH_PLAN_REVIEW:
+            raise InvalidTransitionError("Search plan can only be approved from SEARCH_PLAN_REVIEW.")
+        checkpoint = project.background_research_checkpoint
+        if checkpoint.search_plan is None:
+            raise AIScientistError("No search plan is available for review.")
+        plan = checkpoint.search_plan
+        if queries is not None:
+            plan = type(plan).model_validate(
+                {
+                    **plan.model_dump(mode="json"),
+                    "queries": queries,
+                    "approved_at": None,
+                    "approved_by": None,
+                }
+            )
+        validate_search_plan_binding(project, plan)
+        relevance_status, relevance_note = deterministic_plan_relevance(project, plan)
+        if relevance_status == "irrelevant":
+            checkpoint.search_plan = plan.model_copy(
+                update={"relevance_status": relevance_status, "relevance_note": relevance_note}
+            )
+            self.store.save(project)
+            raise InvalidTransitionError(
+                "The reviewed search plan still does not cover the active research question."
+            )
+        plan = plan.model_copy(
+            update={
+                "relevance_status": relevance_status,
+                "relevance_note": relevance_note,
+                "approved_at": utc_now(),
+                "approved_by": "human",
+            }
+        )
+        checkpoint.search_plan = plan
+        checkpoint.search_plan_approved = True
+        checkpoint.awaiting_search_plan_review = False
+        project.auto_approve_search_plan = auto_approve_future
+        if project.search_plan_history and project.search_plan_history[-1].search_plan_id == plan.search_plan_id:
+            project.search_plan_history[-1] = plan
+        project.phase = ResearchPhase.BACKGROUND_RESEARCH
+        self._save_search_checkpoint(project, checkpoint)
+        self._append_event(
+            project,
+            completed_event(
+                project.project_id,
+                ResearchPhase.SEARCH_PLAN_REVIEW,
+                "human_reviewer",
+                status="search_plan_approved",
+                visibility="user",
+                display_key=f"search_plan_approved_v{plan.version}",
+                display_markdown="检索方案已由研究者确认，下一阶段将执行有界联网检索。",
+            ),
+        )
+        self.store.save(project)
+        return project
+
+    def regenerate_search_plan(self, project_id: str) -> ResearchProject:
+        project = self.get_project(project_id)
+        if project.phase not in {ResearchPhase.SEARCH_PLAN_REVIEW, ResearchPhase.HUMAN_SOURCE_REVIEW}:
+            raise InvalidTransitionError("Search can only be regenerated from a source-review phase.")
+        project.background_research_checkpoint = BackgroundResearchCheckpoint()
+        project.curated_sources = []
+        project.phase = ResearchPhase.BACKGROUND_RESEARCH
+        self._append_event(
+            project,
+            completed_event(
+                project.project_id,
+                ResearchPhase.SEARCH_PLAN_REVIEW,
+                "human_reviewer",
+                status="search_plan_regeneration_requested",
+                visibility="user",
+                display_key=f"search_plan_regenerate_{len(project.search_plan_history)}",
+                display_markdown="研究者要求重新生成检索方案；既有计划历史和来源排除理由已保留。",
+            ),
+        )
+        self.store.save(project)
+        return project
+
+    def add_human_sources(self, project_id: str, entries: list[str]) -> ResearchProject:
+        project = self.get_project(project_id)
+        if project.phase != ResearchPhase.HUMAN_SOURCE_REVIEW:
+            raise InvalidTransitionError("Sources can only be added during HUMAN_SOURCE_REVIEW.")
+        checkpoint = project.background_research_checkpoint
+        existing = {item.url or item.title.lower() for item in checkpoint.candidates}
+        added = []
+        for index, entry in enumerate(entries, start=len(checkpoint.candidates) + 1):
+            if not entry.strip():
+                continue
+            candidate = parse_human_source(entry, index)
+            key = candidate.url or candidate.title.lower()
+            if key in existing:
+                continue
+            existing.add(key)
+            added.append(candidate)
+        checkpoint.candidates.extend(enrich_candidates(project, added))
+        if project.source_candidate_collections:
+            project.source_candidate_collections[-1].candidates = list(checkpoint.candidates)
+        self._save_search_checkpoint(project, checkpoint)
+        self.store.save(project)
+        return project
+
+    def submit_source_selection(
+        self,
+        project_id: str,
+        decisions: list[SourceDecisionInput],
+        selection_note: str = "",
+    ) -> ResearchProject:
+        project = self.get_project(project_id)
+        if project.phase != ResearchPhase.HUMAN_SOURCE_REVIEW:
+            raise InvalidTransitionError("Source selection is only allowed during HUMAN_SOURCE_REVIEW.")
+        checkpoint = project.background_research_checkpoint
+        validate_checkpoint_binding(project)
+        candidates = {item.candidate_id: item for item in checkpoint.candidates}
+        unknown = [item.candidate_id for item in decisions if item.candidate_id not in candidates]
+        if unknown:
+            raise ValueError(f"Unknown candidate IDs: {', '.join(unknown)}")
+        curated = [
+            CuratedSource(
+                candidate_id=item.candidate_id,
+                decision=item.decision,
+                decided_by="human",
+                human_note=item.note,
+                rejection_reason=item.rejection_reason,
+            )
+            for item in decisions
+        ]
+        decided_ids = {item.candidate_id for item in curated}
+        curated.extend(
+            CuratedSource(candidate_id=candidate_id, decision="defer", decided_by="human")
+            for candidate_id in candidates
+            if candidate_id not in decided_ids
+        )
+        kept_ids = [item.candidate_id for item in curated if item.decision == "keep"]
+        minimum = max(1, int(os.getenv("AI_SCIENTIST_MIN_CURATED_SOURCES", "1")))
+        if len(kept_ids) < minimum:
+            raise ValueError(f"At least {minimum} curated source(s) must be kept before continuing.")
+        human_ids = [candidate_id for candidate_id in kept_ids if candidates[candidate_id].human_provided]
+        snapshot = SourceSelectionSnapshot(
+            project_id=project.project_id,
+            iteration=project.iteration,
+            research_question_version=research_question_version(project),
+            search_plan_version=checkpoint.search_plan.version if checkpoint.search_plan else 1,
+            kept_candidate_ids=kept_ids,
+            rejected_candidate_ids=[item.candidate_id for item in curated if item.decision == "reject"],
+            deferred_candidate_ids=[item.candidate_id for item in curated if item.decision == "defer"],
+            human_added_source_ids=human_ids,
+            decisions=curated,
+            selection_note=selection_note,
+        )
+        project.curated_sources.extend(curated)
+        project.source_selection_snapshots.append(snapshot)
+        project.source_review_feedback = summarize_source_feedback(curated)
+        checkpoint.selected_candidates = [
+            candidates[candidate_id].model_copy(
+                update={"extraction_status": "pending", "extracted_text": "", "extraction_error": ""}
+            )
+            for candidate_id in kept_ids
+        ]
+        checkpoint.source_selection_id = snapshot.selection_id
+        checkpoint.source_selection_completed = True
+        checkpoint.awaiting_source_review = False
+        checkpoint.extraction_completed = False
+        project.phase = ResearchPhase.BACKGROUND_RESEARCH
+        record = self.artifacts.save_json(
+            project.project_id,
+            "source_selection_snapshot",
+            snapshot.model_dump(mode="json"),
+            "human",
+        )
+        project.artifacts.append(record)
+        self._save_search_checkpoint(project, checkpoint)
+        self._append_event(
+            project,
+            completed_event(
+                project.project_id,
+                ResearchPhase.HUMAN_SOURCE_REVIEW,
+                "human_reviewer",
+                status="source_selection_submitted",
+                visibility="user",
+                display_key=f"source_selection_{snapshot.selection_id}",
+                display_markdown=(
+                    f"研究者保留{len(snapshot.kept_candidate_ids)}个来源，排除"
+                    f"{len(snapshot.rejected_candidate_ids)}个，暂缓{len(snapshot.deferred_candidate_ids)}个。"
+                ),
+            ),
+        )
+        self.store.save(project)
+        return project
+
+    def register_research_asset(
+        self, project_id: str, filename: str, content_type: str, content: bytes
+    ) -> ResearchProject:
+        project = self.get_project(project_id)
+        safe_name = Path(filename).name
+        suffix = Path(safe_name).suffix.lower()
+        if suffix not in {".pdf", ".md", ".txt"}:
+            raise ValueError("Only PDF, Markdown, and TXT assets can be registered.")
+        directory = self.store.project_dir(project_id) / "assets"
+        directory.mkdir(parents=True, exist_ok=True)
+        target = directory / f"{new_id('asset_file')}{suffix}"
+        target.write_bytes(content)
+        project.research_assets.append(
+            ResearchAsset(
+                filename=safe_name,
+                content_type=content_type,
+                saved_path=str(target.relative_to(self.store.project_dir(project_id))),
+                size_bytes=len(content),
+                parsing_status="registered_only",
+            )
+        )
+        self.store.save(project)
+        return project
 
     def approve_project(
         self,
@@ -741,6 +993,18 @@ class ResearchOrchestrator:
         project = self.get_project(project_id).model_copy(deep=True)
         try:
             collection = self._latest_evidence_collection(project)
+            if not collection.evidence_items:
+                return {
+                    "status": "insufficient_evidence",
+                    "message": "当前没有可进入主张分析的有效证据。",
+                    "debug": {
+                        "evidence_count": 0,
+                        "claim_count": 0,
+                        "invalid_reference_count": 0,
+                        "schema_valid": True,
+                        "model_called": False,
+                    },
+                }
             self._validate_evidence_ids(collection)
             mapping, metadata = self._run_claim_mapping(project, collection, track_failure_budget=False)
             claims = self._canonicalize_claim_mapping(mapping, collection)
@@ -806,7 +1070,9 @@ class ResearchOrchestrator:
 
     def _run_background_research(self, project: ResearchProject, phase: ResearchPhase) -> list[str]:
         if not hasattr(EvidenceResearcherAgent, "search_one_query"):
-            return self._run_background_research_legacy(project, phase)
+            raise AIScientistError(
+                "Evidence Researcher does not implement the required human-curation interface."
+            )
         produced: list[str] = []
         agent = EvidenceResearcherAgent(client=self._structured_client_for_project(project))
         resolution = project.domain_resolution or resolve_domain(project.domain, project.secondary_domains)
@@ -837,6 +1103,8 @@ class ResearchOrchestrator:
         )
 
         checkpoint = project.background_research_checkpoint
+        if checkpoint.search_plan is not None:
+            validate_checkpoint_binding(project)
         invocation_started = time.monotonic()
         elapsed_before_invocation = checkpoint.elapsed_seconds
         total_budget = float(os.getenv("AI_SCIENTIST_SEARCH_TOTAL_BUDGET", "600"))
@@ -874,7 +1142,33 @@ class ResearchOrchestrator:
                 self.store.save(project)
                 raise
             self._apply_call_metadata(project, plan_run.metadata)
-            checkpoint.search_plan = plan_run.output
+            plan = bind_search_plan(project, plan_run.output, plan_run.metadata.actual_model)
+            deterministic_status, deterministic_note = deterministic_plan_relevance(project, plan)
+            semantic_note = ""
+            if deterministic_status != "irrelevant" and hasattr(agent, "validate_search_plan_semantics"):
+                semantic_run = agent.validate_search_plan_semantics(project, plan)
+                self._apply_call_metadata(project, semantic_run.metadata)
+                semantic_status = semantic_run.output.status
+                semantic_note = semantic_run.output.reason
+                status_order = {"relevant": 0, "partially_relevant": 1, "irrelevant": 2}
+                relevance_status = max(
+                    [deterministic_status, semantic_status], key=lambda value: status_order[value]
+                )
+            else:
+                relevance_status = deterministic_status
+            plan = plan.model_copy(
+                update={
+                    "relevance_status": relevance_status,
+                    "relevance_note": " ".join(item for item in [deterministic_note, semantic_note] if item),
+                }
+            )
+            checkpoint.search_plan = plan
+            checkpoint.project_id = project.project_id
+            checkpoint.question_hash = plan.question_hash
+            checkpoint.search_plan_id = plan.search_plan_id
+            checkpoint.awaiting_search_plan_review = True
+            checkpoint.search_plan_approved = False
+            project.search_plan_history.append(plan)
             self._append_event(
                 project,
                 completed_event(
@@ -883,15 +1177,46 @@ class ResearchOrchestrator:
                     "evidence_researcher",
                     status="search_plan_completed",
                     stage_substep="search_planning",
-                    query_count=len(plan_run.output.queries),
+                    query_count=len(plan.queries),
                     requested_model=plan_run.metadata.requested_model,
                     actual_model=plan_run.metadata.actual_model,
                     fallback_used=plan_run.metadata.fallback_used,
                 ),
             )
             produced += self._save_search_checkpoint(project, checkpoint)
+            if project.evidence_review_mode != "AUTO" and not project.auto_approve_search_plan:
+                project.phase = ResearchPhase.SEARCH_PLAN_REVIEW
+                self._append_event(
+                    project,
+                    completed_event(
+                        project.project_id,
+                        phase,
+                        "evidence_researcher",
+                        status="search_plan_review_required",
+                        visibility="user",
+                        display_key=f"search_plan_review_v{plan.version}",
+                        display_markdown=(
+                            "AI 已生成检索方案，请核对检索式是否针对当前研究问题。"
+                            if relevance_status != "irrelevant"
+                            else "系统生成的检索方案可能偏离研究问题，请重新生成或人工修改。"
+                        ),
+                    ),
+                )
+                return produced
+            if relevance_status == "irrelevant":
+                project.phase = ResearchPhase.SEARCH_PLAN_REVIEW
+                return produced
+            checkpoint.search_plan = plan.model_copy(update={"approved_at": utc_now(), "approved_by": "system"})
+            checkpoint.awaiting_search_plan_review = False
+            checkpoint.search_plan_approved = True
+
+        validate_search_plan_binding(project, checkpoint.search_plan)
+        if not checkpoint.search_plan_approved:
+            project.phase = ResearchPhase.SEARCH_PLAN_REVIEW
+            return produced
 
         records_by_query = {item.query: item for item in checkpoint.query_records}
+        last_search_exception: Exception | None = None
         for query in checkpoint.search_plan.queries:
             if records_by_query.get(query) and records_by_query[query].status == "completed":
                 continue
@@ -919,6 +1244,7 @@ class ResearchOrchestrator:
                 result = agent.search_one_query(query, requested_search_model)
                 status = "completed"
             except Exception as exc:
+                last_search_exception = exc
                 original_error = self._sanitize_text(str(exc))
                 if self._is_timeout_error(exc) and fallback_search_model and fallback_search_model != requested_search_model:
                     actual_model = fallback_search_model
@@ -927,6 +1253,7 @@ class ResearchOrchestrator:
                         result = agent.search_one_query(query, fallback_search_model)
                         status = "completed"
                     except Exception as fallback_exc:
+                        last_search_exception = fallback_exc
                         original_error = self._sanitize_text(str(fallback_exc))
                         status = "timeout" if self._is_timeout_error(fallback_exc) else "failed"
                         result = {"candidates": []}
@@ -980,6 +1307,8 @@ class ResearchOrchestrator:
 
         completed_queries = [item for item in checkpoint.query_records if item.status == "completed"]
         if not completed_queries:
+            if last_search_exception is not None:
+                raise last_search_exception
             raise RuntimeError("All bounded evidence search queries failed or timed out.")
         self._append_event(
             project,
@@ -1000,24 +1329,85 @@ class ResearchOrchestrator:
             ),
         )
 
-        if not checkpoint.source_selection_completed:
-            checkpoint.selected_candidates = select_sources(checkpoint.candidates, max_sources)
-            checkpoint.source_selection_completed = True
-            produced += self._save_search_checkpoint(project, checkpoint)
-            self._append_event(
-                project,
-                completed_event(
-                    project.project_id,
-                    phase,
-                    "evidence_researcher",
-                    status="source_selection_completed",
-                    stage_substep="source_selection",
-                    search_result_count=len(checkpoint.selected_candidates),
-                    visibility="user",
-                    display_key="source_selection_completed",
-                    summary_markdown=f"筛选出{len(checkpoint.selected_candidates)}个优先来源。",
-                ),
+        if not checkpoint.awaiting_source_review and not checkpoint.source_selection_completed:
+            deduplicated = select_sources(checkpoint.candidates, maximum=max(1, len(checkpoint.candidates)))
+            checkpoint.candidates = enrich_candidates(project, deduplicated)
+            collection = SourceCandidateCollection(
+                project_id=project.project_id,
+                question_hash=checkpoint.question_hash,
+                search_plan_id=checkpoint.search_plan_id,
+                candidates=checkpoint.candidates,
             )
+            project.source_candidate_collections.append(collection)
+            candidate_record = self.artifacts.save_json(
+                project.project_id,
+                "source_candidate_collection",
+                collection.model_dump(mode="json"),
+                "evidence_researcher",
+            )
+            project.artifacts.append(candidate_record)
+            produced.append(candidate_record.artifact_id)
+            if project.evidence_review_mode == "AUTO":
+                recommended = [item for item in checkpoint.candidates if item.ai_recommendation == "keep"][:max_sources]
+                if recommended:
+                    kept_ids = [item.candidate_id for item in recommended]
+                    auto_decisions = [
+                        CuratedSource(
+                            candidate_id=item.candidate_id,
+                            decision="keep" if item.candidate_id in kept_ids else "reject",
+                            decided_by="system",
+                            rejection_reason="AI recommendation" if item.candidate_id not in kept_ids else "",
+                        )
+                        for item in checkpoint.candidates
+                    ]
+                    snapshot = SourceSelectionSnapshot(
+                        project_id=project.project_id,
+                        iteration=project.iteration,
+                        research_question_version=research_question_version(project),
+                        search_plan_version=checkpoint.search_plan.version,
+                        kept_candidate_ids=kept_ids,
+                        rejected_candidate_ids=[
+                            item.candidate_id for item in checkpoint.candidates if item.candidate_id not in kept_ids
+                        ],
+                        decisions=auto_decisions,
+                        created_by="system",
+                        selection_note="AUTO evidence review mode",
+                    )
+                    project.curated_sources.extend(auto_decisions)
+                    project.source_selection_snapshots.append(snapshot)
+                    checkpoint.selected_candidates = recommended
+                    checkpoint.source_selection_id = snapshot.selection_id
+                    checkpoint.source_selection_completed = True
+                else:
+                    checkpoint.awaiting_source_review = True
+                    project.phase = ResearchPhase.HUMAN_SOURCE_REVIEW
+            else:
+                checkpoint.awaiting_source_review = True
+                project.phase = ResearchPhase.HUMAN_SOURCE_REVIEW
+                produced += self._save_search_checkpoint(project, checkpoint)
+                self._append_event(
+                    project,
+                    completed_event(
+                        project.project_id,
+                        phase,
+                        "evidence_researcher",
+                        status="human_source_review_required",
+                        stage_substep="candidate_source_enrichment",
+                        search_result_count=len(checkpoint.candidates),
+                        visibility="user",
+                        display_key=f"human_source_review_{collection.collection_id}",
+                        summary_markdown=(
+                            f"发现{len(checkpoint.candidates)}个候选来源。AI 建议保留"
+                            f"{len([item for item in checkpoint.candidates if item.ai_recommendation == 'keep'])}个，"
+                            "等待人工确认。"
+                        ),
+                    ),
+                )
+                return produced
+
+        if checkpoint.awaiting_source_review or not checkpoint.source_selection_completed:
+            project.phase = ResearchPhase.HUMAN_SOURCE_REVIEW
+            return produced
 
         extracted_texts: list[str] = []
         pending = [item for item in checkpoint.selected_candidates if item.extraction_status == "pending"]
@@ -1177,6 +1567,34 @@ class ResearchOrchestrator:
         project.evidence, evidence_id_map = self._canonicalize_evidence_ids(
             enrich_evidence_items(verified_collection.evidence_items)
         )
+        latest_selection = project.source_selection_snapshots[-1] if project.source_selection_snapshots else None
+        if latest_selection:
+            candidates_by_url = {item.url: item for item in checkpoint.selected_candidates if item.url}
+            candidates_by_doi = {item.doi: item for item in checkpoint.selected_candidates if item.doi}
+            candidates_by_pmid = {item.pmid: item for item in checkpoint.selected_candidates if item.pmid}
+            project.evidence = [
+                item.model_copy(
+                    update={
+                        "selection_provenance": SelectionProvenance(
+                            selected_by=latest_selection.created_by,
+                            selection_id=latest_selection.selection_id,
+                            candidate_id=(
+                                candidates_by_url.get(item.source_url)
+                                or candidates_by_doi.get(item.doi)
+                                or candidates_by_pmid.get(item.pmid)
+                            ).candidate_id,
+                            verification_method=item.verification_method,
+                        )
+                    }
+                )
+                if (
+                    candidates_by_url.get(item.source_url)
+                    or candidates_by_doi.get(item.doi)
+                    or candidates_by_pmid.get(item.pmid)
+                )
+                else item
+                for item in project.evidence
+            ]
         project.claims = self._remap_claim_evidence_refs(run.output.claims, evidence_id_map)
         project.evidence_gaps = run.output.evidence_gaps
         project.conflicting_evidence = run.output.conflicting_evidence
@@ -1207,6 +1625,28 @@ class ResearchOrchestrator:
                 evidence_count=len(project.evidence),
             ),
         )
+        minimum_verified = max(1, int(os.getenv("AI_SCIENTIST_MIN_VERIFIED_EVIDENCE", "1")))
+        usable_evidence = [
+            item for item in project.evidence
+            if item.verification_status in {"verified", "partially_verified"} and not item.duplicate_of
+        ]
+        if len(usable_evidence) < minimum_verified:
+            checkpoint.awaiting_source_review = True
+            checkpoint.source_selection_completed = False
+            project.phase = ResearchPhase.HUMAN_SOURCE_REVIEW
+            self._append_event(
+                project,
+                completed_event(
+                    project.project_id,
+                    phase,
+                    "evidence_researcher",
+                    status="insufficient_verified_evidence",
+                    visibility="user",
+                    display_key=f"zero_evidence_gate_{len(project.source_selection_snapshots)}",
+                    display_markdown="当前选定资料未形成足够的可验证证据。请调整资料选择、补充来源或重新检索。",
+                    evidence_count=len(usable_evidence),
+                ),
+            )
         return produced
 
     def _run_background_research_legacy(self, project: ResearchProject, phase: ResearchPhase) -> list[str]:
@@ -1273,6 +1713,30 @@ class ResearchOrchestrator:
                 evidence_count=len(project.evidence),
             ),
         )
+        minimum_verified = max(1, int(os.getenv("AI_SCIENTIST_MIN_VERIFIED_EVIDENCE", "1")))
+        usable_evidence = [
+            item for item in project.evidence
+            if item.verification_status in {"verified", "partially_verified"} and not item.duplicate_of
+        ]
+        if len(usable_evidence) < minimum_verified:
+            checkpoint.awaiting_source_review = True
+            checkpoint.source_selection_completed = False
+            project.phase = ResearchPhase.HUMAN_SOURCE_REVIEW
+            self._append_event(
+                project,
+                completed_event(
+                    project.project_id,
+                    phase,
+                    "evidence_researcher",
+                    status="insufficient_verified_evidence",
+                    visibility="user",
+                    display_key=f"zero_evidence_gate_{len(project.source_selection_snapshots)}",
+                    display_markdown=(
+                        "当前选定资料未形成足够的可验证证据。请调整资料选择、补充来源或重新检索。"
+                    ),
+                    evidence_count=len(usable_evidence),
+                ),
+            )
         return produced
 
     def _execute_claim_evidence_mapping(self, project: ResearchProject, phase: ResearchPhase) -> list[str]:
@@ -1289,6 +1753,25 @@ class ResearchOrchestrator:
                 current_substep,
                 evidence_count=len(evidence_collection.evidence_items),
             )
+            if not evidence_collection.evidence_items:
+                project.phase = ResearchPhase.HUMAN_SOURCE_REVIEW
+                project.background_research_checkpoint.awaiting_source_review = True
+                project.background_research_checkpoint.source_selection_completed = False
+                self._append_event(
+                    project,
+                    completed_event(
+                        project.project_id,
+                        phase,
+                        "orchestrator",
+                        status="insufficient_evidence_for_claim_mapping",
+                        visibility="user",
+                        display_key=f"claim_mapping_evidence_gate_{project.iteration}",
+                        display_markdown="当前没有可进入主张分析的有效证据，请重新选择资料、补充来源或重新检索。",
+                        evidence_count=0,
+                    ),
+                )
+                self.store.save(project)
+                return produced
 
             current_substep = "evidence_reference_validation"
             self._claim_mapping_event(project, phase, "claim_mapping_validation_started", current_substep)
@@ -1833,6 +2316,9 @@ class ResearchOrchestrator:
             "reproducibility": ResearchPhase.FEASIBILITY_REVIEW,
         }
         target_phase = target_map[target]
+        if target in {"question", "evidence"}:
+            project.background_research_checkpoint = BackgroundResearchCheckpoint()
+            project.curated_sources = []
         previous_phase = project.phase
         invalidated = self._artifact_ids_from_phase(target_phase, project)
         preserved = [item.artifact_id for item in project.artifacts if item.artifact_id not in set(invalidated)]
@@ -1942,6 +2428,8 @@ class ResearchOrchestrator:
         return {
             ResearchPhase.QUESTION_FORMULATION: "research_director",
             ResearchPhase.BACKGROUND_RESEARCH: "evidence_researcher",
+            ResearchPhase.SEARCH_PLAN_REVIEW: "human_reviewer",
+            ResearchPhase.HUMAN_SOURCE_REVIEW: "human_reviewer",
             ResearchPhase.HYPOTHESIS_GENERATION: "hypothesis_scientist",
             ResearchPhase.METHOD_SELECTION: "methodologist",
             ResearchPhase.STUDY_DESIGN: "study_designer",

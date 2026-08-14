@@ -29,6 +29,8 @@ class ResearchPhase(str, Enum):
     RESEARCH_MODE_SELECTION = "RESEARCH_MODE_SELECTION"
     DOMAIN_SELECTION = "DOMAIN_SELECTION"
     BACKGROUND_RESEARCH = "BACKGROUND_RESEARCH"
+    SEARCH_PLAN_REVIEW = "SEARCH_PLAN_REVIEW"
+    HUMAN_SOURCE_REVIEW = "HUMAN_SOURCE_REVIEW"
     CLAIM_EVIDENCE_MAPPING = "CLAIM_EVIDENCE_MAPPING"
     HYPOTHESIS_GENERATION = "HYPOTHESIS_GENERATION"
     METHOD_SELECTION = "METHOD_SELECTION"
@@ -87,6 +89,7 @@ VerificationMethod = Literal[
     "title_author_year_match",
     "none",
 ]
+EvidenceReviewMode = Literal["AUTO", "ASSISTED", "MANUAL"]
 ClaimDimension = Literal[
     "structural_existence",
     "physiological_function",
@@ -196,6 +199,7 @@ class EvidenceItem(StrictModel):
     retrieval_date: datetime = Field(default_factory=utc_now)
     reliability_score: float = Field(default=0.0, ge=0.0, le=1.0)
     relevance_score: float = Field(default=0.0, ge=0.0, le=1.0)
+    selection_provenance: "SelectionProvenance | None" = None
 
     @model_validator(mode="before")
     @classmethod
@@ -240,12 +244,23 @@ class SearchSource(StrictModel):
 class SearchPlan(StrictModel):
     """Bounded, offline plan for discovering relevant sources."""
 
+    search_plan_id: str = Field(default_factory=lambda: new_id("search_plan"))
+    project_id: str = ""
+    research_question_version: int = 1
+    question_hash: str = ""
+    version: int = Field(default=1, ge=1)
+    generated_at: datetime = Field(default_factory=utc_now)
+    planner_model: str = ""
     queries: list[str] = Field(default_factory=list)
     target_source_types: list[str] = Field(default_factory=list)
     preferred_databases: list[str] = Field(default_factory=list)
     date_constraints: list[str] = Field(default_factory=list)
     maximum_queries: int = Field(default=4, ge=1)
     rationale: str = ""
+    relevance_status: Literal["pending", "relevant", "partially_relevant", "irrelevant"] = "pending"
+    relevance_note: str = ""
+    approved_at: datetime | None = None
+    approved_by: Literal["human", "system"] | None = None
 
     @model_validator(mode="after")
     def bound_queries(self) -> "SearchPlan":
@@ -257,22 +272,113 @@ class SearchPlan(StrictModel):
         return self
 
 
-class SearchCandidate(StrictModel):
+class SourceCandidate(StrictModel):
     """One source discovered by one bounded web-search query."""
 
+    candidate_id: str = Field(default_factory=lambda: new_id("candidate"))
     title: str = ""
-    url: str
-    query: str
-    rank: int = Field(ge=1)
+    url: str = ""
+    query: str = ""
+    rank: int = Field(default=1, ge=1)
     source_domain: str = ""
+    authors: list[str] = Field(default_factory=list)
+    publication_year: str | None = None
+    journal_or_publisher: str | None = None
+    source_type: str = "unknown"
     snippet: str = ""
     doi: str | None = None
     pmid: str | None = None
+    arxiv_id: str | None = None
+    relevance_score: float = Field(default=0.0, ge=0.0, le=1.0)
+    verification_status: VerificationStatus = "unverified"
+    verification_note: str = ""
+    is_primary_source: bool = False
+    ai_summary: str = ""
+    ai_recommendation: Literal["keep", "reject", "uncertain"] = "uncertain"
+    recommendation_reason: str = ""
+    human_provided: bool = False
     discovered_at: datetime = Field(default_factory=utc_now)
     selection_score: int = 0
     extraction_status: Literal["pending", "completed", "timeout", "failed", "skipped"] = "pending"
     extracted_text: str = ""
     extraction_error: str = ""
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_candidate(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        normalized = dict(data)
+        normalized["query"] = normalized.get("query") or normalized.get("search_query") or ""
+        normalized["rank"] = normalized.get("rank") or normalized.get("search_rank") or 1
+        normalized["source_domain"] = normalized.get("source_domain") or normalized.get("domain") or ""
+        normalized["authors"] = _string_list(normalized.get("authors"))
+        return normalized
+
+
+# Backward-compatible import name used by the bounded search implementation.
+SearchCandidate = SourceCandidate
+
+
+class CuratedSource(StrictModel):
+    candidate_id: str
+    decision: Literal["keep", "reject", "defer"]
+    decided_by: Literal["human", "system"] = "human"
+    human_note: str = ""
+    rejection_reason: str = ""
+    decided_at: datetime = Field(default_factory=utc_now)
+
+
+class SelectionProvenance(StrictModel):
+    selected_by: Literal["human", "system"]
+    selection_id: str
+    candidate_id: str
+    verification_method: str = "none"
+
+
+class SourceCandidateCollection(StrictModel):
+    collection_id: str = Field(default_factory=lambda: new_id("candidate_collection"))
+    project_id: str
+    question_hash: str
+    search_plan_id: str
+    candidates: list[SourceCandidate] = Field(default_factory=list)
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class SourceSelectionSnapshot(StrictModel):
+    selection_id: str = Field(default_factory=lambda: new_id("source_selection"))
+    project_id: str
+    iteration: int = 0
+    research_question_version: int = 1
+    search_plan_version: int = 1
+    kept_candidate_ids: list[str] = Field(default_factory=list)
+    rejected_candidate_ids: list[str] = Field(default_factory=list)
+    deferred_candidate_ids: list[str] = Field(default_factory=list)
+    human_added_source_ids: list[str] = Field(default_factory=list)
+    decisions: list[CuratedSource] = Field(default_factory=list)
+    created_at: datetime = Field(default_factory=utc_now)
+    created_by: Literal["human", "system"] = "human"
+    selection_note: str = ""
+
+
+class SourceReviewFeedbackSummary(StrictModel):
+    rejection_reason_counts: dict[str, int] = Field(default_factory=dict)
+    concise_feedback: list[str] = Field(default_factory=list)
+
+
+class ResearchAsset(StrictModel):
+    asset_id: str = Field(default_factory=lambda: new_id("asset"))
+    filename: str
+    content_type: str = "application/octet-stream"
+    saved_path: str
+    size_bytes: int = Field(default=0, ge=0)
+    parsing_status: Literal["registered_only", "parsed"] = "registered_only"
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class SearchPlanRelevanceValidation(StrictModel):
+    status: Literal["relevant", "partially_relevant", "irrelevant"]
+    reason: str = ""
 
 
 class SearchQueryRecord(StrictModel):
@@ -822,6 +928,9 @@ class ResearchEvent(StrictModel):
 
 
 class BackgroundResearchCheckpoint(StrictModel):
+    project_id: str = ""
+    question_hash: str = ""
+    search_plan_id: str = ""
     search_artifact_id: str | None = None
     search_completed: bool = False
     normalization_completed: bool = False
@@ -831,6 +940,10 @@ class BackgroundResearchCheckpoint(StrictModel):
     candidates: list[SearchCandidate] = Field(default_factory=list)
     selected_candidates: list[SearchCandidate] = Field(default_factory=list)
     source_selection_completed: bool = False
+    awaiting_search_plan_review: bool = False
+    search_plan_approved: bool = False
+    awaiting_source_review: bool = False
+    source_selection_id: str | None = None
     extraction_completed: bool = False
     started_at: datetime | None = None
     last_activity_at: datetime | None = None
@@ -885,6 +998,14 @@ class ResearchProject(StrictModel):
     constraints: dict[str, Any] = Field(default_factory=dict)
     question: ResearchQuestion | None = None
     evidence: list[EvidenceItem] = Field(default_factory=list)
+    evidence_review_mode: EvidenceReviewMode = "ASSISTED"
+    search_plan_history: list[SearchPlan] = Field(default_factory=list)
+    source_candidate_collections: list[SourceCandidateCollection] = Field(default_factory=list)
+    curated_sources: list[CuratedSource] = Field(default_factory=list)
+    source_selection_snapshots: list[SourceSelectionSnapshot] = Field(default_factory=list)
+    source_review_feedback: SourceReviewFeedbackSummary = Field(default_factory=SourceReviewFeedbackSummary)
+    research_assets: list[ResearchAsset] = Field(default_factory=list)
+    auto_approve_search_plan: bool = False
     claims: list[Claim] = Field(default_factory=list)
     hypotheses: list[Hypothesis] = Field(default_factory=list)
     study_design: StudyDesign | None = None
@@ -1032,6 +1153,7 @@ class ResearchStartRequest(StrictModel):
         default_factory=lambda: os.getenv("AI_SCIENTIST_DEFAULT_PLANNING_ONLY", "true").lower()
         in {"1", "true", "yes", "on"}
     )
+    evidence_review_mode: EvidenceReviewMode = "ASSISTED"
 
 
 class RevisionRequest(StrictModel):
@@ -1079,6 +1201,33 @@ class HumanEditRequest(StrictModel):
 class EvidenceCreateRequest(StrictModel):
     evidence: EvidenceItem
     reason: str = ""
+
+
+class SearchPlanReviewRequest(StrictModel):
+    queries: list[str] | None = None
+    auto_approve_future: bool = False
+
+
+class SourceDecisionInput(StrictModel):
+    candidate_id: str
+    decision: Literal["keep", "reject", "defer"]
+    note: str = ""
+    rejection_reason: str = ""
+
+
+class SourceSelectionRequest(StrictModel):
+    decisions: list[SourceDecisionInput]
+    selection_note: str = ""
+
+
+class HumanSourceRequest(StrictModel):
+    entries: list[str]
+
+
+class ResearchAssetUploadRequest(StrictModel):
+    filename: str
+    content_type: str = "application/octet-stream"
+    content_base64: str
 
 
 class AgentStageResult(StrictModel):

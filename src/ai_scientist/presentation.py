@@ -28,6 +28,8 @@ PHASE_LABELS = {
     "RESEARCH_MODE_SELECTION": "选择研究方法",
     "DOMAIN_SELECTION": "判断研究领域",
     "BACKGROUND_RESEARCH": "检索和评估证据",
+    "SEARCH_PLAN_REVIEW": "审核检索方案",
+    "HUMAN_SOURCE_REVIEW": "候选资料审查",
     "CLAIM_EVIDENCE_MAPPING": "整理主张与证据",
     "HYPOTHESIS_GENERATION": "形成假设与竞争性解释",
     "METHOD_SELECTION": "细化研究方法",

@@ -14,6 +14,7 @@ from src.ai_scientist.schemas import (
     SearchAcquisitionResult,
     SearchCandidate,
     SearchPlan,
+    SearchPlanRelevanceValidation,
     SearchSource,
 )
 from src.ai_scientist.tools.search_tools import QwenEvidenceSearchTool
@@ -28,9 +29,9 @@ class EvidenceResearcherAgent(BaseResearchAgent[EvidenceResearchOutput]):
         self.search_tool = search_tool or QwenEvidenceSearchTool()
 
     def run(self, project: ResearchProject) -> AgentRun[EvidenceResearchOutput]:
-        resolution = ModelRegistry(project.model_overrides).resolve_model(self.agent_name)
-        acquisition = self.acquire_search(project, resolution.resolved_model)
-        return self.normalize_search_result(project, acquisition)
+        raise StructuredOutputError(
+            "Evidence Researcher must run through the orchestrator's search-plan and source-review gates."
+        )
 
     def plan_search(self, project: ResearchProject) -> AgentRun[SearchPlan]:
         """Create a compact search plan without enabling network tools."""
@@ -40,11 +41,14 @@ class EvidenceResearcherAgent(BaseResearchAgent[EvidenceResearchOutput]):
         maximum = max(1, int(os.getenv("AI_SCIENTIST_MAX_SEARCH_QUERIES", "4")))
         research_mode = getattr(project, "research_mode", None)
         payload = {
+            "project_id": project.project_id,
+            "research_question": project.question.model_dump(mode="json"),
             "normalized_question": project.question.normalized_question,
             "research_mode": research_mode.value if research_mode else None,
             "domain": project.domain,
             "evidence_gaps": getattr(project, "evidence_gaps", []),
             "constraints": getattr(project, "constraints", {}),
+            "source_review_feedback_summary": project.source_review_feedback.model_dump(mode="json"),
             "maximum_queries": maximum,
             "task": (
                 "Produce compact bibliographic search queries only. Prefer queries that discriminate among claims. "
@@ -57,6 +61,24 @@ class EvidenceResearcherAgent(BaseResearchAgent[EvidenceResearchOutput]):
             self.skill_loader.compose_instructions(skills),
             payload,
             SearchPlan,
+        )
+        return AgentRun(output=result.value, metadata=result.metadata)
+
+    def validate_search_plan_semantics(
+        self, project: ResearchProject, plan: SearchPlan
+    ) -> AgentRun[SearchPlanRelevanceValidation]:
+        """Use one small structured call only to classify plan relevance."""
+
+        result = self.client.call(
+            self.agent_name,
+            "Judge whether bibliographic queries target the supplied research question. Return JSON only.",
+            {
+                "research_question": project.question.model_dump(mode="json") if project.question else None,
+                "domain": project.domain,
+                "queries": plan.queries,
+                "allowed_status": ["relevant", "partially_relevant", "irrelevant"],
+            },
+            SearchPlanRelevanceValidation,
         )
         return AgentRun(output=result.value, metadata=result.metadata)
 

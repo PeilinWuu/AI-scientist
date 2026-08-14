@@ -76,3 +76,11 @@ class InvalidEvidenceReferenceError(AIScientistError):
             failure_category="orchestration_postprocess_error",
             failing_component="evidence_reference_validation",
         )
+
+
+class StaleSearchPlanError(AIScientistError):
+    """Raised when a search plan or checkpoint belongs to another question."""
+
+
+class InsufficientEvidenceForClaimMapping(AIScientistError):
+    """A recoverable workflow gate, not a provider or orchestration failure."""

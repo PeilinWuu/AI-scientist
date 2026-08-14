@@ -126,6 +126,34 @@ def render_claims_markdown(project: ResearchProject) -> str:
     return "\n".join(rows)
 
 
+def render_evidence_curation_markdown(project: ResearchProject) -> str:
+    candidates = (
+        project.source_candidate_collections[-1].candidates
+        if project.source_candidate_collections else []
+    )
+    selection = project.source_selection_snapshots[-1] if project.source_selection_snapshots else None
+    recommended = len([item for item in candidates if item.ai_recommendation == "keep"])
+    kept = len(selection.kept_candidate_ids) if selection else 0
+    rejected = len(selection.rejected_candidate_ids) if selection else 0
+    deferred = len(selection.deferred_candidate_ids) if selection else 0
+    verified = len([
+        item for item in project.evidence
+        if item.verification_status in {"verified", "partially_verified"} and not item.duplicate_of
+    ])
+    lines = [
+        f"系统检索并整理了 **{len(candidates)}** 个候选来源，AI 初步建议保留 **{recommended}** 个。",
+        f"研究者最终保留 **{kept}** 个、排除 **{rejected}** 个、暂缓 **{deferred}** 个。",
+        f"其中 **{verified}** 个来源通过来源验证并形成正式 Evidence Collection。",
+    ]
+    if project.source_review_feedback.concise_feedback:
+        lines.extend(["", "**人工排除理由汇总**", bullets(project.source_review_feedback.concise_feedback)])
+    lines.extend([
+        "",
+        "每条正式证据通过 selection provenance 连接候选来源、人工选择快照和验证方法。",
+    ])
+    return "\n".join(lines)
+
+
 def classify_and_dedupe_todos(project: ResearchProject) -> dict[str, list[str]]:
     """Classify execution limitations without turning them into fake results."""
 
