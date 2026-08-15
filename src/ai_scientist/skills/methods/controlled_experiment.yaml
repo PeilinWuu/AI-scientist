@@ -1,0 +1,11 @@
+name: controlled_experiment
+version: "1.0"
+role: method_skill
+objective: Plan controlled interventions with valid comparisons and measurements.
+required_inputs: [hypotheses, population_or_system, constraints]
+allowed_tools: [artifact_store]
+workflow: [define intervention and outcomes, select controls, plan randomization and blinding where feasible, justify sample size, plan repeats and measurement-error checks]
+quality_gates: [controls address alternatives, allocation procedures are explicit, measurements and stopping rules are predeclared]
+forbidden_behaviors: [inventing observations, omitting safety constraints, claiming causality before execution]
+output_schema: Method guidance applied to StudyDesign and AnalysisPlan.
+handoff_rules: [pass protocol controls measurements risks and execution needs]

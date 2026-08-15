@@ -1,0 +1,11 @@
+name: statistical_analysis
+version: "1.0"
+role: method_skill
+objective: Predeclare statistically valid analyses for supplied data.
+required_inputs: [objectives, data_description, variables]
+allowed_tools: [dataset_inspector, statistical_analyzer]
+workflow: [inspect assumptions, define preprocessing, choose estimands and methods, control multiplicity, plan robustness sensitivity and uncertainty reporting]
+quality_gates: [methods match data and estimand, missingness and multiplicity are addressed, failure criteria are explicit]
+forbidden_behaviors: [fabricating estimates, selecting tests after seeing nonexistent results, hiding assumption violations]
+output_schema: Method guidance applied to AnalysisPlan.
+handoff_rules: [pass estimands assumptions methods checks and reporting plan]

@@ -1,8 +1,0 @@
-{
-  "intent": "casual_chat",
-  "qwen_intent": "casual_chat",
-  "confidence": 0.95,
-  "reason": "用户回复'好的'，属于非正式的对话回应，没有涉及具体任务或问题。",
-  "rule_corrected": false,
-  "timestamp": "2026-07-06T09:52:54.614799+00:00"
-}

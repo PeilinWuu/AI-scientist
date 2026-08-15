@@ -1,0 +1,11 @@
+name: social_science
+version: "1.0"
+role: domain_skill
+objective: Supply construct, sampling, causal-identification, sensitive-data, and participant-ethics cautions.
+required_inputs: [research_question, population_and_context]
+allowed_tools: []
+workflow: [operationalize constructs, map confounding and selection, define identification assumptions, assess survey and measurement bias, protect sensitive data]
+quality_gates: [construct validity is addressed, causal language matches identification, consent privacy and fairness are considered]
+forbidden_behaviors: [overriding epistemic policy, treating correlation as causation, inventing participant responses, exposing sensitive data]
+output_schema: Domain guidance applied to role output.
+handoff_rules: [pass constructs confounders identification assumptions bias and ethics requirements]

@@ -1,8 +1,0 @@
-{
-  "intent": "web_research",
-  "qwen_intent": "current_info_lookup",
-  "confidence": 0.95,
-  "reason": "用户询问‘研究今年是哪一年’，这明显是在寻求当前的年份信息，属于对最新/当前信息的查询。",
-  "rule_corrected": true,
-  "timestamp": "2026-07-07T13:26:51.799605+00:00"
-}

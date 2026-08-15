@@ -1,8 +1,0 @@
-{
-  "energy_too_high": false,
-  "stability_too_low": false,
-  "speed_too_low": false,
-  "efficiency_improved": false,
-  "next_strategy": "broaden local search because the last move did not improve the target",
-  "message": "Next planner should broaden local search because the last move did not improve the target. This links measured results directly to the next experiment plan."
-}

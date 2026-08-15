@@ -1,8 +1,0 @@
-{
-  "intent": "research_consultation",
-  "qwen_intent": "research_consultation",
-  "confidence": 0.95,
-  "reason": "用户描述了一个具体的研究方向，涉及仿生软体游泳机器人的流场与运动控制优化，包括流固耦合、Navier-Stokes方程、疲劳约束和多目标函数。但并未明确要求设计实验计划或执行工具，因此属于研究咨询类别。",
-  "rule_corrected": false,
-  "timestamp": "2026-07-06T08:06:53.919607+00:00"
-}

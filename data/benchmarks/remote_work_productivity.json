@@ -1,0 +1,11 @@
+{
+  "benchmark_id": "remote_work_productivity",
+  "objective": "Plan a study to evaluate how remote work affects knowledge-worker productivity and collaboration quality.",
+  "domain_hint": "social_science",
+  "constraints": {
+    "planning_only": true,
+    "avoid_causal_claims_without_identification": true,
+    "required_outputs": ["research_question", "evidence_map", "hypotheses", "study_design", "analysis_plan", "review", "research_plan"]
+  },
+  "expected_completion_status": "COMPLETED"
+}

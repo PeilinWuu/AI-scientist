@@ -1,0 +1,11 @@
+name: systematic_review
+version: "1.0"
+role: method_skill
+objective: Plan transparent and reproducible evidence synthesis.
+required_inputs: [research_question, scope]
+allowed_tools: [web_search, web_extractor, citation_manager, artifact_store]
+workflow: [select databases, define search strings, predeclare inclusion and exclusion criteria, deduplicate and screen, assess bias, grade evidence, define synthesis method]
+quality_gates: [search strategy is reproducible, eligibility is predeclared, bias assessment is planned, excluded records are accountable]
+forbidden_behaviors: [inventing studies, cherry-picking evidence, presenting a narrative search as systematic]
+output_schema: Method guidance applied to StudyDesign and AnalysisPlan.
+handoff_rules: [pass protocol search strategy eligibility bias assessment and synthesis plan]

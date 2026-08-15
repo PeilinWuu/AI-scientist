@@ -1,0 +1,11 @@
+name: computer_science
+version: "1.0"
+role: domain_skill
+objective: Supply computing terminology, evaluation conventions, security, privacy, and reproducibility cautions.
+required_inputs: [research_question, system_or_algorithm]
+allowed_tools: []
+workflow: [define task and interface, identify datasets and baselines, specify correctness performance and resource metrics, assess security privacy and reproducibility]
+quality_gates: [comparisons are fair, test information is isolated, resource budgets and versions are recorded]
+forbidden_behaviors: [overriding epistemic policy, inventing benchmark results, ignoring data leakage security or privacy]
+output_schema: Domain guidance applied to role output.
+handoff_rules: [pass task definitions baselines metrics threat model and reproducibility needs]

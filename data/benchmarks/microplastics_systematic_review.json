@@ -1,0 +1,12 @@
+{
+  "benchmark_id": "microplastics_systematic_review",
+  "objective": "Plan a systematic review of evidence on microplastics exposure and marine ecosystem impacts.",
+  "domain_hint": "biology",
+  "constraints": {
+    "planning_only": true,
+    "review_type": "systematic_review",
+    "require_search_protocol": true,
+    "required_outputs": ["search_strategy", "evidence_quality", "claim_evidence_mapping", "synthesis_plan", "research_plan"]
+  },
+  "expected_completion_status": "COMPLETED"
+}

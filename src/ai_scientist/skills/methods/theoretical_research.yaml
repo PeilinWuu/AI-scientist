@@ -1,0 +1,11 @@
+name: theoretical_research
+version: "1.0"
+role: method_skill
+objective: Structure definition-driven theoretical inquiry and proof planning.
+required_inputs: [research_question, assumptions]
+allowed_tools: [file_search]
+workflow: [define objects and assumptions, identify lemmas, state proof obligations, search for counterexamples, test boundary cases]
+quality_gates: [all terms are defined, proof obligations are explicit, counterexamples and edge cases are considered]
+forbidden_behaviors: [claiming an uncompleted proof is complete, replacing proof with empirical correlation, inventing citations]
+output_schema: Method guidance applied to role output.
+handoff_rules: [pass definitions assumptions obligations counterexamples and unresolved gaps]

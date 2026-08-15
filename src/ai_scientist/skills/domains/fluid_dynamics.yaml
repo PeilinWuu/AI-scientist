@@ -1,0 +1,11 @@
+name: fluid_dynamics
+version: "1.0"
+role: domain_skill
+objective: Supply fluid-system terminology, dimensionless regimes, force metrics, wake diagnostics, and validation cautions as an optional plugin.
+required_inputs: [research_question, flow_configuration]
+allowed_tools: []
+workflow: [define geometry and boundary conditions, identify Reynolds number and relevant scales, select Cd_mean Cl_rms Strouhal and vorticity diagnostics when applicable, plan grid independence and model validation]
+quality_gates: [regime and boundary conditions are explicit, conservation and convergence are checked, CFD or LBM results require verification and validation]
+forbidden_behaviors: [overriding epistemic policy, inventing simulation output, treating soft-swimmer or cylinder-wake assumptions as universal]
+output_schema: Domain guidance applied to role output.
+handoff_rules: [pass geometry regime metrics validation requirements and domain risks]

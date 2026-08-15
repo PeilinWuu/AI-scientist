@@ -1,1 +1,1 @@
-"""FlowScientist-Loop package."""
+"""Pure Qwen Shell package."""

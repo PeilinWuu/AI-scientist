@@ -1,8 +1,0 @@
-{
-  "intent": "research_consultation",
-  "qwen_intent": "research_consultation",
-  "confidence": 0.95,
-  "reason": "用户描述了一个具体的研究方向，涉及仿生软体游泳机器人的过渡区流场与运动控制闭环优化，并提到了Re=150、流固耦合、边界条件、目标函数和材料疲劳约束。这属于研究咨询的范畴，但没有明确要求执行实验或生成报告，因此归类为'research_consultation'。",
-  "rule_corrected": false,
-  "timestamp": "2026-07-06T08:55:32.378948+00:00"
-}

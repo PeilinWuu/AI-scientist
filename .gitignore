@@ -1,0 +1,13 @@
+.env
+*.env
+.venv/
+.venv-*/
+__pycache__/
+.pytest_cache/
+runs/*
+!runs/.gitkeep
+data/research_projects/*
+!data/research_projects/.gitkeep
+outputs/
+work/
+*.pyc

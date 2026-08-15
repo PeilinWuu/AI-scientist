@@ -1,5 +1,0 @@
-candidate_id,amplitude,frequency,wavelength,stiffness,phase,mean_speed,energy_cost,efficiency,stability_score,vortex_loss,constraint_violation
-iter2_cand1,0.135,1.05,1.1,0.51,0.2125,0.80117,0.32147,2.35629,0.93968,0.09757,False
-iter2_cand2,0.155,1.15,1.06,0.53,0.2125,0.88226,0.36133,2.3255,0.96156,0.09883,False
-iter2_cand3,0.115,0.95,1.14,0.55,0.1925,0.69355,0.32067,2.06748,0.97353,0.10043,False
-iter2_cand4,0.135,1.11,1.18,0.48,0.2425,0.80373,0.32686,2.33617,0.95922,0.10336,False

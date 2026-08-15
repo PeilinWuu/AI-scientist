@@ -1,8 +1,0 @@
-{
-  "intent": "current_info_lookup",
-  "qwen_intent": "current_info_lookup",
-  "confidence": 0.95,
-  "reason": "The user is asking for clarification about the location '罗罗' (Luo Luo), which indicates they want current or recent information about this place, likely its geographical or contextual details.",
-  "rule_corrected": false,
-  "timestamp": "2026-07-08T11:55:44.010489+00:00"
-}

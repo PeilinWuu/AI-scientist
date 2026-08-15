@@ -1,0 +1,11 @@
+name: engineering
+version: "1.0"
+role: domain_skill
+objective: Supply requirements, tradeoff, reliability, hazard, and verification conventions.
+required_inputs: [research_question, target_system, constraints]
+allowed_tools: []
+workflow: [define stakeholders and requirements, identify interfaces and failure modes, plan tradeoff analysis, define verification and acceptance tests]
+quality_gates: [requirements are testable, hazards and tolerances are explicit, verification is separated from validation]
+forbidden_behaviors: [overriding epistemic policy, inventing test performance, ignoring safety factors or failure modes]
+output_schema: Domain guidance applied to role output.
+handoff_rules: [pass requirements interfaces tradeoffs hazards and verification needs]

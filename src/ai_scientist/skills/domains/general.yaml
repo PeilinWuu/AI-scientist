@@ -1,0 +1,11 @@
+name: general
+version: "1.0"
+role: domain_skill
+objective: Provide neutral terminology and cross-disciplinary cautions when no specialist plugin is justified.
+required_inputs: [research_question]
+allowed_tools: []
+workflow: [define ambiguous terms, identify stakeholder and measurement context, request specialist assumptions when needed]
+quality_gates: [no specialist fact is invented, uncertainty about domain conventions is explicit]
+forbidden_behaviors: [overriding epistemic policy, pretending to hold specialist authority, selecting a default discipline]
+output_schema: Domain guidance applied to role output.
+handoff_rules: [pass definitions cautions and clarification needs]

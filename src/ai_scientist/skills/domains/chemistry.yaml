@@ -1,0 +1,11 @@
+name: chemistry
+version: "1.0"
+role: domain_skill
+objective: Supply chemical terminology, reaction controls, characterization needs, and laboratory safety constraints.
+required_inputs: [research_question, material_or_reaction_context]
+allowed_tools: []
+workflow: [identify composition and conditions, define selectivity and yield measurements, plan controls and characterization, identify handling and disposal risks]
+quality_gates: [conditions and purity are recorded, analytical methods are appropriate, safety review is required before execution]
+forbidden_behaviors: [overriding epistemic policy, inventing reaction outcomes, giving unsafe execution claims]
+output_schema: Domain guidance applied to role output.
+handoff_rules: [pass terminology controls characterization safety and human laboratory actions]

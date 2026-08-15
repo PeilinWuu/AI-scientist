@@ -1,0 +1,74 @@
+name: general_research_v1
+version: "1.0"
+transitions:
+  INTAKE: {next: QUESTION_FORMULATION}
+  QUESTION_FORMULATION: {next: RESEARCH_MODE_SELECTION}
+  RESEARCH_MODE_SELECTION: {next: DOMAIN_SELECTION}
+  DOMAIN_SELECTION: {next: BACKGROUND_RESEARCH}
+  BACKGROUND_RESEARCH: {next: CLAIM_EVIDENCE_MAPPING}
+  SEARCH_PLAN_REVIEW:
+    approve: BACKGROUND_RESEARCH
+    regenerate: BACKGROUND_RESEARCH
+    cancel: CANCELLED
+  HUMAN_SOURCE_REVIEW:
+    continue: BACKGROUND_RESEARCH
+    research_again: BACKGROUND_RESEARCH
+    cancel: CANCELLED
+  CLAIM_EVIDENCE_MAPPING: {next: HYPOTHESIS_GENERATION}
+  HYPOTHESIS_GENERATION: {next: METHOD_SELECTION}
+  METHOD_SELECTION: {next: STUDY_DESIGN}
+  STUDY_DESIGN: {next: ANALYSIS_PLANNING}
+  ANALYSIS_PLANNING: {next: FEASIBILITY_REVIEW}
+  FEASIBILITY_REVIEW:
+    approve: HUMAN_APPROVAL
+    revision_required: HUMAN_REVISION_REVIEW
+    human_intervention_required: HUMAN_INTERVENTION_REQUIRED
+    revise_question: QUESTION_FORMULATION
+    revise_evidence: BACKGROUND_RESEARCH
+    revise_hypothesis: HYPOTHESIS_GENERATION
+    revise_method: METHOD_SELECTION
+    revise_design: STUDY_DESIGN
+    revise_analysis: ANALYSIS_PLANNING
+    reject: FAILED
+  HUMAN_REVISION_REVIEW:
+    submit: REVISION
+    defer: HUMAN_INTERVENTION_REQUIRED
+    cancel: CANCELLED
+  HUMAN_APPROVAL:
+    approve: EXECUTION_WAITING
+    revise: REVISION
+    cancel: CANCELLED
+  HUMAN_INTERVENTION_REQUIRED:
+    evidence: BACKGROUND_RESEARCH
+    question: QUESTION_FORMULATION
+    approve: SYNTHESIS
+    cancel: CANCELLED
+  REVISION:
+    question: QUESTION_FORMULATION
+    evidence: BACKGROUND_RESEARCH
+    hypothesis: HYPOTHESIS_GENERATION
+    method: METHOD_SELECTION
+    design: STUDY_DESIGN
+    analysis: ANALYSIS_PLANNING
+    reproducibility: FEASIBILITY_REVIEW
+  EXECUTION_WAITING:
+    data_provided: DATA_ANALYSIS
+    execution_tool_available: EXECUTION
+    planning_only: SYNTHESIS
+  EXECUTION:
+    success: DATA_ANALYSIS
+    failure: CRITICAL_REVIEW
+  DATA_ANALYSIS: {next: CRITICAL_REVIEW}
+  CRITICAL_REVIEW:
+    approve: SYNTHESIS
+    revision_required: HUMAN_REVISION_REVIEW
+    human_intervention_required: HUMAN_INTERVENTION_REQUIRED
+    revise_question: QUESTION_FORMULATION
+    revise_evidence: BACKGROUND_RESEARCH
+    revise_hypothesis: HYPOTHESIS_GENERATION
+    revise_method: METHOD_SELECTION
+    revise_design: STUDY_DESIGN
+    revise_analysis: ANALYSIS_PLANNING
+    rerun: EXECUTION_WAITING
+    reject: FAILED
+  SYNTHESIS: {next: COMPLETED}

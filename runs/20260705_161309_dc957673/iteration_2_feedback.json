@@ -1,8 +1,0 @@
-{
-  "energy_too_high": false,
-  "stability_too_low": false,
-  "speed_too_low": false,
-  "efficiency_improved": true,
-  "next_strategy": "continue local search around the best measured candidate",
-  "message": "Next planner should continue local search around the best measured candidate. This links measured results directly to the next experiment plan."
-}

@@ -1,8 +1,0 @@
-{
-  "intent": "capability_question",
-  "qwen_intent": "capability_question",
-  "confidence": 0.95,
-  "reason": "用户询问是否支持文件上传和接口问题，属于对系统功能的疑问。",
-  "rule_corrected": false,
-  "timestamp": "2026-07-07T11:51:57.603609+00:00"
-}
