@@ -190,7 +190,7 @@ class StructuredQwenClient:
         if not api_key:
             raise RuntimeError("DASHSCOPE_API_KEY is missing. Please set it in .env.")
         self.http_client = httpx.Client(
-            timeout=float(os.getenv("AI_SCIENTIST_MODEL_TIMEOUT", os.getenv("LLM_TIMEOUT", "300"))),
+            timeout=float(os.getenv("AI_SCIENTIST_MODEL_TIMEOUT", "300")),
             trust_env=False,
         )
         self.client = OpenAI(
@@ -200,6 +200,7 @@ class StructuredQwenClient:
                 os.getenv("LLM_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
             ),
             http_client=self.http_client,
+            max_retries=0,
         )
         return self.client
 

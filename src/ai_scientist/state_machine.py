@@ -22,6 +22,7 @@ REVIEW_DECISION_OUTCOMES = {
     "reject",
     "rerun",
     "human_intervention_required",
+    "revision_required",
 }
 REVISION_TARGET_PHASES = {
     ResearchPhase.QUESTION_FORMULATION,
@@ -31,6 +32,7 @@ REVISION_TARGET_PHASES = {
     ResearchPhase.STUDY_DESIGN,
     ResearchPhase.ANALYSIS_PLANNING,
     ResearchPhase.FEASIBILITY_REVIEW,
+    ResearchPhase.HUMAN_REVISION_REVIEW,
 }
 
 

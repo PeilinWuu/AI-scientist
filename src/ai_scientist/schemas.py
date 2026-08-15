@@ -37,6 +37,7 @@ class ResearchPhase(str, Enum):
     STUDY_DESIGN = "STUDY_DESIGN"
     ANALYSIS_PLANNING = "ANALYSIS_PLANNING"
     FEASIBILITY_REVIEW = "FEASIBILITY_REVIEW"
+    HUMAN_REVISION_REVIEW = "HUMAN_REVISION_REVIEW"
     HUMAN_APPROVAL = "HUMAN_APPROVAL"
     HUMAN_INTERVENTION_REQUIRED = "HUMAN_INTERVENTION_REQUIRED"
     EXECUTION_WAITING = "EXECUTION_WAITING"
@@ -792,7 +793,104 @@ class RevisionAction(StrictModel):
     required_changes: list[str] = Field(default_factory=list)
     completion_criteria: list[str] = Field(default_factory=list)
     action_id: str = Field(default_factory=lambda: new_id("revision_action"))
-    status: Literal["pending", "in_progress", "completed", "skipped"] = "pending"
+    status: Literal[
+        "pending", "in_progress", "completed", "skipped", "needs_attention", "failed_verification"
+    ] = "pending"
+
+
+RevisionIssueClassification = Literal[
+    "plan_blocking", "execution_prerequisite", "non_blocking", "optional"
+]
+RevisionIssueTarget = Literal[
+    "question",
+    "evidence",
+    "hypothesis",
+    "methodology",
+    "study_design",
+    "analysis_plan",
+    "reproducibility_plan",
+    "execution_requirements",
+]
+RevisionDisposition = Literal[
+    "accept_ai",
+    "accept_modified",
+    "provide_content",
+    "accept_limitation",
+    "defer_execution",
+    "reject",
+]
+
+
+class RevisionIssue(StrictModel):
+    issue_id: str = Field(default_factory=lambda: new_id("revision_issue"))
+    source_action_ids: list[str] = Field(default_factory=list)
+    classification: RevisionIssueClassification
+    target: RevisionIssueTarget
+    problem: str
+    severity: str = "需要在方案定稿前处理"
+    impact: str = "如果不处理，研究计划的可执行性或可复现性可能下降。"
+    reviewer_recommendations: list[str] = Field(default_factory=list)
+    completion_criteria: list[str] = Field(default_factory=list)
+    priority: int = Field(default=1, ge=1)
+    status: Literal[
+        "pending", "approved", "rejected", "deferred", "limitation", "completed", "needs_attention"
+    ] = "pending"
+
+
+class RevisionIssueDecision(StrictModel):
+    issue_id: str
+    disposition: RevisionDisposition
+    instruction: str = ""
+    reason: str = ""
+
+
+class RevisionCriterionResult(StrictModel):
+    criterion: str
+    passed: bool
+    evidence: str = ""
+    note: str = ""
+
+
+class RevisionVerificationResult(StrictModel):
+    verification_id: str = Field(default_factory=lambda: new_id("revision_verification"))
+    action_id: str
+    target_artifact: str
+    artifact_version: int
+    criteria_results: list[RevisionCriterionResult] = Field(default_factory=list)
+    overall_passed: bool = False
+    verification_method: str
+    verified_at: datetime = Field(default_factory=utc_now)
+
+
+class RevisionTargetBatch(StrictModel):
+    batch_id: str = Field(default_factory=lambda: new_id("revision_batch"))
+    target: RevisionIssueTarget
+    issue_ids: list[str] = Field(default_factory=list)
+    issue_snapshots: list[RevisionIssue] = Field(default_factory=list)
+    completion_criteria: list[str] = Field(default_factory=list)
+    instructions: list[str] = Field(default_factory=list)
+    provided_content: list[str] = Field(default_factory=list)
+    status: Literal["pending", "in_progress", "completed", "needs_attention"] = "pending"
+    old_artifact_version: int | None = None
+    new_artifact_version: int | None = None
+    verification_id: str | None = None
+    job_id: str | None = None
+
+
+class ApprovedRevisionPlan(StrictModel):
+    revision_plan_id: str = Field(default_factory=lambda: new_id("approved_revision_plan"))
+    project_id: str
+    review_version: int
+    revision_cycle: int
+    approved_issues: list[str] = Field(default_factory=list)
+    rejected_issues: list[str] = Field(default_factory=list)
+    deferred_issues: list[str] = Field(default_factory=list)
+    accepted_as_limitation: list[str] = Field(default_factory=list)
+    human_modified_instructions: dict[str, str] = Field(default_factory=dict)
+    target_batches: list[RevisionTargetBatch] = Field(default_factory=list)
+    created_at: datetime = Field(default_factory=utc_now)
+    created_by: Literal["human"] = "human"
+    status: Literal["approved", "in_progress", "completed", "needs_attention"] = "approved"
 
 
 class EvidenceRevisionTask(StrictModel):
@@ -1019,6 +1117,15 @@ class ResearchProject(StrictModel):
     review_package: ReviewPackage | None = None
     human_approval_history: list[HumanApprovalRecord] = Field(default_factory=list)
     human_revision_history: list[HumanRevisionRecord] = Field(default_factory=list)
+    revision_issues: list[RevisionIssue] = Field(default_factory=list)
+    approved_revision_plans: list[ApprovedRevisionPlan] = Field(default_factory=list)
+    revision_verifications: list[RevisionVerificationResult] = Field(default_factory=list)
+    active_revision_plan_id: str | None = None
+    active_job_id: str | None = None
+    execution_requirements: list[str] = Field(default_factory=list)
+    accepted_limitations: list[str] = Field(default_factory=list)
+    revision_migration_version: int = 0
+    revision_recovery_messages: list[str] = Field(default_factory=list)
     approval_valid_for_versions: dict[str, int | None] = Field(default_factory=dict)
     approval_status: Literal["not_requested", "pending", "valid", "stale", "deferred"] = "not_requested"
     version_change_summaries: list[str] = Field(default_factory=list)
@@ -1159,6 +1266,14 @@ class ResearchStartRequest(StrictModel):
 class RevisionRequest(StrictModel):
     target: Literal["question", "evidence", "hypothesis", "method", "design", "analysis", "reproducibility"]
     feedback: str
+
+
+class RevisionReviewSubmitRequest(StrictModel):
+    decisions: list[RevisionIssueDecision]
+
+
+class RevisionReviewDeferRequest(StrictModel):
+    reason: str = ""
 
 
 class ApprovalRequest(StrictModel):

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import time
 import traceback
@@ -17,6 +18,7 @@ from src.ai_scientist.agents import (
     MethodologistAgent,
     ReproducibilityEngineerAgent,
     ResearchDirectorAgent,
+    RevisionVerifierAgent,
     ScientificSynthesizerAgent,
     SkepticalReviewerAgent,
     StudyDesignerAgent,
@@ -64,8 +66,16 @@ from src.ai_scientist.presentation import (
 from src.ai_scientist.project_store import ProjectStore
 from src.ai_scientist.quality import apply_reviewer_quality_gates, compute_quality_metrics, enrich_evidence_items
 from src.ai_scientist.report_writer import build_research_plan_json, build_research_plan_markdown
+from src.ai_scientist.revision_workflow import (
+    build_approved_revision_plan,
+    combine_revision_verification_results,
+    deterministic_verify_batch,
+    normalize_completion_criteria,
+    normalize_revision_plan,
+)
 from src.ai_scientist.schemas import (
     AnalysisPlan,
+    ApprovedRevisionPlan,
     BackgroundResearchCheckpoint,
     Claim,
     ClaimEvidenceMappingResult,
@@ -95,6 +105,11 @@ from src.ai_scientist.schemas import (
     ReviewResult,
     ReviewPackage,
     RevisionAction,
+    RevisionIssue,
+    RevisionIssueDecision,
+    RevisionCriterionResult,
+    RevisionTargetBatch,
+    RevisionVerificationResult,
     StudyDesign,
     new_id,
     utc_now,
@@ -122,6 +137,10 @@ class ResearchOrchestrator:
         self.domain_router = DomainRouter()
         self.tools = ToolRegistry()
         self.execution = ExecutionAdapter()
+        self.revision_max_attempts = min(
+            3,
+            max(1, int(os.getenv("AI_SCIENTIST_REVISION_MAX_ATTEMPTS", "3"))),
+        )
 
     def create_project(
         self,
@@ -175,6 +194,8 @@ class ResearchOrchestrator:
         blocking_issues: list[str] = []
         max_revision_exhausted = False
         stage_status = "completed"
+        project.active_job_id = job_id
+        self.store.save(project)
         started_event = ResearchEvent(
             job_id=job_id,
             project_id=project.project_id,
@@ -276,7 +297,8 @@ class ResearchOrchestrator:
                 )
                 review = self._run_agent(project, SkepticalReviewerAgent)
                 self._refresh_quality_metrics(project)
-                gated_review = apply_reviewer_quality_gates(review.output, project.quality_metrics)
+                prepared_review = self._prepare_review_for_project(project, review.output)
+                gated_review = apply_reviewer_quality_gates(prepared_review, project.quality_metrics)
                 project.reviews.append(gated_review)
                 self._refresh_quality_metrics(project)
                 project.human_actions_required.extend(gated_review.blocking_issues)
@@ -294,14 +316,17 @@ class ResearchOrchestrator:
                 max_revision_exhausted = review_flow["max_revision_exhausted"]
             elif project.phase == ResearchPhase.HUMAN_APPROVAL:
                 stage_status = "awaiting_human_approval"
+            elif project.phase == ResearchPhase.HUMAN_REVISION_REVIEW:
+                stage_status = "awaiting_human_revision_review"
             elif project.phase == ResearchPhase.HUMAN_INTERVENTION_REQUIRED:
                 stage_status = "waiting_for_human_intervention"
             elif project.phase == ResearchPhase.REVISION:
-                target = project.pending_revision_target
-                if not target:
-                    raise AIScientistError("Revision target is missing.")
-                self._transition_event(project, target)
-                project.pending_revision_target = None
+                if not job_id:
+                    raise InvalidTransitionError("Approved revision batches must run through the asynchronous job endpoint.")
+                revision_artifacts, revision_status = self._execute_approved_revision_plan(project)
+                produced_artifacts += revision_artifacts
+                stage_status = revision_status
+                revision_required = project.phase == ResearchPhase.HUMAN_REVISION_REVIEW
             elif project.phase == ResearchPhase.EXECUTION_WAITING:
                 if project.planning_only:
                     self._transition_event(project, "planning_only")
@@ -317,11 +342,22 @@ class ResearchOrchestrator:
                 )
             elif project.phase == ResearchPhase.CRITICAL_REVIEW:
                 review = self._run_agent(project, SkepticalReviewerAgent)
-                project.reviews.append(review.output)
+                self._refresh_quality_metrics(project)
+                gated_review = apply_reviewer_quality_gates(
+                    self._prepare_review_for_project(project, review.output), project.quality_metrics
+                )
+                gated_review = self._converge_verified_revision_review(project, gated_review)
+                project.reviews.append(gated_review)
+                review = AgentRun(
+                    output=gated_review,
+                    metadata=review.metadata,
+                    tool_names=review.tool_names,
+                    auxiliary=review.auxiliary,
+                )
                 produced_artifacts += self._record_agent_output(project, previous_phase, review, "critical_review")
-                review_decision = review.output.decision
-                blocking_issues = review.output.blocking_issues
-                review_flow = self._apply_review_decision(project, review.output)
+                review_decision = gated_review.decision
+                blocking_issues = gated_review.blocking_issues
+                review_flow = self._apply_review_decision(project, gated_review)
                 revision_required = review_flow["revision_required"]
                 max_revision_exhausted = review_flow["max_revision_exhausted"]
             elif project.phase == ResearchPhase.SYNTHESIS:
@@ -333,7 +369,7 @@ class ResearchOrchestrator:
                 produced_artifacts += self._write_research_plan(project)
             else:
                 raise InvalidTransitionError(f"No stage handler for phase {project.phase.value}")
-            self._advance_revision_queue_after_phase(project, previous_phase)
+            project.active_job_id = None
             self.store.save(project)
         except Exception as exc:
             stage_substep = self._substep_for_error(previous_phase, exc)
@@ -380,6 +416,7 @@ class ResearchOrchestrator:
             project.stage_messages.append(event.display_markdown)
             self._append_event(project, event)
             project.phase = previous_phase
+            project.active_job_id = None
             self.store.save(project)
             raise
         finally:
@@ -842,11 +879,191 @@ class ResearchOrchestrator:
         return project
 
     def get_project(self, project_id: str) -> ResearchProject:
-        return self.store.load(project_id)
+        project = self.store.load(project_id)
+        if self._recover_orphan_revision(project):
+            self.store.save(project)
+        return project
+
+    def _recover_orphan_revision(self, project: ResearchProject) -> bool:
+        changed = False
+        active_plan = next(
+            (
+                item
+                for item in project.approved_revision_plans
+                if item.revision_plan_id == project.active_revision_plan_id
+            ),
+            None,
+        )
+        stale_context_recovered = False
+        if active_plan is not None:
+            for batch in active_plan.target_batches:
+                if batch.issue_snapshots:
+                    continue
+                matched = [
+                    issue for issue in project.revision_issues if issue.issue_id in batch.issue_ids
+                ]
+                stale_ids = bool(batch.issue_ids) and not matched
+                if not matched:
+                    matched = [issue for issue in project.revision_issues if issue.target == batch.target]
+                if matched:
+                    batch.issue_snapshots = [issue.model_copy(deep=True) for issue in matched]
+                    batch.completion_criteria = list(
+                        dict.fromkeys(
+                            criterion
+                            for issue in matched
+                            for criterion in issue.completion_criteria
+                        )
+                    )
+                    changed = True
+                    stale_context_recovered = stale_context_recovered or stale_ids
+        if (
+            active_plan is not None
+            and active_plan.status == "needs_attention"
+            and stale_context_recovered
+        ):
+            for batch in active_plan.target_batches:
+                if batch.status == "needs_attention":
+                    batch.status = "pending"
+                    batch.job_id = None
+            active_plan.status = "approved"
+            project.current_revision_action = None
+            project.active_job_id = None
+            project.phase = ResearchPhase.REVISION
+            self._append_event(
+                project,
+                completed_event(
+                    project.project_id,
+                    ResearchPhase.REVISION,
+                    "orchestrator",
+                    status="revision_context_snapshot_recovered",
+                    visibility="user",
+                    display_key=(
+                        f"revision_cycle_{active_plan.revision_cycle}_context_snapshot_recovered"
+                    ),
+                    display_markdown=(
+                        "检测到旧计划的修订问题 ID 已失效；已从当前审查恢复验收标准快照，"
+                        "本轮可直接重新验证。"
+                    ),
+                ),
+            )
+            changed = True
+        if active_plan is not None and active_plan.status == "in_progress":
+            if project.active_job_id and self._job_record_is_active(project.project_id, project.active_job_id):
+                return False
+            interrupted = [batch for batch in active_plan.target_batches if batch.status == "in_progress"]
+            if interrupted:
+                for batch in interrupted:
+                    batch.status = "pending"
+                    batch.job_id = None
+                active_plan.status = "approved"
+                project.current_revision_action = None
+                project.active_job_id = None
+                project.phase = ResearchPhase.REVISION
+                message = "上一次模型调用在产物生成前中断；已批准的修订计划已保留，可以直接重试。"
+                if message not in project.revision_recovery_messages:
+                    project.revision_recovery_messages.append(message)
+                    project.stage_messages.append(message)
+                self._append_event(
+                    project,
+                    completed_event(
+                        project.project_id,
+                        ResearchPhase.REVISION,
+                        "orchestrator",
+                        status="revision_transport_failure_recovered",
+                        visibility="user",
+                        display_key=(
+                            f"revision_cycle_{active_plan.revision_cycle}_transport_failure_recovered"
+                        ),
+                        display_markdown="模型调用中断，已保留本轮修订计划；可直接重试，不消耗新的修订轮次。",
+                    ),
+                )
+                changed = True
+        action = project.current_revision_action
+        if action is not None and action.status == "in_progress":
+            if project.active_job_id and self._job_record_is_active(project.project_id, project.active_job_id):
+                return False
+            project.current_revision_action = action.model_copy(update={"status": "pending"})
+            project.completed_revision_actions = [
+                item.model_copy(update={"status": "failed_verification"})
+                if item.status == "completed"
+                else item
+                for item in project.completed_revision_actions
+            ]
+            project.pending_revision_actions = []
+            project.active_job_id = None
+            if project.reviews:
+                project.revision_issues = normalize_revision_plan(project.reviews[-1], project.planning_only)
+            project.phase = ResearchPhase.HUMAN_REVISION_REVIEW
+            project.revision_migration_version = max(project.revision_migration_version, 1)
+            message = "检测到旧版自动修订流程未完整结束，已迁移到人工修订审查。"
+            if message not in project.revision_recovery_messages:
+                project.revision_recovery_messages.append(message)
+                project.stage_messages.append(message)
+            event = completed_event(
+                project.project_id,
+                ResearchPhase.HUMAN_REVISION_REVIEW,
+                "orchestrator",
+                status="orphan_revision_action_recovered",
+                visibility="user",
+                display_key="orphan_revision_action_recovered_v1",
+                display_markdown="上一次修订任务未完整结束，已恢复为可重新审查和执行的状态。",
+            )
+            self._append_event(project, event)
+            changed = True
+
+        if (
+            project.revision_migration_version == 1
+            and project.phase == ResearchPhase.HUMAN_REVISION_REVIEW
+            and project.reviews
+        ):
+            project.revision_issues = normalize_revision_plan(project.reviews[-1], project.planning_only)
+            project.revision_migration_version = 2
+            changed = True
+        if (
+            project.revision_migration_version == 2
+            and project.phase == ResearchPhase.HUMAN_REVISION_REVIEW
+            and not project.approved_revision_plans
+        ):
+            project.iteration = max(0, project.iteration - 1)
+            project.budget.used_iterations = max(0, project.budget.used_iterations - 1)
+            project.revision_migration_version = 3
+            changed = True
+        if project.revision_migration_version < 5 and project.planning_only:
+            for issue in project.revision_issues:
+                issue.completion_criteria = normalize_completion_criteria(
+                    issue.completion_criteria,
+                    planning_only=True,
+                )
+            project.revision_migration_version = 5
+            changed = True
+        return changed
+
+    def _job_record_is_active(self, project_id: str, job_id: str) -> bool:
+        path = self.store.project_dir(project_id) / "jobs" / f"{job_id}.json"
+        if not path.exists():
+            return False
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return False
+        return payload.get("status") in {"queued", "running"}
 
     def list_events(self, project_id: str) -> list[ResearchEvent]:
         self.get_project(project_id)
         return self.store.list_events(project_id)
+
+    def recover_revision_projects(self) -> int:
+        """Recover legacy orphan revision states during backend startup."""
+
+        recovered = 0
+        for directory in self.store.root.iterdir():
+            if not directory.is_dir() or not (directory / "project.json").exists():
+                continue
+            project = self.store.load(directory.name)
+            if self._recover_orphan_revision(project):
+                self.store.save(project)
+                recovered += 1
+        return recovered
 
     def list_artifacts(self, project_id: str) -> list[dict[str, Any]]:
         return [item.model_dump(mode="json") for item in self.get_project(project_id).artifacts]
@@ -868,8 +1085,9 @@ class ResearchOrchestrator:
             self.state_machine.transition(project, "reject")
             return {"revision_required": False, "max_revision_exhausted": False}
 
-        actions = self._revision_actions_from_review(review)
-        project.pending_revision_actions = actions
+        issues = normalize_revision_plan(review, project.planning_only)
+        project.revision_issues = issues
+        project.pending_revision_actions = []
         project.current_revision_action = None
         snapshot = build_revision_snapshot(project)
         project.revision_snapshots.append(snapshot)
@@ -888,57 +1106,230 @@ class ResearchOrchestrator:
                 "自动修订已达到上限，但项目并非失败。当前需要人工提供来源、调整范围，或确认接受证据不足结论。"
             )
             return {"revision_required": True, "max_revision_exhausted": True}
-        project.iteration += 1
-        project.budget.used_iterations += 1
-        self._start_next_revision_action(project)
+        project.phase = ResearchPhase.HUMAN_REVISION_REVIEW
+        project.stage_messages.append(
+            "独立审查没有否定当前研究，但提出了需要由您决定如何处理的修订问题。"
+        )
+        event = completed_event(
+            project.project_id,
+            ResearchPhase.FEASIBILITY_REVIEW if len(project.reviews) == 1 else ResearchPhase.CRITICAL_REVIEW,
+            "skeptical_reviewer",
+            job_id=_CURRENT_JOB_ID.get(),
+            status="revision_review_required",
+            visibility="user",
+            display_key=f"revision_cycle_{project.iteration + 1}_review_required",
+            display_markdown=(
+                f"独立审查提出 {len(issues)} 项问题。系统已暂停自动修订，等待您审核修订计划。"
+            ),
+        )
+        self._append_event(project, event)
         return {"revision_required": True, "max_revision_exhausted": False}
 
-    def _revision_actions_from_review(self, review: ReviewResult) -> list[RevisionAction]:
-        actions = list(review.revision_plan)
-        if not actions and review.required_revision_target != "none":
-            actions.append(
-                RevisionAction(
-                    target=self._normalize_revision_target(review.required_revision_target),
-                    priority=1,
-                    reason="Reviewer requested a targeted revision.",
-                    required_changes=review.blocking_issues[:5],
-                    completion_criteria=["The targeted revision is completed and re-reviewed."],
-                )
+    def _prepare_review_for_project(self, project: ResearchProject, review: ReviewResult) -> ReviewResult:
+        """Keep planning defects blocking while moving future execution work out of the gate."""
+
+        if not project.planning_only or review.decision == "reject":
+            return review
+        issues = normalize_revision_plan(review, planning_only=True)
+        plan_blockers = [issue.problem for issue in issues if issue.classification == "plan_blocking"]
+        execution = [issue.problem for issue in issues if issue.classification == "execution_prerequisite"]
+        project.execution_requirements.extend(execution)
+        non_blocking = list(
+            dict.fromkeys(
+                review.non_blocking_issues
+                + [issue.problem for issue in issues if issue.classification in {"non_blocking", "optional"}]
             )
-        if not actions:
-            actions.append(
-                RevisionAction(
-                    target="evidence",
-                    priority=1,
-                    reason="Reviewer requested revision but did not provide a target.",
-                    required_changes=review.blocking_issues[:5],
-                    completion_criteria=["Reviewer blocking issues are addressed."],
-                )
-            )
-        return sorted(
-            [item.model_copy(update={"target": self._normalize_revision_target(item.target), "status": "pending"}) for item in actions],
-            key=lambda item: item.priority,
+        )
+        scores = [
+            review.evidence_quality_score,
+            review.methodological_validity_score,
+            review.feasibility_score,
+            review.reproducibility_score,
+            review.claim_support_score,
+            review.uncertainty_handling_score,
+        ]
+        update: dict[str, Any] = {
+            "blocking_issues": list(dict.fromkeys(plan_blockers)),
+            "non_blocking_issues": non_blocking,
+        }
+        if not plan_blockers and min(scores) >= 6:
+            update.update({"decision": "approve", "required_revision_target": "none", "revision_plan": []})
+        return review.model_copy(update=update)
+
+    def _converge_verified_revision_review(
+        self,
+        project: ResearchProject,
+        review: ReviewResult,
+    ) -> ReviewResult:
+        """Bound critical re-review to verified, human-approved revision scope."""
+
+        completed_plans = [item for item in project.approved_revision_plans if item.status == "completed"]
+        if not completed_plans:
+            return review
+        plan = completed_plans[-1]
+        verification_by_id = {
+            item.verification_id: item for item in project.revision_verifications
+        }
+        if not plan.target_batches or any(
+            batch.status != "completed"
+            or not batch.verification_id
+            or not verification_by_id.get(batch.verification_id)
+            or not verification_by_id[batch.verification_id].overall_passed
+            for batch in plan.target_batches
+        ):
+            return review
+
+        integrity_tokens = (
+            "fabricated source",
+            "fabricated evidence",
+            "fabricated data",
+            "falsified",
+            "ethical violation",
+            "safety violation",
+            "fundamentally unresearchable",
+            "伪造来源",
+            "伪造证据",
+            "伪造数据",
+            "伦理违规",
+            "安全违规",
+            "根本不可研究",
+        )
+        integrity_blockers = [
+            issue
+            for issue in review.blocking_issues
+            if any(token in issue.lower() for token in integrity_tokens)
+        ]
+        if integrity_blockers or review.decision == "reject":
+            return review.model_copy(update={"blocking_issues": integrity_blockers or review.blocking_issues})
+
+        score_updates: dict[str, float] = {}
+        targets = {batch.target for batch in plan.target_batches}
+        target_score_fields = {
+            "question": ["feasibility_score", "uncertainty_handling_score"],
+            "evidence": ["evidence_quality_score", "claim_support_score"],
+            "hypothesis": ["claim_support_score", "uncertainty_handling_score"],
+            "methodology": ["methodological_validity_score", "feasibility_score"],
+            "study_design": ["methodological_validity_score", "feasibility_score"],
+            "analysis_plan": [
+                "methodological_validity_score",
+                "feasibility_score",
+                "reproducibility_score",
+                "uncertainty_handling_score",
+            ],
+            "reproducibility_plan": ["reproducibility_score", "feasibility_score"],
+        }
+        for target in targets:
+            for field in target_score_fields.get(target, []):
+                score_updates[field] = max(6.0, float(getattr(review, field)))
+        resulting_scores = [
+            score_updates.get("evidence_quality_score", review.evidence_quality_score),
+            score_updates.get("methodological_validity_score", review.methodological_validity_score),
+            score_updates.get("feasibility_score", review.feasibility_score),
+            score_updates.get("reproducibility_score", review.reproducibility_score),
+            score_updates.get("claim_support_score", review.claim_support_score),
+            score_updates.get("uncertainty_handling_score", review.uncertainty_handling_score),
+        ]
+        if min(resulting_scores) < 6:
+            return review
+
+        deferred_suggestions = list(
+            dict.fromkeys(review.non_blocking_issues + review.blocking_issues)
+        )
+        return review.model_copy(
+            update={
+                **score_updates,
+                "blocking_issues": [],
+                "non_blocking_issues": deferred_suggestions,
+                "decision": "approve",
+                "failed_quality_gates": [],
+                "required_revision_target": "none",
+                "revision_plan": [],
+                "approval_conditions": list(
+                    dict.fromkeys(
+                        review.approval_conditions
+                        + [
+                            "Human-approved blocking issues passed criterion-level verification.",
+                            "New non-integrity suggestions are retained as non-blocking follow-up items.",
+                            "Planning-only limitations and execution prerequisites remain explicitly disclosed.",
+                        ]
+                    )
+                ),
+            }
         )
 
-    def _start_next_revision_action(self, project: ResearchProject) -> None:
-        if not project.pending_revision_actions:
-            project.current_revision_action = None
-            project.phase = ResearchPhase.CRITICAL_REVIEW
-            return
-        action = project.pending_revision_actions.pop(0).model_copy(update={"status": "in_progress"})
-        project.current_revision_action = action
-        project.phase = self._phase_for_revision_target(action.target)
-        project.stage_messages.append(self._revision_action_message(action, len(project.pending_revision_actions) + 1))
+    def get_revision_review(self, project_id: str) -> dict[str, Any]:
+        project = self.get_project(project_id)
+        if project.phase != ResearchPhase.HUMAN_REVISION_REVIEW:
+            raise InvalidTransitionError("Revision issues are reviewable only in HUMAN_REVISION_REVIEW.")
+        review = project.reviews[-1] if project.reviews else None
+        return {
+            "project_id": project.project_id,
+            "phase": project.phase.value,
+            "review_version": len(project.reviews),
+            "revision_cycle": project.iteration + 1,
+            "review": review.model_dump(mode="json") if review else None,
+            "issues": [issue.model_dump(mode="json") for issue in project.revision_issues],
+            "latest_plan": (
+                project.approved_revision_plans[-1].model_dump(mode="json")
+                if project.approved_revision_plans
+                else None
+            ),
+            "recovery_messages": project.revision_recovery_messages,
+        }
 
-    def _advance_revision_queue_after_phase(self, project: ResearchProject, completed_phase: ResearchPhase) -> None:
-        action = project.current_revision_action
-        if action is None:
-            return
-        if self._completion_phase_for_revision_target(action.target) != completed_phase:
-            return
-        project.completed_revision_actions.append(action.model_copy(update={"status": "completed"}))
+    def submit_revision_review(
+        self,
+        project_id: str,
+        decisions: list[RevisionIssueDecision],
+    ) -> ResearchProject:
+        project = self.get_project(project_id)
+        if project.phase != ResearchPhase.HUMAN_REVISION_REVIEW:
+            raise InvalidTransitionError("Revision plan can only be submitted from HUMAN_REVISION_REVIEW.")
+        if project.iteration >= project.max_iterations:
+            raise InvalidTransitionError("项目已达到最大修订轮次，不能开始新的自动修订。")
+        plan = build_approved_revision_plan(project, decisions)
+        project.approved_revision_plans.append(plan)
+        project.active_revision_plan_id = plan.revision_plan_id
         project.current_revision_action = None
-        self._start_next_revision_action(project)
+        project.pending_revision_actions = []
+        project.iteration += 1
+        project.budget.used_iterations += 1
+        project.revision_feedback.extend(plan.human_modified_instructions.values())
+        project.human_revision_history.append(
+            HumanRevisionRecord(
+                project_id=project.project_id,
+                target="revision_plan",
+                feedback=(
+                    f"Approved {len(plan.approved_issues)} issues; deferred {len(plan.deferred_issues)}; "
+                    f"accepted as limitations {len(plan.accepted_as_limitation)}; rejected {len(plan.rejected_issues)}."
+                ),
+                artifact_versions=dict(project.active_artifact_versions),
+            )
+        )
+        self._invalidate_approval(project, f"Human approved revision cycle {plan.revision_cycle}.")
+        project.phase = ResearchPhase.REVISION if plan.target_batches else ResearchPhase.CRITICAL_REVIEW
+        event = completed_event(
+            project.project_id,
+            ResearchPhase.HUMAN_REVISION_REVIEW,
+            "human_reviewer",
+            visibility="user",
+            display_key=f"revision_cycle_{plan.revision_cycle}_approved",
+            display_markdown=(
+                f"您已确认第 {plan.revision_cycle} 轮修订计划：{len(plan.target_batches)} 个产物批次等待执行。"
+            ),
+        )
+        self._append_event(project, event)
+        self.store.save(project)
+        return project
+
+    def defer_revision_review(self, project_id: str, reason: str = "") -> ResearchProject:
+        project = self.get_project(project_id)
+        if project.phase != ResearchPhase.HUMAN_REVISION_REVIEW:
+            raise InvalidTransitionError("Revision review can only be deferred from HUMAN_REVISION_REVIEW.")
+        project.phase = ResearchPhase.HUMAN_INTERVENTION_REQUIRED
+        project.stage_messages.append(reason or "用户暂缓处理独立审查提出的修订建议。")
+        self.store.save(project)
+        return project
 
     @staticmethod
     def _normalize_revision_target(target: str) -> str:
@@ -986,6 +1377,476 @@ class ResearchOrchestrator:
         }.get(action.target, action.target)
         suffix = f" 后续还有 {remaining_count - 1} 项修订。" if remaining_count > 1 else ""
         return f"独立审查要求定向修订：{target_label}。{action.reason}{suffix}"
+
+    def _execute_approved_revision_plan(self, project: ResearchProject) -> tuple[list[str], str]:
+        plan = next(
+            (item for item in project.approved_revision_plans if item.revision_plan_id == project.active_revision_plan_id),
+            None,
+        )
+        if plan is None:
+            raise AIScientistError("Approved revision plan is missing.")
+        if project.active_job_id is None:
+            raise AIScientistError("Revision execution requires an active persisted job.")
+
+        produced: list[str] = []
+        plan.status = "in_progress"
+        cycle_event = completed_event(
+            project.project_id,
+            ResearchPhase.REVISION,
+            "orchestrator",
+            job_id=project.active_job_id,
+            status="revision_cycle_started",
+            visibility="user",
+            display_key=f"revision_cycle_{plan.revision_cycle}_started",
+            display_markdown=f"第 {plan.revision_cycle} 轮修订开始，共 {len(plan.target_batches)} 个产物批次。",
+        )
+        self._append_event(project, cycle_event)
+
+        issue_by_id = {item.issue_id: item for item in project.revision_issues}
+        for index, batch in enumerate(plan.target_batches, start=1):
+            if batch.status == "completed":
+                continue
+            issues = [issue.model_copy(deep=True) for issue in batch.issue_snapshots]
+            if not issues:
+                issues = [issue_by_id[issue_id] for issue_id in batch.issue_ids if issue_id in issue_by_id]
+            if not issues:
+                issues = [issue for issue in project.revision_issues if issue.target == batch.target]
+            if not batch.issue_snapshots and issues:
+                batch.issue_snapshots = [issue.model_copy(deep=True) for issue in issues]
+            if not batch.completion_criteria and issues:
+                batch.completion_criteria = list(
+                    dict.fromkeys(
+                        criterion for issue in issues for criterion in issue.completion_criteria
+                    )
+                )
+            batch.status = "in_progress"
+            batch.job_id = project.active_job_id
+            batch.old_artifact_version = project.active_artifact_versions.get(batch.target)
+            project.current_revision_action = RevisionAction(
+                target=self._legacy_target(batch.target),
+                priority=min((issue.priority for issue in issues), default=1),
+                reason=f"Human-approved {batch.target} revision batch.",
+                required_changes=list(batch.instructions),
+                completion_criteria=list(batch.completion_criteria),
+                action_id=batch.batch_id,
+                status="in_progress",
+            )
+            self._append_event(
+                project,
+                completed_event(
+                    project.project_id,
+                    ResearchPhase.REVISION,
+                    "orchestrator",
+                    job_id=project.active_job_id,
+                    status="revision_batch_started",
+                    visibility="user",
+                    display_key=f"revision_cycle_{plan.revision_cycle}_{batch.batch_id}_started",
+                    display_markdown=f"{index} / {len(plan.target_batches)}　正在修订{self._revision_target_label(batch.target)}。",
+                ),
+            )
+
+            if batch.target == "execution_requirements":
+                project.execution_requirements.extend(batch.instructions)
+                record = self.artifacts.save_json(
+                    project.project_id,
+                    "execution_requirements",
+                    {"requirements": list(dict.fromkeys(project.execution_requirements))},
+                    "human_reviewer",
+                )
+                project.artifacts.append(record)
+                project.active_artifact_versions["execution_requirements"] = record.version
+                produced.append(record.artifact_id)
+                verification = RevisionVerificationResult(
+                    action_id=batch.batch_id,
+                    target_artifact=batch.target,
+                    artifact_version=record.version,
+                    criteria_results=[
+                        RevisionCriterionResult(
+                            criterion="Execution prerequisite is recorded without claiming execution.",
+                            passed=True,
+                            evidence="Recorded under execution_requirements.",
+                        )
+                    ],
+                    overall_passed=True,
+                    verification_method="deterministic_recording",
+                )
+                verification_artifact_id = self._record_revision_verification(project, plan, batch, verification)
+                produced.append(verification_artifact_id)
+            elif batch.target == "evidence":
+                batch.status = "needs_attention"
+                batch.job_id = None
+                plan.status = "needs_attention"
+                project.current_revision_action = project.current_revision_action.model_copy(update={"status": "needs_attention"})
+                project.phase = ResearchPhase.HUMAN_REVISION_REVIEW
+                project.stage_messages.append("证据修订需要重新经过检索方案与来源人工筛选，已返回人工修订审查。")
+                self.store.save(project)
+                return produced, "revision_needs_attention"
+            else:
+                old_artifact = self._current_revision_artifact(project, batch.target)
+                working_artifact = old_artifact
+                previous_verification: RevisionVerificationResult | None = None
+                for attempt in range(1, self.revision_max_attempts + 1):
+                    run = self._run_revision_model(
+                        project,
+                        batch,
+                        working_artifact,
+                        issues,
+                        previous_verification,
+                    )
+                    artifact_id, new_version = self._record_revision_output(project, plan, batch, run)
+                    produced.append(artifact_id)
+                    batch.new_artifact_version = new_version
+                    new_artifact = self._current_revision_artifact(project, batch.target)
+                    retry_remaining = attempt < self.revision_max_attempts
+                    verification, verification_artifact_id = self._verify_revision_batch(
+                        project,
+                        plan,
+                        batch,
+                        issues,
+                        working_artifact,
+                        new_artifact,
+                        new_version,
+                        retry_remaining,
+                    )
+                    produced.append(verification_artifact_id)
+                    if verification.overall_passed:
+                        break
+                    previous_verification = verification
+                    working_artifact = new_artifact
+                    if retry_remaining:
+                        failed_count = len([item for item in verification.criteria_results if not item.passed])
+                        self._append_event(
+                            project,
+                            completed_event(
+                                project.project_id,
+                                ResearchPhase.REVISION,
+                                "orchestrator",
+                                job_id=project.active_job_id,
+                                status="revision_auto_repair_started",
+                                visibility="user",
+                                display_key=(
+                                    f"revision_cycle_{plan.revision_cycle}_{batch.batch_id}_"
+                                    f"auto_repair_after_v{new_version}"
+                                ),
+                                display_markdown=(
+                                    f"验证发现 {failed_count} 项尚未满足，正在根据逐条反馈自动补修"
+                                    f"{self._revision_target_label(batch.target)}。"
+                                ),
+                            ),
+                        )
+                if not verification.overall_passed:
+                    batch.status = "needs_attention"
+                    batch.job_id = None
+                    plan.status = "needs_attention"
+                    project.current_revision_action = project.current_revision_action.model_copy(
+                        update={"status": "needs_attention"}
+                    )
+                    for issue in issues:
+                        issue.status = "needs_attention"
+                    project.phase = ResearchPhase.HUMAN_REVISION_REVIEW
+                    project.stage_messages.append("AI 未能完整解决当前修订批次，已返回人工审查。")
+                    self._append_event(
+                        project,
+                        completed_event(
+                            project.project_id,
+                            ResearchPhase.REVISION,
+                            "revision_verifier",
+                            job_id=project.active_job_id,
+                            status="revision_verification_failed",
+                            visibility="user",
+                            display_key=f"revision_cycle_{plan.revision_cycle}_{batch.batch_id}_needs_attention_v{new_version}",
+                            display_markdown="修订验证未通过。AI 未完整满足部分要求，请补充指令、提供内容或调整处置方式。",
+                        ),
+                    )
+                    self.store.save(project)
+                    return produced, "revision_needs_attention"
+
+            batch.status = "completed"
+            batch.job_id = None
+            for issue in issues:
+                issue.status = "completed"
+            completed_action = project.current_revision_action.model_copy(update={"status": "completed"})
+            project.completed_revision_actions.append(completed_action)
+            project.current_revision_action = None
+            passed_count = len([item for item in verification.criteria_results if item.passed])
+            self._append_event(
+                project,
+                completed_event(
+                    project.project_id,
+                    ResearchPhase.REVISION,
+                    "revision_verifier",
+                    job_id=project.active_job_id,
+                    status="revision_batch_completed",
+                    visibility="user",
+                    display_key=f"revision_cycle_{plan.revision_cycle}_{batch.batch_id}_completed_v{verification.artifact_version}",
+                    display_markdown=(
+                        f"{self._revision_target_label(batch.target)} v{verification.artifact_version} 修订完成；"
+                        f"验证 {passed_count}/{len(verification.criteria_results)} 条通过。"
+                    ),
+                ),
+            )
+
+        plan.status = "completed"
+        project.current_revision_action = None
+        project.active_revision_plan_id = None
+        project.phase = ResearchPhase.CRITICAL_REVIEW
+        self._append_event(
+            project,
+            completed_event(
+                project.project_id,
+                ResearchPhase.REVISION,
+                "orchestrator",
+                job_id=project.active_job_id,
+                status="revision_cycle_completed",
+                visibility="user",
+                display_key=f"revision_cycle_{plan.revision_cycle}_completed",
+                display_markdown=f"第 {plan.revision_cycle} 轮全部修订批次已验证完成，下一步将进行独立复审。",
+            ),
+        )
+        return produced, "revision_cycle_completed"
+
+    def _run_revision_model(
+        self,
+        project: ResearchProject,
+        batch: RevisionTargetBatch,
+        old_artifact: Any,
+        issues: list[RevisionIssue],
+        previous_verification: RevisionVerificationResult | None = None,
+    ) -> AgentRun:
+        role_and_model = {
+            "question": ("research_director", ResearchDirectorAgent.output_model),
+            "hypothesis": ("hypothesis_scientist", HypothesisScientistAgent.output_model),
+            "methodology": ("methodologist", MethodologistAgent.output_model),
+            "study_design": ("study_designer", StudyDesignerAgent.output_model),
+            "analysis_plan": ("analyst", AnalystAgent.output_model),
+            "reproducibility_plan": ("reproducibility_engineer", ReproducibilityEngineerAgent.output_model),
+        }
+        if batch.target not in role_and_model:
+            raise AIScientistError(f"Unsupported automated revision target: {batch.target}")
+        role, output_model = role_and_model[batch.target]
+        result = self._structured_client_for_project(project).call(
+            role,
+            (
+                "Revise one existing research-planning artifact using only the approved human revision batch. "
+                "Implement every completion criterion as concrete text or fields in the artifact; general promises "
+                "are not completion. Preserve correct existing content. If prior verification feedback is supplied, "
+                "repair every failed criterion and retain criteria that already passed. "
+                "Do not claim that future execution tasks have already occurred. Return structured JSON only."
+            ),
+            {
+                "project_id": project.project_id,
+                "planning_only": project.planning_only,
+                "research_question": project.question.model_dump(mode="json") if project.question else None,
+                "current_artifact": old_artifact,
+                "approved_revision_batch": batch.model_dump(mode="json"),
+                "approved_issues": [issue.model_dump(mode="json") for issue in issues],
+                "completion_criteria": list(
+                    batch.completion_criteria
+                    or dict.fromkeys(criterion for issue in issues for criterion in issue.completion_criteria)
+                ),
+                "human_instructions": batch.instructions,
+                "human_provided_content": batch.provided_content,
+                "previous_verification_failures": [
+                    item.model_dump(mode="json")
+                    for item in (previous_verification.criteria_results if previous_verification else [])
+                    if not item.passed
+                ],
+            },
+            output_model,
+        )
+        return AgentRun(output=result.value, metadata=result.metadata)
+
+    def _record_revision_output(
+        self,
+        project: ResearchProject,
+        plan: ApprovedRevisionPlan,
+        batch: RevisionTargetBatch,
+        run: AgentRun,
+    ) -> tuple[str, int]:
+        self._apply_call_metadata(project, run.metadata)
+        artifact_type = batch.target
+        self._apply_revision_output(project, artifact_type, run.output)
+        record = self.artifacts.save_json(
+            project.project_id,
+            artifact_type,
+            run.output.model_dump(mode="json"),
+            run.metadata.agent_name,
+        )
+        project.artifacts.append(record)
+        project.active_artifact_versions[artifact_type] = record.version
+        self._invalidate_approval(project, f"Revision cycle {plan.revision_cycle} produced {artifact_type} v{record.version}.")
+        self._append_event(
+            project,
+            completed_event(
+                project.project_id,
+                ResearchPhase.REVISION,
+                run.metadata.agent_name,
+                job_id=project.active_job_id,
+                requested_model=run.metadata.requested_model,
+                actual_model=run.metadata.actual_model,
+                fallback_used=run.metadata.fallback_used,
+                output_artifact_ids=[record.artifact_id],
+                attempted_calls=run.metadata.attempted_calls,
+                successful_calls=run.metadata.successful_calls,
+                visibility="user",
+                display_key=f"revision_cycle_{plan.revision_cycle}_{batch.batch_id}_{artifact_type}_v{record.version}_generated",
+                display_markdown=f"已生成 {self._revision_target_label(artifact_type)} v{record.version}，正在验证修订要求。",
+            ),
+        )
+        return record.artifact_id, record.version
+
+    def _verify_revision_batch(
+        self,
+        project: ResearchProject,
+        plan: ApprovedRevisionPlan,
+        batch: RevisionTargetBatch,
+        issues: list[RevisionIssue],
+        old_artifact: Any,
+        new_artifact: Any,
+        new_version: int,
+        retry_remaining: bool = False,
+    ) -> tuple[RevisionVerificationResult, str]:
+        deterministic = deterministic_verify_batch(batch, issues, new_artifact)
+        try:
+            verifier = RevisionVerifierAgent(client=self._structured_client_for_project(project))
+            run = verifier.verify(
+                project, batch, issues, old_artifact, new_artifact, new_version, deterministic
+            )
+            self._apply_call_metadata(project, run.metadata)
+            model_result = run.output
+            combined = combine_revision_verification_results(
+                deterministic,
+                model_result.criteria_results,
+            )
+            verification = model_result.model_copy(
+                update={
+                    "action_id": batch.batch_id,
+                    "target_artifact": batch.target,
+                    "artifact_version": new_version,
+                    "criteria_results": combined,
+                    "overall_passed": bool(combined) and all(item.passed for item in combined),
+                    "verification_method": "deterministic+independent_qwen",
+                }
+            )
+        except Exception as exc:
+            verification = RevisionVerificationResult(
+                action_id=batch.batch_id,
+                target_artifact=batch.target,
+                artifact_version=new_version,
+                criteria_results=[
+                    item.model_copy(
+                        update={
+                            "passed": False,
+                            "note": f"{item.note} Independent verification failed: {type(exc).__name__}",
+                        }
+                    )
+                    for item in deterministic
+                ],
+                overall_passed=False,
+                verification_method="deterministic+independent_verifier_failed",
+            )
+        artifact_id = self._record_revision_verification(
+            project,
+            plan,
+            batch,
+            verification,
+            retry_remaining=retry_remaining,
+        )
+        return verification, artifact_id
+
+    def _record_revision_verification(
+        self,
+        project: ResearchProject,
+        plan: ApprovedRevisionPlan,
+        batch: RevisionTargetBatch,
+        verification: RevisionVerificationResult,
+        retry_remaining: bool = False,
+    ) -> str:
+        project.revision_verifications.append(verification)
+        batch.verification_id = verification.verification_id
+        record = self.artifacts.save_json(
+            project.project_id,
+            "revision_verification",
+            verification.model_dump(mode="json"),
+            "revision_verifier",
+        )
+        project.artifacts.append(record)
+        self._append_event(
+            project,
+            completed_event(
+                project.project_id,
+                ResearchPhase.REVISION,
+                "revision_verifier",
+                job_id=project.active_job_id,
+                output_artifact_ids=[record.artifact_id],
+                visibility="user",
+                display_key=f"revision_cycle_{plan.revision_cycle}_{batch.batch_id}_verification_v{verification.artifact_version}",
+                display_markdown=(
+                    "修订验证通过。"
+                    if verification.overall_passed
+                    else (
+                        "修订验证发现可补全项，准备自动定向补修。"
+                        if retry_remaining
+                        else "修订验证未通过，需要人工处理。"
+                    )
+                ),
+            ),
+        )
+        return record.artifact_id
+
+    @staticmethod
+    def _apply_revision_output(project: ResearchProject, target: str, output: Any) -> None:
+        if target == "question":
+            project.question = output.research_question
+            project.title = output.project_title
+        elif target == "hypothesis":
+            project.hypotheses = output.hypotheses
+        elif target == "methodology":
+            project.research_mode = output.selected_research_mode
+            project.method_rationale = output.methodological_rationale
+            project.validity_threats = output.validity_threats
+            project.required_controls = output.required_controls
+        elif target == "study_design":
+            project.study_design = output
+        elif target == "analysis_plan":
+            project.analysis_plan = output
+        elif target == "reproducibility_plan":
+            project.reproducibility_plan = output.model_dump(mode="json")
+
+    def _current_revision_artifact(self, project: ResearchProject, target: str) -> Any:
+        return {
+            "question": project.question.model_dump(mode="json") if project.question else None,
+            "hypothesis": [item.model_dump(mode="json") for item in project.hypotheses],
+            "methodology": {
+                "selected_research_mode": project.research_mode.value if project.research_mode else None,
+                "methodological_rationale": project.method_rationale,
+                "validity_threats": project.validity_threats,
+                "required_controls": project.required_controls,
+            },
+            "study_design": project.study_design.model_dump(mode="json") if project.study_design else None,
+            "analysis_plan": project.analysis_plan.model_dump(mode="json") if project.analysis_plan else None,
+            "reproducibility_plan": project.reproducibility_plan,
+        }.get(target)
+
+    @staticmethod
+    def _legacy_target(target: str) -> str:
+        return {
+            "methodology": "method",
+            "execution_requirements": "reproducibility_plan",
+        }.get(target, target)
+
+    @staticmethod
+    def _revision_target_label(target: str) -> str:
+        return {
+            "question": "研究问题",
+            "evidence": "证据",
+            "hypothesis": "研究假设",
+            "methodology": "方法学方案",
+            "study_design": "研究设计",
+            "analysis_plan": "分析方案",
+            "reproducibility_plan": "可复现性方案",
+            "execution_requirements": "执行阶段要求",
+        }.get(target, target)
 
     def debug_claim_mapping(self, project_id: str) -> dict[str, Any]:
         """Dry-run claim mapping validation without changing formal project state."""

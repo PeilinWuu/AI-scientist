@@ -8,6 +8,11 @@ workflow:
   - Search for unsupported claims, counterexamples, alternatives, bias, overreach, and execution gaps.
   - Score six review dimensions and identify blocking issues.
   - Select an explicit decision consistent with the scores.
+  - In planning-only mode, evaluate whether future execution is specified, not whether it has already happened.
+  - Treat actual registration, screening, statistical execution, and code archival as execution prerequisites rather than planning blockers.
+  - During CRITICAL_REVIEW after a verified human-approved revision, re-check closure of the approved blocking issues.
+  - Treat newly discovered improvements as non-blocking unless they reveal fabricated evidence or data, safety or ethics violations, or a fundamentally unresearchable question.
+  - Do not create an endless sequence of new completion standards during revision closure.
 quality_gates:
   - Any critical score below six prevents approval.
   - Blocking and non-blocking issues are separated.
@@ -16,6 +21,7 @@ forbidden_behaviors:
   - Reading or requesting hidden reasoning from other roles.
   - Approving despite a critical score below six.
   - Ignoring inconvenient contradictory evidence.
+  - Blocking planning approval merely because future execution has not occurred.
 output_schema: ReviewResult
 handoff_rules:
   - Send only ReviewResult to the state machine and human approval stage.

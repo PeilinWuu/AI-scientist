@@ -21,6 +21,7 @@ transitions:
   ANALYSIS_PLANNING: {next: FEASIBILITY_REVIEW}
   FEASIBILITY_REVIEW:
     approve: HUMAN_APPROVAL
+    revision_required: HUMAN_REVISION_REVIEW
     human_intervention_required: HUMAN_INTERVENTION_REQUIRED
     revise_question: QUESTION_FORMULATION
     revise_evidence: BACKGROUND_RESEARCH
@@ -29,6 +30,10 @@ transitions:
     revise_design: STUDY_DESIGN
     revise_analysis: ANALYSIS_PLANNING
     reject: FAILED
+  HUMAN_REVISION_REVIEW:
+    submit: REVISION
+    defer: HUMAN_INTERVENTION_REQUIRED
+    cancel: CANCELLED
   HUMAN_APPROVAL:
     approve: EXECUTION_WAITING
     revise: REVISION
@@ -56,6 +61,7 @@ transitions:
   DATA_ANALYSIS: {next: CRITICAL_REVIEW}
   CRITICAL_REVIEW:
     approve: SYNTHESIS
+    revision_required: HUMAN_REVISION_REVIEW
     human_intervention_required: HUMAN_INTERVENTION_REQUIRED
     revise_question: QUESTION_FORMULATION
     revise_evidence: BACKGROUND_RESEARCH

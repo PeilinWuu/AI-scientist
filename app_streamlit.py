@@ -38,6 +38,7 @@ SCIENTIST_MODEL_KEYS = {
     "analyst": ("scientist_analyst_model", "分析师模型"),
     "reproducibility_engineer": ("scientist_reproducibility_model", "可复现性工程师模型"),
     "skeptical_reviewer": ("scientist_reviewer_model", "独立审查员模型"),
+    "revision_verifier": ("scientist_revision_verifier_model", "修订验证模型"),
     "scientific_synthesizer": ("scientist_synthesizer_model", "科学综合模型"),
     "fallback": ("scientist_fallback_model", "备用模型"),
 }
@@ -460,7 +461,8 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
     columns[0].metric("当前阶段", PHASE_LABELS.get(project.get("phase", ""), project.get("phase", "")))
     columns[1].metric("研究模式", project.get("research_mode") or "待选择")
     columns[2].metric("研究领域", project.get("domain") or "通用")
-    columns[3].metric("修订轮次", project.get("iteration", 0))
+    pending_cycle = 1 if project.get("phase") == "HUMAN_REVISION_REVIEW" and project.get("revision_issues") else 0
+    columns[3].metric("修订轮次", project.get("iteration", 0) + pending_cycle)
     budget = project.get("budget") or {}
     columns[4].metric("模型调用", f"{budget.get('used_model_calls', 0)}/{budget.get('max_model_calls', 0)}")
     st.caption(f"项目 ID：{project.get('project_id')}")
@@ -503,11 +505,16 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
     job_running = bool(active_job and active_job.get("status") in {"queued", "running"})
 
     _render_evidence_curation_gate(backend_url, project, job_running, show_debug)
+    _render_revision_review_gate(backend_url, project, job_running, show_debug)
 
     action_columns = st.columns(3)
-    human_gate = project.get("phase") in {"SEARCH_PLAN_REVIEW", "HUMAN_SOURCE_REVIEW", "HUMAN_APPROVAL"}
+    human_gate = project.get("phase") in {
+        "SEARCH_PLAN_REVIEW", "HUMAN_SOURCE_REVIEW", "HUMAN_REVISION_REVIEW", "HUMAN_APPROVAL"
+    }
     if action_columns[0].button("运行下一阶段", type="primary", disabled=job_running or human_gate):
         _start_research_step_job(backend_url, project["project_id"])
+    if project.get("phase") == "HUMAN_REVISION_REVIEW":
+        st.info("当前需要您审查独立审查员提出的修订建议。请先在上方逐项决定如何处理。")
     if action_columns[1].button("刷新"):
         refresh_research_project(backend_url)
         st.rerun()
@@ -639,7 +646,7 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
 
     tabs = st.tabs([
         "研究问题", "证据与来源", "主张与证据", "假设与竞争性解释", "研究方法",
-        "研究设计", "分析方案", "可复现性", "独立审查", "最终综合",
+        "研究设计", "分析方案", "可复现性", "独立审查", "修订历史", "最终综合",
     ])
     with tabs[0]:
         question = project.get("question") or {}
@@ -742,6 +749,48 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
         else:
             st.info("尚未运行独立审查。")
     with tabs[9]:
+        plans = project.get("approved_revision_plans") or []
+        verifications = {item.get("verification_id"): item for item in project.get("revision_verifications") or []}
+        if not plans:
+            st.info("尚未开始人工批准的修订轮次。")
+            legacy_versions: dict[str, list[int]] = {}
+            for artifact in project.get("artifacts") or []:
+                version = artifact.get("version")
+                if isinstance(version, int) and version > 1:
+                    legacy_versions.setdefault(str(artifact.get("artifact_type")), []).append(version)
+            if legacy_versions:
+                st.markdown("### 旧版自动修订产物（未经过 completion criteria 验证）")
+                for artifact_type, versions in sorted(legacy_versions.items()):
+                    all_versions = [1, *sorted(set(versions))]
+                    st.markdown(
+                        f"- {_revision_target_label(artifact_type)}："
+                        + " → ".join(f"v{version}" for version in all_versions)
+                    )
+        for plan in plans:
+            st.markdown(f"### Independent Review v{plan.get('review_version')} → 修订轮次 {plan.get('revision_cycle')}")
+            summary = st.columns(4)
+            summary[0].metric("人工接受", len(plan.get("approved_issues") or []))
+            summary[1].metric("延期执行", len(plan.get("deferred_issues") or []))
+            summary[2].metric("接受为局限", len(plan.get("accepted_as_limitation") or []))
+            summary[3].metric("不同意", len(plan.get("rejected_issues") or []))
+            for batch in plan.get("target_batches") or []:
+                verification = verifications.get(batch.get("verification_id")) or {}
+                criteria = verification.get("criteria_results") or []
+                passed = len([item for item in criteria if item.get("passed")])
+                version = batch.get("new_artifact_version")
+                st.markdown(
+                    f"- {_revision_target_label(batch.get('target'))}"
+                    f"{f' v{version}' if version else ''}：{_revision_batch_status(batch.get('status'))}；"
+                    f"验证 {passed}/{len(criteria)}"
+                )
+                if criteria:
+                    with st.expander(f"查看{_revision_target_label(batch.get('target'))}验证详情"):
+                        for criterion in criteria:
+                            marker = "通过" if criterion.get("passed") else "未通过"
+                            st.markdown(f"**{marker}：** {criterion.get('criterion')}")
+                            if criterion.get("evidence"):
+                                st.caption(f"依据：{criterion.get('evidence')}")
+    with tabs[10]:
         conclusion = project.get("conclusion")
         if conclusion:
             _render_mapping_sections(conclusion, {
@@ -782,6 +831,179 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
             artifact_rows = [{"type": item.get("artifact_type"), "file": item.get("filename"), "version": item.get("version")} for item in normalize_records(artifacts)]
             if artifact_rows:
                 st.dataframe(artifact_rows, use_container_width=True, hide_index=True)
+
+
+def _render_revision_review_gate(
+    backend_url: str, project: dict, job_running: bool, show_debug: bool
+) -> None:
+    if project.get("phase") != "HUMAN_REVISION_REVIEW":
+        return
+    project_id = project.get("project_id")
+    st.subheader("独立审查要求修订")
+    st.info("独立审查没有否定这项研究，而是提出了需要您决定如何处理的问题。系统不会在您确认前自动重写研究产物。")
+    for message in project.get("revision_recovery_messages") or []:
+        st.warning(message)
+    review = (project.get("reviews") or [{}])[-1]
+    scores = st.columns(3)
+    scores[0].metric("方法有效性", review.get("methodological_validity_score", 0))
+    scores[1].metric("可复现性", review.get("reproducibility_score", 0))
+    scores[2].metric("证据质量", review.get("evidence_quality_score", 0))
+    _render_named_list("非阻断问题", review.get("non_blocking_issues") or [])
+    _render_named_list("总体建议", review.get("recommendations") or [])
+
+    verifications = project.get("revision_verifications") or []
+    latest_verification = verifications[-1] if verifications else None
+    if latest_verification and not latest_verification.get("overall_passed"):
+        failed_criteria = [
+            item for item in latest_verification.get("criteria_results") or [] if not item.get("passed")
+        ]
+        st.warning(
+            f"最近一次自动修订有 {len(failed_criteria)} 项验收标准未满足。"
+            "重新确认后，系统会根据这些逐条反馈进行有限次数的定向补修。"
+        )
+        with st.expander("查看未通过的验收标准", expanded=True):
+            for criterion in failed_criteria:
+                st.markdown(f"**未通过：** {criterion.get('criterion') or '未命名标准'}")
+                note = str(criterion.get("note") or "").split("Independent:", 1)[-1].strip()
+                if note:
+                    st.caption(note)
+
+    st.markdown("### 建议修订计划")
+    issues = project.get("revision_issues") or []
+    if not issues:
+        st.error("当前没有可提交的结构化修订问题，请刷新项目或查看后端迁移日志。")
+        return
+    decisions: list[dict] = []
+    options = [
+        "accept_ai",
+        "accept_modified",
+        "provide_content",
+        "accept_limitation",
+        "defer_execution",
+        "reject",
+    ]
+    for index, issue in enumerate(issues):
+        issue_id = issue.get("issue_id")
+        classification = issue.get("classification")
+        with st.container(border=True):
+            st.markdown(f"**问题：** {issue.get('problem') or '未说明的问题'}")
+            st.markdown(f"**严重性：** {_revision_classification_label(classification)}")
+            st.markdown(f"**影响：** {issue.get('impact') or '尚未说明'}")
+            _render_named_list("Reviewer 建议", issue.get("reviewer_recommendations") or [])
+            _render_named_list("验收标准", issue.get("completion_criteria") or [])
+            st.markdown(f"**目标：** {_revision_target_label(issue.get('target'))}")
+            default = "defer_execution" if classification == "execution_prerequisite" else (
+                "accept_limitation" if classification in {"non_blocking", "optional"} else "accept_ai"
+            )
+            disposition = st.selectbox(
+                "如何处理",
+                options,
+                index=options.index(default),
+                format_func=lambda value: {
+                    "accept_ai": "接受 AI 建议并自动修订",
+                    "accept_modified": "接受，但修改修订要求",
+                    "provide_content": "我自己提供补充信息",
+                    "accept_limitation": "接受为研究局限性",
+                    "defer_execution": "延期到执行阶段",
+                    "reject": "不同意 Reviewer 此项建议",
+                }[value],
+                key=f"revision_disposition_{project_id}_{issue_id}",
+            )
+            instruction = ""
+            reason = ""
+            if disposition in {"accept_modified", "provide_content"}:
+                instruction = st.text_area(
+                    "修订指令或补充内容",
+                    key=f"revision_instruction_{project_id}_{issue_id}",
+                    placeholder="写明希望采用的具体规则、参数、检索式或方法。",
+                )
+            elif disposition in {"accept_limitation", "defer_execution", "reject"}:
+                reason = st.text_area(
+                    "说明",
+                    key=f"revision_reason_{project_id}_{issue_id}",
+                    placeholder="说明接受为局限、延期或不同意的理由。",
+                )
+            if show_debug:
+                st.caption(
+                    f"issue_id={issue_id} · source_actions={', '.join(issue.get('source_action_ids') or [])}"
+                )
+            decisions.append(
+                {
+                    "issue_id": issue_id,
+                    "disposition": disposition,
+                    "instruction": instruction,
+                    "reason": reason,
+                }
+            )
+
+    columns = st.columns(3)
+    if columns[0].button(
+        "确认修订计划并开始修订",
+        type="primary",
+        disabled=job_running,
+        key=f"submit_revision_review_{project_id}",
+    ):
+        try:
+            response = post_json(
+                backend_url,
+                f"/api/research/{project_id}/revision-review/submit",
+                {"decisions": decisions},
+            )
+            if response.get("phase") == "REVISION":
+                _start_research_step_job(backend_url, project_id)
+            else:
+                refresh_research_project(backend_url)
+                st.rerun()
+        except BackendAPIError as exc:
+            detail = exc.detail
+            message = detail.get("error_message") if isinstance(detail, dict) else str(detail)
+            st.error(f"修订提交失败：{message or detail}")
+            if show_debug:
+                render_debug_object(
+                    {"http_status": exc.status_code, "error_detail": detail}
+                )
+    if columns[1].button("稍后处理", disabled=job_running, key=f"defer_revision_review_{project_id}"):
+        try:
+            _research_action(
+                backend_url,
+                f"/api/research/{project_id}/revision-review/defer",
+                {"reason": "用户选择稍后处理独立审查建议。"},
+            )
+        except BackendAPIError as exc:
+            st.error(f"暂缓失败：{exc.detail}")
+    if columns[2].button("取消项目", disabled=job_running, key=f"cancel_revision_review_{project_id}"):
+        _research_action(backend_url, f"/api/research/{project_id}/revision-review/cancel", {})
+
+
+def _revision_classification_label(value: str | None) -> str:
+    return {
+        "plan_blocking": "需要在方案定稿前处理",
+        "execution_prerequisite": "未来执行阶段的前置要求",
+        "non_blocking": "非阻断改进",
+        "optional": "可选优化",
+    }.get(value or "", value or "未分类")
+
+
+def _revision_target_label(value: str | None) -> str:
+    return {
+        "question": "研究问题",
+        "evidence": "证据",
+        "hypothesis": "研究假设",
+        "methodology": "方法学方案",
+        "study_design": "研究设计",
+        "analysis_plan": "分析方案",
+        "reproducibility_plan": "可复现性方案",
+        "execution_requirements": "执行阶段要求",
+    }.get(value or "", value or "未指定")
+
+
+def _revision_batch_status(value: str | None) -> str:
+    return {
+        "pending": "等待执行",
+        "in_progress": "正在执行",
+        "completed": "已验证完成",
+        "needs_attention": "需要人工处理",
+    }.get(value or "", value or "未知")
 
 
 def _render_evidence_curation_gate(
@@ -1095,10 +1317,10 @@ def _render_research_job_status(backend_url: str, project: dict, show_debug: boo
         error = job.get("error") or {}
         message = str(error.get("error_message") or "")
         stage_substep = str(error.get("stage_substep") or "")
-        if stage_substep:
+        if "timeout" in message.lower():
+            st.error("Qwen 模型调用超时。已批准的修订计划会被保留，刷新后可直接重试，不消耗新的修订轮次。")
+        elif stage_substep:
             st.error(_research_failure_message(stage_substep))
-        elif "timeout" in message.lower():
-            st.error("研究阶段运行超时，项目保留在上一个已完成阶段。")
         else:
             st.error("研究阶段执行失败，项目保留在上一个已完成阶段。")
         if show_debug:
@@ -1123,6 +1345,10 @@ def _research_failure_message(stage_substep: str) -> str:
 
 def _revision_message(result: dict) -> str:
     target = result.get("current_phase")
+    if target == "HUMAN_REVISION_REVIEW":
+        if result.get("stage_status") == "revision_needs_attention":
+            return "AI 未能完整满足当前修订批次的验证标准，项目已返回人工修订审查。"
+        return "独立审查提出了需要处理的问题。系统已暂停自动修订，等待您逐项审核修订建议。"
     target_text = {
         "BACKGROUND_RESEARCH": "背景证据研究阶段",
         "HYPOTHESIS_GENERATION": "假设生成阶段",

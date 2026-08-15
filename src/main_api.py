@@ -24,6 +24,8 @@ from src.ai_scientist.schemas import (
     ResearchStartRequest,
     ResearchAssetUploadRequest,
     RevisionRequest,
+    RevisionReviewDeferRequest,
+    RevisionReviewSubmitRequest,
     SearchPlanReviewRequest,
     SourceSelectionRequest,
 )
@@ -42,6 +44,7 @@ app = FastAPI(
 
 research_orchestrator = ResearchOrchestrator()
 research_job_store = ResearchJobStore(research_orchestrator.store.root)
+research_orchestrator.recover_revision_projects()
 
 
 @app.get("/health")
@@ -623,6 +626,47 @@ def research_revise(project_id: str, request: RevisionRequest) -> dict:
     try:
         project = research_orchestrator.request_revision(project_id, request.target, request.feedback)
         return {"project_id": project.project_id, "phase": project.phase.value, "status": "revision_requested"}
+    except Exception as exc:  # noqa: BLE001
+        raise _research_http_error(exc) from exc
+
+
+@app.get("/api/research/{project_id}/revision-review")
+def research_revision_review(project_id: str) -> dict:
+    try:
+        return research_orchestrator.get_revision_review(project_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _research_http_error(exc) from exc
+
+
+@app.post("/api/research/{project_id}/revision-review/submit")
+def research_revision_review_submit(project_id: str, request: RevisionReviewSubmitRequest) -> dict:
+    try:
+        project = research_orchestrator.submit_revision_review(project_id, request.decisions)
+        plan = project.approved_revision_plans[-1]
+        return {
+            "project_id": project.project_id,
+            "phase": project.phase.value,
+            "status": "revision_plan_approved",
+            "revision_plan": plan.model_dump(mode="json"),
+        }
+    except Exception as exc:  # noqa: BLE001
+        raise _research_http_error(exc) from exc
+
+
+@app.post("/api/research/{project_id}/revision-review/defer")
+def research_revision_review_defer(project_id: str, request: RevisionReviewDeferRequest) -> dict:
+    try:
+        project = research_orchestrator.defer_revision_review(project_id, request.reason)
+        return {"project_id": project.project_id, "phase": project.phase.value, "status": "deferred"}
+    except Exception as exc:  # noqa: BLE001
+        raise _research_http_error(exc) from exc
+
+
+@app.post("/api/research/{project_id}/revision-review/cancel")
+def research_revision_review_cancel(project_id: str) -> dict:
+    try:
+        project = research_orchestrator.cancel_project(project_id)
+        return {"project_id": project.project_id, "phase": project.phase.value, "status": "cancelled"}
     except Exception as exc:  # noqa: BLE001
         raise _research_http_error(exc) from exc
 

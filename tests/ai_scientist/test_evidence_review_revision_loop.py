@@ -104,7 +104,7 @@ def test_reviewer_quality_gates_preserve_multiple_revision_actions() -> None:
     ]
 
 
-def test_orchestrator_starts_multi_target_revision_queue(tmp_path: Path) -> None:
+def test_orchestrator_stops_at_human_review_with_multiple_targets(tmp_path: Path) -> None:
     orchestrator = ResearchOrchestrator(tmp_path)
     project = orchestrator.create_project("Queue")
     project.phase = ResearchPhase.FEASIBILITY_REVIEW
@@ -128,13 +128,12 @@ def test_orchestrator_starts_multi_target_revision_queue(tmp_path: Path) -> None
     result = orchestrator._apply_review_decision(project, review)
 
     assert result["revision_required"] is True
-    assert project.phase == ResearchPhase.BACKGROUND_RESEARCH
-    assert project.current_revision_action is not None
-    assert project.current_revision_action.target == "evidence"
-    assert [item.target for item in project.pending_revision_actions] == ["analysis_plan"]
+    assert project.phase == ResearchPhase.HUMAN_REVISION_REVIEW
+    assert project.current_revision_action is None
+    assert {item.target for item in project.revision_issues} == {"evidence", "analysis_plan"}
 
 
-def test_orchestrator_advances_revision_queue_without_collapsing_targets(tmp_path: Path) -> None:
+def test_human_approval_batches_revision_issues_by_target(tmp_path: Path) -> None:
     orchestrator = ResearchOrchestrator(tmp_path)
     project = orchestrator.create_project("Queue advance")
     project.phase = ResearchPhase.FEASIBILITY_REVIEW
@@ -156,12 +155,20 @@ def test_orchestrator_advances_revision_queue_without_collapsing_targets(tmp_pat
     )
 
     orchestrator._apply_review_decision(project, review)
-    orchestrator._advance_revision_queue_after_phase(project, ResearchPhase.CLAIM_EVIDENCE_MAPPING)
+    orchestrator.store.save(project)
+    from src.ai_scientist.schemas import RevisionIssueDecision
 
-    assert [item.target for item in project.completed_revision_actions] == ["evidence"]
-    assert project.current_revision_action is not None
-    assert project.current_revision_action.target == "analysis_plan"
-    assert project.phase == ResearchPhase.ANALYSIS_PLANNING
+    decisions = [
+        RevisionIssueDecision(issue_id=item.issue_id, disposition="accept_ai")
+        for item in project.revision_issues
+    ]
+    updated = orchestrator.submit_revision_review(project.project_id, decisions)
+
+    assert {item.target for item in updated.approved_revision_plans[-1].target_batches} == {
+        "evidence", "analysis_plan"
+    }
+    assert updated.iteration == 1
+    assert updated.phase == ResearchPhase.REVISION
 
 
 def test_conclusion_traceability_gate_waits_for_synthesis() -> None:

@@ -143,7 +143,8 @@ def apply_reviewer_quality_gates(review: ReviewResult, metrics: ResearchQualityM
         "question": "revise_question",
     }
     decision = "reject" if review.decision == "reject" else decision_map.get(target, "revise_evidence")
-    blocking = list(dict.fromkeys(review.blocking_issues + [f"Quality gate failed: {item}" for item in failed]))
+    # Failed gates are system metadata, not scientific revision issues.
+    blocking = list(dict.fromkeys(review.blocking_issues))
     revision_plan = _merge_revision_actions(review.revision_plan, failed, target, blocking)
     return review.model_copy(
         update={

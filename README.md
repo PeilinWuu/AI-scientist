@@ -46,6 +46,12 @@ The research roles are:
 
 The Reviewer is an independent Qwen call that receives structured project state only. A critical score below 6 cannot produce an `approve` decision.
 
+### Independent review and human-controlled revision
+
+Reviewer revision requests stop at `HUMAN_REVISION_REVIEW`; they do not immediately rewrite artifacts. The workspace classifies issues as planning blockers, execution prerequisites, non-blocking improvements, or optional suggestions. A human can accept the AI proposal, modify it, provide exact content, accept an issue as a limitation, defer it to execution, or reject it with a reason.
+
+Accepted issues are grouped by target artifact and executed as batches. A successful model response only creates a new artifact version. Completion requires deterministic checks followed by an independent structured verifier call. Failed verification returns the project to human review instead of silently advancing. `AI_SCIENTIST_REVISION_VERIFIER_MODEL` can assign a separate Qwen model to this verification role.
+
 Each role call loads exactly four selected skill files:
 
 1. `skills/core/epistemic_policy.yaml`

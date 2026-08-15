@@ -63,6 +63,13 @@ def build_research_plan_json(project: ResearchProject) -> dict[str, Any]:
         "analysis_plan": project.analysis_plan.model_dump(mode="json") if project.analysis_plan else None,
         "reproducibility_plan": project.reproducibility_plan,
         "reviewer": review,
+        "revision_workflow": {
+            "issues": [item.model_dump(mode="json") for item in project.revision_issues],
+            "approved_plans": [item.model_dump(mode="json") for item in project.approved_revision_plans],
+            "verifications": [item.model_dump(mode="json") for item in project.revision_verifications],
+            "execution_requirements": project.execution_requirements,
+            "accepted_limitations": project.accepted_limitations,
+        },
         "conclusion": project.conclusion.model_dump(mode="json") if project.conclusion else None,
         "unknowns": project.question.unknowns if project.question else [],
         "human_actions_required": project.human_actions_required,
@@ -138,13 +145,16 @@ def build_research_plan_markdown(project: ResearchProject) -> str:
         "## 15. Reviewer Scores and Comments",
         render_review_markdown(project.reviews[-1] if project.reviews else None),
         "",
-        "## 16. Unknown Questions",
+        "## 16. Independent Review and Revision History",
+        _revision_history(project),
+        "",
+        "## 17. Unknown Questions",
         _bullet_list(project.question.unknowns if project.question else []),
         "",
-        "## 17. Human or External Tool To-Dos",
+        "## 18. Human or External Tool To-Dos",
         render_todos_markdown(project),
         "",
-        "## 18. Research Status Statement",
+        "## 19. Research Status Statement",
         NO_EXECUTION_STATEMENT,
         "",
         "## Quality Summary",
@@ -159,6 +169,33 @@ def build_research_plan_markdown(project: ResearchProject) -> str:
         "",
     ]
     return "\n".join(lines)
+
+
+def _revision_history(project: ResearchProject) -> str:
+    if not project.approved_revision_plans:
+        return "No human-approved revision cycle has been executed."
+    verification_by_id = {item.verification_id: item for item in project.revision_verifications}
+    lines: list[str] = []
+    for plan in project.approved_revision_plans:
+        lines.extend(
+            [
+                f"### Review v{plan.review_version} / Revision cycle {plan.revision_cycle}",
+                f"- Accepted: `{len(plan.approved_issues)}`",
+                f"- Deferred to execution: `{len(plan.deferred_issues)}`",
+                f"- Accepted as limitations: `{len(plan.accepted_as_limitation)}`",
+                f"- Rejected by human reviewer: `{len(plan.rejected_issues)}`",
+            ]
+        )
+        for batch in plan.target_batches:
+            verification = verification_by_id.get(batch.verification_id or "")
+            passed = len([item for item in verification.criteria_results if item.passed]) if verification else 0
+            total = len(verification.criteria_results) if verification else 0
+            lines.append(
+                f"- `{batch.target}` v{batch.new_artifact_version or 'pending'}: "
+                f"`{batch.status}`, verification `{passed}/{total}`"
+            )
+        lines.append("")
+    return "\n".join(lines).strip()
 
 
 def _question_text(project: ResearchProject) -> str:

@@ -103,35 +103,35 @@ def run_review(tmp_path: Path, decision: str, max_iterations: int = 2, iteration
     return result, orchestrator.get_project(project.project_id)
 
 
-def test_reviewer_revise_evidence_returns_to_background_research(tmp_path: Path) -> None:
+def test_reviewer_revise_evidence_enters_human_revision_review(tmp_path: Path) -> None:
     result, project = run_review(tmp_path, "revise_evidence")
 
-    assert result["current_phase"] == ResearchPhase.BACKGROUND_RESEARCH.value
+    assert result["current_phase"] == ResearchPhase.HUMAN_REVISION_REVIEW.value
     assert result["revision_required"] is True
     assert result["review_decision"] == "revise_evidence"
-    assert result["iteration"] == 1
+    assert result["iteration"] == 0
     assert project.phase != ResearchPhase.FAILED
 
 
-def test_reviewer_revise_hypothesis_returns_to_hypothesis_generation(tmp_path: Path) -> None:
+def test_reviewer_revise_hypothesis_waits_for_human_review(tmp_path: Path) -> None:
     result, project = run_review(tmp_path, "revise_hypothesis")
 
-    assert result["current_phase"] == ResearchPhase.HYPOTHESIS_GENERATION.value
-    assert project.phase == ResearchPhase.HYPOTHESIS_GENERATION
+    assert result["current_phase"] == ResearchPhase.HUMAN_REVISION_REVIEW.value
+    assert project.phase == ResearchPhase.HUMAN_REVISION_REVIEW
 
 
-def test_reviewer_revise_method_returns_to_method_selection(tmp_path: Path) -> None:
+def test_reviewer_revise_method_waits_for_human_review(tmp_path: Path) -> None:
     result, project = run_review(tmp_path, "revise_method")
 
-    assert result["current_phase"] == ResearchPhase.METHOD_SELECTION.value
-    assert project.phase == ResearchPhase.METHOD_SELECTION
+    assert result["current_phase"] == ResearchPhase.HUMAN_REVISION_REVIEW.value
+    assert project.phase == ResearchPhase.HUMAN_REVISION_REVIEW
 
 
-def test_reviewer_revise_design_returns_to_study_design(tmp_path: Path) -> None:
+def test_reviewer_revise_design_waits_for_human_review(tmp_path: Path) -> None:
     result, project = run_review(tmp_path, "revise_design")
 
-    assert result["current_phase"] == ResearchPhase.STUDY_DESIGN.value
-    assert project.phase == ResearchPhase.STUDY_DESIGN
+    assert result["current_phase"] == ResearchPhase.HUMAN_REVISION_REVIEW.value
+    assert project.phase == ResearchPhase.HUMAN_REVISION_REVIEW
 
 
 def test_reviewer_reject_enters_failed(tmp_path: Path) -> None:
