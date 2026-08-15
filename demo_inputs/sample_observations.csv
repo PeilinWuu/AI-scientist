@@ -1,0 +1,6 @@
+sample_id,treatment_group,timepoint_hours,response_value,quality_flag
+S001,control,0,10.2,valid
+S002,control,24,10.8,valid
+S003,experimental,0,10.1,valid
+S004,experimental,24,14.7,valid
+S005,experimental,48,16.3,review

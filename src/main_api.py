@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import os
 import base64
+import mimetypes
 import threading
 import time
+from urllib.parse import quote
 from urllib.parse import urlparse
 
 from fastapi import FastAPI, HTTPException, status
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import FileResponse, PlainTextResponse
 
 from src.ai_scientist.job_store import ResearchJobStore, fail_job
 from src.ai_scientist.model_registry import ModelRegistry
@@ -41,6 +43,16 @@ app = FastAPI(
     description="A minimal Qwen pass-through API with pure chat and optional native Qwen search.",
     version="0.1.0",
 )
+
+INLINE_ASSET_MEDIA_TYPES = {
+    ".pdf": "application/pdf",
+    ".md": "text/plain; charset=utf-8",
+    ".txt": "text/plain; charset=utf-8",
+    ".csv": "text/csv; charset=utf-8",
+    ".tsv": "text/tab-separated-values; charset=utf-8",
+    ".json": "application/json",
+    ".xml": "application/xml",
+}
 
 research_orchestrator = ResearchOrchestrator()
 research_job_store = ResearchJobStore(research_orchestrator.store.root)
@@ -593,12 +605,63 @@ def research_upload_asset(project_id: str, request: ResearchAssetUploadRequest) 
     try:
         content = base64.b64decode(request.content_base64, validate=True)
         project = research_orchestrator.register_research_asset(
-            project_id, request.filename, request.content_type, content
+            project_id,
+            request.filename,
+            request.content_type,
+            content,
+            purpose=request.purpose,
+            description=request.description,
+            upload_context=request.upload_context,
         )
         return {
             "project_id": project.project_id,
             "asset": project.research_assets[-1].model_dump(mode="json"),
-            "message": "文件已保存，但当前版本尚未自动解析内容。",
+            "message": (
+                "文件已登记并完成本地解析。"
+                if project.research_assets[-1].parsing_status == "parsed"
+                else "文件已登记，但解析未完成；可在项目文件区查看原因并重试。"
+            ),
+        }
+    except Exception as exc:  # noqa: BLE001
+        raise _research_http_error(exc) from exc
+
+
+@app.get("/api/research/{project_id}/research-assets/{asset_id}")
+def research_open_asset(project_id: str, asset_id: str) -> FileResponse:
+    """Open a registered project file without exposing an arbitrary filesystem path."""
+
+    try:
+        asset, path = research_orchestrator.get_research_asset(project_id, asset_id)
+        suffix = path.suffix.lower()
+        media_type = INLINE_ASSET_MEDIA_TYPES.get(
+            suffix, mimetypes.guess_type(asset.filename)[0] or "application/octet-stream"
+        )
+        encoded_name = quote(asset.filename, safe="")
+        return FileResponse(
+            path=path,
+            media_type=media_type,
+            headers={
+                "Content-Disposition": f"inline; filename*=UTF-8''{encoded_name}",
+                "Cache-Control": "private, no-store",
+                "X-Content-Type-Options": "nosniff",
+            },
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise _research_http_error(exc) from exc
+
+
+@app.post("/api/research/{project_id}/research-assets/{asset_id}/parse")
+def research_parse_asset(project_id: str, asset_id: str) -> dict:
+    """Parse or retry parsing one registered project file."""
+
+    try:
+        project = research_orchestrator.parse_research_asset(project_id, asset_id)
+        asset = next(item for item in project.research_assets if item.asset_id == asset_id)
+        return {
+            "project_id": project.project_id,
+            "asset": asset.model_dump(mode="json"),
+            "status": asset.parsing_status,
+            "message": "文件解析完成。" if asset.parsing_status == "parsed" else "文件解析失败。",
         }
     except Exception as exc:  # noqa: BLE001
         raise _research_http_error(exc) from exc
@@ -823,7 +886,13 @@ def research_capabilities(project_id: str) -> dict:
 
 def _research_http_error(exc: Exception) -> HTTPException:
     error_type = type(exc).__name__
-    status_code = 404 if error_type == "ProjectNotFoundError" else 409 if error_type == "InvalidTransitionError" else 500
+    status_code = (
+        404
+        if error_type in {"ProjectNotFoundError", "ResearchAssetNotFoundError"}
+        else 409
+        if error_type == "InvalidTransitionError"
+        else 500
+    )
     return HTTPException(
         status_code=status_code,
         detail={

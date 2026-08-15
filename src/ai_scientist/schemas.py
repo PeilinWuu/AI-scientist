@@ -160,7 +160,19 @@ def normalize_evidence_payload(data: Any) -> Any:
     if not normalized.get("verification_method"):
         normalized["verification_method"] = "none"
     source_type = str(normalized.get("source_type") or "unknown").strip().lower().replace(" ", "_")
-    allowed = {"paper", "article", "website", "report", "review", "dataset", "book", "unknown", "web_source"}
+    allowed = {
+        "paper",
+        "article",
+        "website",
+        "report",
+        "review",
+        "dataset",
+        "book",
+        "unknown",
+        "web_source",
+        "uploaded_reference",
+        "uploaded_dataset",
+    }
     normalized["source_type"] = source_type if source_type in allowed else "unknown"
     for key in ("reliability", "relevance"):
         if normalized.get(key) is None:
@@ -175,6 +187,7 @@ class EvidenceItem(StrictModel):
     title: str
     source_type: str = "unknown"
     source_url: str | None = None
+    source_asset_id: str | None = None
     citation: str | None = None
     authors: list[str] = Field(default_factory=list)
     doi: str | None = None
@@ -367,13 +380,39 @@ class SourceReviewFeedbackSummary(StrictModel):
     concise_feedback: list[str] = Field(default_factory=list)
 
 
+class ParsedAssetContent(StrictModel):
+    parser_name: str
+    content_kind: Literal["document", "tabular", "structured_data"]
+    summary: str = ""
+    extracted_text: str = ""
+    structured_summary: dict[str, Any] = Field(default_factory=dict)
+    warnings: list[str] = Field(default_factory=list)
+    content_sha256: str
+    truncated: bool = False
+    parsed_at: datetime = Field(default_factory=utc_now)
+
+
 class ResearchAsset(StrictModel):
     asset_id: str = Field(default_factory=lambda: new_id("asset"))
-    filename: str
+    filename: str = Field(min_length=1, max_length=255)
     content_type: str = "application/octet-stream"
     saved_path: str
     size_bytes: int = Field(default=0, ge=0)
-    parsing_status: Literal["registered_only", "parsed"] = "registered_only"
+    purpose: Literal["reference", "data", "other"] = "reference"
+    description: str = Field(default="", max_length=2000)
+    upload_context: Literal[
+        "project_creation",
+        "search_plan_review",
+        "source_review",
+        "revision_review",
+        "human_approval",
+        "project_workspace",
+    ] = "project_workspace"
+    parsing_status: Literal["registered_only", "parsing", "parsed", "failed"] = "registered_only"
+    parsed_content: ParsedAssetContent | None = None
+    parsed_artifact_id: str | None = None
+    parse_error: str = ""
+    used_by_agents: list[str] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=utc_now)
 
 
@@ -1340,9 +1379,19 @@ class HumanSourceRequest(StrictModel):
 
 
 class ResearchAssetUploadRequest(StrictModel):
-    filename: str
+    filename: str = Field(min_length=1, max_length=255)
     content_type: str = "application/octet-stream"
-    content_base64: str
+    content_base64: str = Field(min_length=1)
+    purpose: Literal["reference", "data", "other"] = "reference"
+    description: str = Field(default="", max_length=2000)
+    upload_context: Literal[
+        "project_creation",
+        "search_plan_review",
+        "source_review",
+        "revision_review",
+        "human_approval",
+        "project_workspace",
+    ] = "project_workspace"
 
 
 class AgentStageResult(StrictModel):

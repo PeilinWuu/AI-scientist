@@ -34,6 +34,21 @@ def build_research_plan_json(project: ResearchProject) -> dict[str, Any]:
         "title": project.title,
         "status": project.phase.value,
         "statement": NO_EXECUTION_STATEMENT,
+        "uploaded_assets": [
+            {
+                "asset_id": asset.asset_id,
+                "filename": asset.filename,
+                "purpose": asset.purpose,
+                "description": asset.description,
+                "parsing_status": asset.parsing_status,
+                "parser_name": asset.parsed_content.parser_name if asset.parsed_content else None,
+                "summary": asset.parsed_content.summary if asset.parsed_content else "",
+                "content_sha256": asset.parsed_content.content_sha256 if asset.parsed_content else None,
+                "warnings": asset.parsed_content.warnings if asset.parsed_content else [],
+                "used_by_agents": asset.used_by_agents,
+            }
+            for asset in project.research_assets
+        ],
         "research_question": project.question.model_dump(mode="json") if project.question else None,
         "scope": project.question.scope if project.question else "",
         "operational_definitions": project.question.operational_definitions if project.question else [],
@@ -92,6 +107,9 @@ def build_research_plan_markdown(project: ResearchProject) -> str:
         f"- Project ID: `{project.project_id}`",
         f"- Status: `{project.phase.value}`",
         f"- Research mode: `{project.research_mode.value if project.research_mode else 'pending'}`",
+        "",
+        "## Uploaded Research Materials and Data",
+        _uploaded_assets(project),
         "",
         "## 2. Research Question",
         _question_text(project),
@@ -168,6 +186,24 @@ def build_research_plan_markdown(project: ResearchProject) -> str:
         ),
         "",
     ]
+    return "\n".join(lines)
+
+
+def _uploaded_assets(project: ResearchProject) -> str:
+    if not project.research_assets:
+        return "No user-provided research files were registered."
+    lines = [
+        "Parsing creates a bounded local representation; it does not independently verify a reference or execute data analysis.",
+        "",
+    ]
+    for asset in project.research_assets:
+        summary = asset.parsed_content.summary if asset.parsed_content else "No parsed summary available."
+        used_by = ", ".join(asset.used_by_agents) if asset.used_by_agents else "not yet used by a research role"
+        digest = asset.parsed_content.content_sha256 if asset.parsed_content else "unavailable"
+        lines.append(
+            f"- `{asset.asset_id}` **{asset.filename}** ({asset.purpose}, {asset.parsing_status}): "
+            f"{summary} Used by: {used_by}. SHA-256: `{digest}`."
+        )
     return "\n".join(lines)
 
 

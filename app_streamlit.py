@@ -28,6 +28,8 @@ load_dotenv(ROOT_DIR / ".env")
 DEFAULT_BACKEND_URL = "http://localhost:8000"
 APP_MODES = ["Pure Qwen", "Qwen Search", "AI Scientist"]
 RESEARCH_STEP_TIMEOUT = int(os.getenv("AI_SCIENTIST_FRONTEND_STEP_TIMEOUT", "600"))
+RESEARCH_ASSET_EXTENSIONS = ["pdf", "md", "txt", "csv", "tsv", "json", "xml", "xlsx", "xls"]
+RESEARCH_ASSET_MAX_BYTES = int(os.getenv("AI_SCIENTIST_MAX_ASSET_BYTES", str(25 * 1024 * 1024)))
 
 SCIENTIST_MODEL_KEYS = {
     "research_director": ("scientist_director_model", "研究总监模型"),
@@ -88,6 +90,171 @@ def get_text(backend_url: str, path: str) -> str:
     if not response.ok:
         raise BackendAPIError(response.status_code, _extract_error_detail(response))
     return response.text
+
+
+def _save_research_assets(
+    backend_url: str,
+    project_id: str,
+    uploads: list,
+    purpose: str,
+    description: str,
+    upload_context: str,
+) -> tuple[list[dict], list[str]]:
+    """Persist uploaded files through the project asset API and report partial failures."""
+
+    saved: list[dict] = []
+    errors: list[str] = []
+    for upload in uploads:
+        content = upload.getvalue()
+        if len(content) > RESEARCH_ASSET_MAX_BYTES:
+            errors.append(
+                f"{upload.name}：超过 {RESEARCH_ASSET_MAX_BYTES // (1024 * 1024)} MB 限制。"
+            )
+            continue
+        try:
+            result = post_json(
+                backend_url,
+                f"/api/research/{project_id}/research-assets",
+                {
+                    "filename": upload.name,
+                    "content_type": upload.type or "application/octet-stream",
+                    "content_base64": base64.b64encode(content).decode("ascii"),
+                    "purpose": purpose,
+                    "description": description.strip(),
+                    "upload_context": upload_context,
+                },
+                timeout=120,
+            )
+            saved.append(result.get("asset") or {})
+        except BackendAPIError as exc:
+            detail = exc.detail
+            message = detail.get("error_message") if isinstance(detail, dict) else str(detail)
+            errors.append(f"{upload.name}：{message or detail}")
+    return saved, errors
+
+
+def _render_research_asset_uploader(
+    backend_url: str,
+    project: dict,
+    *,
+    upload_context: str,
+    key_prefix: str,
+    title: str = "上传补充资料或数据",
+    expanded: bool = False,
+    embedded: bool = False,
+) -> None:
+    """Render one auditable multi-file upload entry for an existing project."""
+
+    project_id = str(project.get("project_id") or "")
+    container = st.container(border=True) if embedded else st.expander(title, expanded=expanded)
+    with container:
+        if embedded:
+            st.markdown(f"**{title}**")
+        st.caption(
+            "支持 PDF、Markdown、TXT、CSV、TSV、JSON、XML 和 Excel。"
+            "文件会在本地安全解析为有边界的文本或结构摘要，并在后续科研阶段作为带来源标识的材料使用。"
+        )
+        uploads = st.file_uploader(
+            "选择一个或多个文件",
+            type=RESEARCH_ASSET_EXTENSIONS,
+            accept_multiple_files=True,
+            key=f"{key_prefix}_files_{project_id}",
+        )
+        purpose = st.radio(
+            "文件用途",
+            options=["reference", "data", "other"],
+            format_func=lambda value: {
+                "reference": "参考资料",
+                "data": "数据来源",
+                "other": "其他项目文件",
+            }[value],
+            horizontal=True,
+            key=f"{key_prefix}_purpose_{project_id}",
+        )
+        description = st.text_area(
+            "文件说明（可选）",
+            placeholder="例如：研究者提供的原始数据、需要复核的方法附件或补充文献。",
+            key=f"{key_prefix}_description_{project_id}",
+        )
+        if st.button(
+            "保存到项目",
+            disabled=not uploads,
+            key=f"{key_prefix}_save_{project_id}",
+        ):
+            saved, errors = _save_research_assets(
+                backend_url,
+                project_id,
+                list(uploads or []),
+                purpose,
+                description,
+                upload_context,
+            )
+            if saved:
+                st.success(f"已保存 {len(saved)} 个文件。")
+                refresh_research_project(backend_url)
+            for error in errors:
+                st.error(error)
+
+        assets = project.get("research_assets") or []
+        if assets:
+            st.markdown("**当前项目已登记文件**")
+            for item in assets:
+                purpose_label = {
+                    "reference": "参考资料",
+                    "data": "数据来源",
+                    "other": "其他",
+                }.get(item.get("purpose"), "参考资料")
+                parsing_status = str(item.get("parsing_status") or "registered_only")
+                status_label = {
+                    "registered_only": "已登记，等待解析",
+                    "parsing": "正在解析",
+                    "parsed": "已解析",
+                    "failed": "解析失败，可重试",
+                }.get(parsing_status, parsing_status)
+                filename = str(item.get("filename") or "未命名文件")
+                asset_url = (
+                    f"{backend_url.rstrip('/')}/api/research/{project_id}/research-assets/"
+                    f"{item.get('asset_id')}"
+                )
+                details = st.columns([3, 2])
+                details[0].link_button(filename, asset_url, use_container_width=True)
+                details[1].caption(
+                    f"{purpose_label} · {round(float(item.get('size_bytes') or 0) / 1024, 1)} KB · "
+                    f"{status_label}"
+                )
+                if item.get("description"):
+                    st.caption(str(item.get("description")))
+                parsed = item.get("parsed_content") or {}
+                if parsed:
+                    st.caption(
+                        f"解析器：{parsed.get('parser_name')} · {parsed.get('summary')}"
+                    )
+                    warnings = parsed.get("warnings") or []
+                    if warnings:
+                        st.caption("解析提示：" + "；".join(str(value) for value in warnings))
+                    used_by = item.get("used_by_agents") or []
+                    st.caption(
+                        "后续使用记录："
+                        + ("、".join(str(value) for value in used_by) if used_by else "尚未进入使用该材料的研究阶段")
+                    )
+                if parsing_status in {"registered_only", "failed"}:
+                    if item.get("parse_error"):
+                        st.caption(f"失败原因：{item.get('parse_error')}")
+                    if st.button(
+                        "解析文件" if parsing_status == "registered_only" else "重新解析",
+                        key=f"{key_prefix}_parse_{project_id}_{item.get('asset_id')}",
+                    ):
+                        try:
+                            post_json(
+                                backend_url,
+                                f"/api/research/{project_id}/research-assets/{item.get('asset_id')}/parse",
+                                {},
+                                timeout=120,
+                            )
+                            refresh_research_project(backend_url)
+                            st.rerun()
+                        except BackendAPIError as exc:
+                            st.error(exc.detail)
 
 
 def get_model_config(backend_url: str) -> dict:
@@ -429,6 +596,30 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
             }[value],
             index=0,
         )
+        creation_uploads = st.file_uploader(
+            "项目初始资料或数据（可选）",
+            type=RESEARCH_ASSET_EXTENSIONS,
+            accept_multiple_files=True,
+            key="research_creation_assets",
+            help="支持 PDF、文本、结构化数据和 Excel；创建项目后会保存到该项目。",
+        )
+        creation_asset_purpose = st.radio(
+            "初始文件用途",
+            options=["reference", "data", "other"],
+            format_func=lambda value: {
+                "reference": "参考资料",
+                "data": "数据来源",
+                "other": "其他项目文件",
+            }[value],
+            horizontal=True,
+            key="research_creation_asset_purpose",
+        )
+        creation_asset_description = st.text_input(
+            "初始文件说明（可选）",
+            key="research_creation_asset_description",
+            placeholder="例如：已有文献、实验记录或待分析数据。",
+        )
+        st.caption("上传文件会随项目保存并在本地解析；解析摘要会进入后续研究角色的结构化输入。")
         if st.button("创建项目", type="primary"):
             try:
                 created = post_json(
@@ -446,8 +637,20 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
                     },
                 )
                 st.session_state.research_project_id = created["project_id"]
+                saved, upload_errors = _save_research_assets(
+                    backend_url,
+                    created["project_id"],
+                    list(creation_uploads or []),
+                    creation_asset_purpose,
+                    creation_asset_description,
+                    "project_creation",
+                )
                 refresh_research_project(backend_url)
-                st.rerun()
+                st.success(
+                    f"项目已创建。{'同时保存了 ' + str(len(saved)) + ' 个文件。' if saved else ''}"
+                )
+                for upload_error in upload_errors:
+                    st.error(upload_error)
             except (ValueError, BackendAPIError) as exc:
                 st.error(exc.detail if isinstance(exc, BackendAPIError) else str(exc))
 
@@ -470,6 +673,15 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
         st.caption("该项目使用创建时保存的模型覆盖配置。")
         if show_debug:
             render_debug_object(project.get("model_overrides"))
+
+    _render_research_asset_uploader(
+        backend_url,
+        project,
+        upload_context="project_workspace",
+        key_prefix="project_workspace_asset",
+        title="项目资料与数据",
+        expanded=bool(project.get("research_assets")),
+    )
 
     metrics = project.get("quality_metrics") or {}
     st.subheader("研究质量")
@@ -526,6 +738,13 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
 
     if project.get("phase") == "HUMAN_APPROVAL":
         st.subheader("人工审查包")
+        _render_research_asset_uploader(
+            backend_url,
+            project,
+            upload_context="human_approval",
+            key_prefix="approval_asset",
+            title="为最终审核补充资料或数据",
+        )
         try:
             review_package = get_json(
                 backend_url, f"/api/research/{project['project_id']}/review-package"
@@ -841,6 +1060,13 @@ def _render_revision_review_gate(
     project_id = project.get("project_id")
     st.subheader("独立审查要求修订")
     st.info("独立审查没有否定这项研究，而是提出了需要您决定如何处理的问题。系统不会在您确认前自动重写研究产物。")
+    _render_research_asset_uploader(
+        backend_url,
+        project,
+        upload_context="revision_review",
+        key_prefix="revision_asset",
+        title="为本轮修订补充资料或数据",
+    )
     for message in project.get("revision_recovery_messages") or []:
         st.warning(message)
     review = (project.get("reviews") or [{}])[-1]
@@ -1015,6 +1241,13 @@ def _render_evidence_curation_gate(
         checkpoint = project.get("background_research_checkpoint") or {}
         plan = checkpoint.get("search_plan") or {}
         st.subheader("检索方案审查")
+        _render_research_asset_uploader(
+            backend_url,
+            project,
+            upload_context="search_plan_review",
+            key_prefix="search_plan_asset",
+            title="为检索审核补充资料或数据",
+        )
         st.markdown(f"**当前研究问题：** {(project.get('question') or {}).get('normalized_question') or project.get('objective')}")
         status = plan.get("relevance_status")
         if status == "irrelevant":
@@ -1098,26 +1331,14 @@ def _render_evidence_curation_gate(
                     f"/api/research/{project_id}/human-sources",
                     {"entries": [line.strip() for line in source_entries.splitlines() if line.strip()]},
                 )
-            upload = st.file_uploader(
-                "上传 PDF / Markdown / TXT",
-                type=["pdf", "md", "txt"],
-                key=f"research_asset_upload_{project_id}",
+            _render_research_asset_uploader(
+                backend_url,
+                project,
+                upload_context="source_review",
+                key_prefix="source_review_asset",
+                title="上传本地资料或数据文件",
+                embedded=True,
             )
-            if upload and st.button("保存文件", key=f"save_research_asset_{project_id}"):
-                try:
-                    result = post_json(
-                        backend_url,
-                        f"/api/research/{project_id}/research-assets",
-                        {
-                            "filename": upload.name,
-                            "content_type": upload.type or "application/octet-stream",
-                            "content_base64": base64.b64encode(upload.getvalue()).decode("ascii"),
-                        },
-                    )
-                    st.success(result.get("message", "文件已保存。"))
-                    refresh_research_project(backend_url)
-                except BackendAPIError as exc:
-                    st.error(exc.detail)
 
         note = st.text_area("本次资料筛选说明（可选）", key=f"source_selection_note_{project_id}")
         action_columns = st.columns(3)

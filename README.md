@@ -198,6 +198,23 @@ streamlit run app_streamlit.py
 
 Select `Pure Qwen`, `Qwen Search`, or `AI Scientist` in the sidebar.
 
+### Project reference and data uploads
+
+AI Scientist accepts multiple project files when a project is created and at the search-plan,
+source-selection, independent-revision, and final-approval review gates. Supported extensions are
+PDF, Markdown, TXT, CSV, TSV, JSON, XML, XLSX, and XLS. Every file is stored under the project's
+`assets/` directory with its original filename, purpose (`reference`, `data`, or `other`), optional
+description, upload context, size, and audit event. The default per-file limit is 25 MiB and can be
+changed with `AI_SCIENTIST_MAX_ASSET_BYTES`.
+
+Registered filenames are clickable in the Streamlit project workspace. The backend resolves each
+request by project ID and asset ID, validates that the file remains inside the project directory,
+and returns it inline when the browser supports that format.
+
+This release registers files for review and provenance only. It does not yet parse PDF/XML content
+or feed uploaded bytes into a model, so the UI labels these assets as `registered_only` rather than
+claiming that they have already influenced the research output.
+
 ## AI Scientist API
 
 Create a planning-only project:
@@ -243,6 +260,8 @@ GET  /api/research/{project_id}/source-candidates
 POST /api/research/{project_id}/source-selection
 POST /api/research/{project_id}/human-sources
 POST /api/research/{project_id}/research-assets
+GET  /api/research/{project_id}/research-assets/{asset_id}
+POST /api/research/{project_id}/research-assets/{asset_id}/parse
 POST /api/research/{project_id}/revise
 POST /api/research/{project_id}/provide-data
 POST /api/research/{project_id}/cancel
@@ -263,6 +282,26 @@ data/research_projects/{project_id}/artifacts/
 ```
 
 `project.json` is atomically replaced. `events.jsonl` is append-only.
+
+## Local Research File Parsing
+
+Project creation and every human-review entry can accept PDF, Markdown, TXT, CSV, TSV, JSON, XML,
+XLSX, and legacy XLS files. By default, an upload is saved first and then parsed locally into a
+bounded, auditable artifact. The original file remains available through its project-scoped link,
+and a failed parse can be retried without uploading the file again.
+
+Parsed content is not decorative metadata. Every structured research role receives a bounded
+`uploaded_asset_context` containing the asset ID, purpose, parser summary, content digest, structured
+table/schema information, and a text excerpt. Completed role calls record the parsed artifact as an
+input and append the role name to `research_assets[].used_by_agents`. The final report includes this
+provenance without copying full uploaded content.
+
+The global epistemic skill treats file content as untrusted research material, never instructions.
+Parsing does not independently verify a paper and does not execute statistical analysis. CSV and
+Excel parsing provides columns, missing-value summaries, and bounded samples so the Analyst can
+design a data-grounded analysis plan; it cannot report results until a real analysis tool is connected.
+Likewise, scanned PDFs without a text layer require a future OCR adapter. Parser and context limits are
+configured with the `AI_SCIENTIST_ASSET_*` settings in `.env.example`.
 
 ## Extend AI Scientist
 

@@ -36,6 +36,10 @@ class ProjectNotFoundError(AIScientistError):
     """Raised when a persisted project does not exist."""
 
 
+class ResearchAssetNotFoundError(AIScientistError):
+    """Raised when a project file record or its persisted bytes cannot be found."""
+
+
 class InvalidTransitionError(AIScientistError):
     """Raised when a state-machine transition is not allowed."""
 

@@ -2,12 +2,13 @@ name: research_director
 version: "1.0"
 role: research_director
 objective: Formalize the objective into a scoped, measurable research question.
-required_inputs: [objective, constraints, optional_domain_hint]
+required_inputs: [objective, constraints, optional_domain_hint, optional_parsed_uploaded_assets]
 allowed_tools: []
 workflow:
   - Normalize the question without changing user intent.
   - Define scope, operational terms, success criteria, assumptions, knowns, and unknowns.
   - Identify missing information and clarification questions.
+  - Use uploaded material to refine scope and operational definitions without treating it as verified fact.
 quality_gates:
   - Success criteria are measurable or explicitly marked unresolved.
   - Scope and exclusions are explicit.

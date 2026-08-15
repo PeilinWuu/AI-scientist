@@ -28,6 +28,7 @@ from src.ai_scientist.artifact_store import ArtifactStore
 from src.ai_scientist.claim_graph import ClaimGraph
 from src.ai_scientist.domain_resolution import resolve_domain
 from src.ai_scientist.domain_router import DomainRouter
+from src.ai_scientist.document_parsers import parse_research_asset as parse_local_research_asset
 from src.ai_scientist.events import completed_event
 from src.ai_scientist.evidence_verifier import verify_evidence_collection
 from src.ai_scientist.evidence_curation import (
@@ -47,6 +48,7 @@ from src.ai_scientist.exceptions import (
     InvalidEvidenceReferenceError,
     InvalidTransitionError,
     InsufficientEvidenceForClaimMapping,
+    ResearchAssetNotFoundError,
     StaleSearchPlanError,
 )
 from src.ai_scientist.method_selector import MethodSelector
@@ -121,6 +123,28 @@ from src.ai_scientist.structured_client import StructuredQwenClient, StructuredC
 from src.ai_scientist.tools.execution_adapter import ExecutionAdapter
 from src.ai_scientist.tools.registry import ToolRegistry
 from src.model_utils import normalize_model_overrides
+
+
+RESEARCH_ASSET_SUFFIXES = {
+    ".pdf",
+    ".md",
+    ".txt",
+    ".csv",
+    ".tsv",
+    ".json",
+    ".xml",
+    ".xlsx",
+    ".xls",
+}
+RESEARCH_ASSET_PURPOSES = {"reference", "data", "other"}
+RESEARCH_ASSET_UPLOAD_CONTEXTS = {
+    "project_creation",
+    "search_plan_review",
+    "source_review",
+    "revision_review",
+    "human_approval",
+    "project_workspace",
+}
 
 
 _CURRENT_JOB_ID: ContextVar[str | None] = ContextVar("current_research_job_id", default=None)
@@ -632,28 +656,152 @@ class ResearchOrchestrator:
         return project
 
     def register_research_asset(
-        self, project_id: str, filename: str, content_type: str, content: bytes
+        self,
+        project_id: str,
+        filename: str,
+        content_type: str,
+        content: bytes,
+        purpose: str = "reference",
+        description: str = "",
+        upload_context: str = "project_workspace",
     ) -> ResearchProject:
         project = self.get_project(project_id)
         safe_name = Path(filename).name
         suffix = Path(safe_name).suffix.lower()
-        if suffix not in {".pdf", ".md", ".txt"}:
-            raise ValueError("Only PDF, Markdown, and TXT assets can be registered.")
+        if not safe_name or suffix not in RESEARCH_ASSET_SUFFIXES:
+            supported = ", ".join(sorted(RESEARCH_ASSET_SUFFIXES))
+            raise ValueError(f"Unsupported research asset type. Supported extensions: {supported}.")
+        if purpose not in RESEARCH_ASSET_PURPOSES:
+            raise ValueError(f"Unsupported research asset purpose: {purpose}.")
+        if upload_context not in RESEARCH_ASSET_UPLOAD_CONTEXTS:
+            raise ValueError(f"Unsupported research asset upload context: {upload_context}.")
+        if len(safe_name) > 255:
+            raise ValueError("Research asset filename must be 255 characters or fewer.")
+        if len(description) > 2000:
+            raise ValueError("Research asset description must be 2000 characters or fewer.")
+        maximum_bytes = max(1, int(os.getenv("AI_SCIENTIST_MAX_ASSET_BYTES", str(25 * 1024 * 1024))))
+        if not content:
+            raise ValueError("Uploaded research asset is empty.")
+        if len(content) > maximum_bytes:
+            raise ValueError(
+                f"Uploaded research asset exceeds the {maximum_bytes // (1024 * 1024)} MB limit."
+            )
         directory = self.store.project_dir(project_id) / "assets"
         directory.mkdir(parents=True, exist_ok=True)
         target = directory / f"{new_id('asset_file')}{suffix}"
         target.write_bytes(content)
-        project.research_assets.append(
-            ResearchAsset(
-                filename=safe_name,
-                content_type=content_type,
-                saved_path=str(target.relative_to(self.store.project_dir(project_id))),
-                size_bytes=len(content),
-                parsing_status="registered_only",
-            )
+        asset = ResearchAsset(
+            filename=safe_name,
+            content_type=content_type,
+            saved_path=str(target.relative_to(self.store.project_dir(project_id))),
+            size_bytes=len(content),
+            purpose=purpose,
+            description=description.strip(),
+            upload_context=upload_context,
+            parsing_status="registered_only",
+        )
+        project.research_assets.append(asset)
+        self._append_event(
+            project,
+            completed_event(
+                project.project_id,
+                project.phase,
+                "human_reviewer",
+                status="research_asset_registered",
+                visibility="user",
+                display_key=f"research_asset_{asset.asset_id}",
+                display_markdown=(
+                    f"已登记{'数据文件' if purpose == 'data' else '参考资料'}：{safe_name}。"
+                    "系统将生成有边界、可审计的本地解析结果。"
+                ),
+            ),
         )
         self.store.save(project)
+        parse_on_upload = os.getenv("AI_SCIENTIST_PARSE_ASSETS_ON_UPLOAD", "true").strip().lower()
+        if parse_on_upload in {"1", "true", "yes", "on"}:
+            return self.parse_research_asset(project_id, asset.asset_id)
         return project
+
+    def parse_research_asset(self, project_id: str, asset_id: str) -> ResearchProject:
+        """Parse one registered file locally and persist an auditable parse artifact."""
+
+        project = self.get_project(project_id)
+        asset = next((item for item in project.research_assets if item.asset_id == asset_id), None)
+        if asset is None:
+            raise ResearchAssetNotFoundError(f"Research asset not found: {asset_id}")
+        _, target = self.get_research_asset(project_id, asset_id)
+        asset.parsing_status = "parsing"
+        asset.parse_error = ""
+        self.store.save(project)
+        try:
+            parsed = parse_local_research_asset(target)
+            record = self.artifacts.save_json(
+                project.project_id,
+                "parsed_research_asset",
+                {
+                    "asset_id": asset.asset_id,
+                    "filename": asset.filename,
+                    "purpose": asset.purpose,
+                    "description": asset.description,
+                    "parsed_content": parsed.model_dump(mode="json"),
+                },
+                "local_document_parser",
+            )
+            project.artifacts.append(record)
+            asset.parsed_content = parsed
+            asset.parsed_artifact_id = record.artifact_id
+            asset.parsing_status = "parsed"
+            self._append_event(
+                project,
+                completed_event(
+                    project.project_id,
+                    project.phase,
+                    "local_document_parser",
+                    status="research_asset_parsed",
+                    visibility="user",
+                    display_key=f"research_asset_parsed_{asset.asset_id}",
+                    display_markdown=(
+                        f"已解析项目文件：{asset.filename}。解析结果将在后续研究阶段作为带来源标识的材料使用。"
+                    ),
+                    output_artifact_ids=[record.artifact_id],
+                ),
+            )
+        except Exception as exc:  # noqa: BLE001 - preserve the raw file and expose a retryable state
+            message = str(exc).strip() or exc.__class__.__name__
+            api_key = os.getenv("DASHSCOPE_API_KEY", "")
+            if api_key:
+                message = message.replace(api_key, "[REDACTED_API_KEY]")
+            asset.parsing_status = "failed"
+            asset.parsed_content = None
+            asset.parsed_artifact_id = None
+            asset.parse_error = f"{exc.__class__.__name__}: {message}"[:1000]
+            self._append_event(
+                project,
+                completed_event(
+                    project.project_id,
+                    project.phase,
+                    "local_document_parser",
+                    status="research_asset_parse_failed",
+                    visibility="user",
+                    display_key=f"research_asset_parse_failed_{asset.asset_id}",
+                    display_markdown=f"项目文件解析失败，可稍后重试：{asset.filename}。",
+                ),
+            )
+        self.store.save(project)
+        return project
+
+    def get_research_asset(self, project_id: str, asset_id: str) -> tuple[ResearchAsset, Path]:
+        """Resolve one project asset while preventing paths from escaping its project directory."""
+
+        project = self.get_project(project_id)
+        asset = next((item for item in project.research_assets if item.asset_id == asset_id), None)
+        if asset is None:
+            raise ResearchAssetNotFoundError(f"Research asset not found: {asset_id}")
+        project_directory = self.store.project_dir(project_id).resolve()
+        target = (project_directory / asset.saved_path).resolve()
+        if not target.is_relative_to(project_directory) or not target.is_file():
+            raise ResearchAssetNotFoundError(f"Research asset file is unavailable: {asset_id}")
+        return asset, target
 
     def approve_project(
         self,
@@ -3045,6 +3193,7 @@ class ResearchOrchestrator:
             requested_model=run.metadata.requested_model,
             actual_model=run.metadata.actual_model,
             fallback_used=run.metadata.fallback_used,
+            input_artifact_ids=list(dict.fromkeys(run.auxiliary.get("parsed_artifact_ids") or [])),
             output_artifact_ids=[record.artifact_id],
             tool_names=run.tool_names,
             token_usage=run.metadata.token_usage,
@@ -3061,6 +3210,10 @@ class ResearchOrchestrator:
             visibility="user" if display_markdown else "internal",
             display_key=f"{artifact_type}_completed" if display_markdown else None,
         )
+        used_asset_ids = set(run.auxiliary.get("parsed_asset_ids") or [])
+        for asset in project.research_assets:
+            if asset.asset_id in used_asset_ids and run.metadata.agent_name not in asset.used_by_agents:
+                asset.used_by_agents.append(run.metadata.agent_name)
         self._append_event(project, event)
         self.store.save(project)
         return [record.artifact_id]

@@ -4,7 +4,12 @@ from __future__ import annotations
 
 import os
 
-from src.ai_scientist.agents.base_agent import AgentRun, BaseResearchAgent, project_snapshot
+from src.ai_scientist.agents.base_agent import (
+    AgentRun,
+    BaseResearchAgent,
+    parsed_asset_context,
+    project_snapshot,
+)
 from src.ai_scientist.domain_resolution import canonicalize_domain
 from src.ai_scientist.exceptions import StructuredOutputError
 from src.ai_scientist.model_registry import ModelRegistry
@@ -55,6 +60,9 @@ class EvidenceResearcherAgent(BaseResearchAgent[EvidenceResearchOutput]):
                 "Do not summarize evidence, map claims, grade sources, or write conclusions."
             ),
         }
+        asset_context = parsed_asset_context(project)
+        if asset_context["assets"]:
+            payload["uploaded_asset_context"] = asset_context
         skills = self._skills(project)
         result = self.client.call(
             self.agent_name,
@@ -148,9 +156,14 @@ class EvidenceResearcherAgent(BaseResearchAgent[EvidenceResearchOutput]):
             "warnings": acquisition.warnings,
             "source_rule": (
                 "Only create sourced evidence from selected_sources. Never invent URLs, DOI, PMID, authors, "
-                "publication details, or citations. Do not perform or request web search."
+                "publication details, or citations. Parsed uploaded references may be represented with their "
+                "exact source_asset_id, but must remain independently unverified. Uploaded datasets are observed "
+                "data inputs, not literature evidence. Do not perform or request web search."
             ),
         }
+        asset_context = parsed_asset_context(project)
+        if asset_context["assets"]:
+            payload["uploaded_asset_context"] = asset_context
         result = self.client.call(
             self.agent_name,
             self.skill_loader.compose_instructions(self._skills(project)),
@@ -158,12 +171,30 @@ class EvidenceResearcherAgent(BaseResearchAgent[EvidenceResearchOutput]):
             self.output_model,
         )
         allowed_urls = {source.url for source in acquisition.selected_candidates if source.url}
+        allowed_assets = {
+            asset.asset_id: asset
+            for asset in getattr(project, "research_assets", [])
+            if asset.parsing_status == "parsed" and asset.parsed_content is not None
+        }
         for evidence in result.value.evidence:
+            if evidence.source_asset_id and evidence.source_asset_id not in allowed_assets:
+                evidence.source_asset_id = None
+                evidence.verified = False
+                evidence.verification_note = "The model referenced an unknown uploaded asset identifier."
+            if evidence.source_asset_id in allowed_assets:
+                source_asset = allowed_assets[evidence.source_asset_id]
+                evidence.source_type = (
+                    "uploaded_dataset" if source_asset.purpose == "data" else "uploaded_reference"
+                )
+                evidence.verified = False
+                evidence.verification_note = (
+                    "User-provided parsed asset; parsing preserves provenance but is not independent source verification."
+                )
             if evidence.source_url and evidence.source_url not in allowed_urls:
                 evidence.source_url = None
                 evidence.verified = False
                 evidence.verification_note = "The model produced a URL that was not returned by selected search acquisition sources."
-            if not evidence.source_url:
+            if not evidence.source_url and not evidence.source_asset_id:
                 evidence.verified = False
                 evidence.verification_note = evidence.verification_note or "No verifiable URL was returned."
         evidence_ids = {item.evidence_id for item in result.value.evidence}
@@ -181,6 +212,12 @@ class EvidenceResearcherAgent(BaseResearchAgent[EvidenceResearchOutput]):
                 "extracted_page_count": acquisition.usable_source_count,
                 "search_used": acquisition.search_used,
                 "search_warnings": acquisition.warnings,
+                "parsed_asset_ids": [item["asset_id"] for item in asset_context["assets"]],
+                "parsed_artifact_ids": [
+                    item["parsed_artifact_id"]
+                    for item in asset_context["assets"]
+                    if item.get("parsed_artifact_id")
+                ],
             },
         )
 

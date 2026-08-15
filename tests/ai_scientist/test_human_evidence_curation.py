@@ -12,7 +12,7 @@ from src.ai_scientist.evidence_curation import (
     validate_checkpoint_binding,
     validate_search_plan_binding,
 )
-from src.ai_scientist.exceptions import StaleSearchPlanError
+from src.ai_scientist.exceptions import ResearchAssetNotFoundError, StaleSearchPlanError
 from src.ai_scientist.orchestrator import ResearchOrchestrator
 from src.ai_scientist.schemas import (
     EvidenceItem,
@@ -250,7 +250,7 @@ def test_assisted_flow_stops_twice_and_extracts_only_human_kept_source(
     assert updated.evidence[0].selection_provenance.selected_by == "human"
 
 
-def test_human_sources_accept_doi_pmid_url_and_assets_are_registered_only(
+def test_human_sources_accept_doi_pmid_url_and_assets_are_locally_parsed(
     tmp_path: Path,
 ) -> None:
     orchestrator = ResearchOrchestrator(tmp_path)
@@ -272,7 +272,73 @@ def test_human_sources_accept_doi_pmid_url_and_assets_are_registered_only(
     assert any(source.url == "https://example.org/paper" for source in updated.background_research_checkpoint.candidates)
 
     updated = orchestrator.register_research_asset(item.project_id, "paper.txt", "text/plain", b"text")
-    assert updated.research_assets[-1].parsing_status == "registered_only"
+    assert updated.research_assets[-1].parsing_status == "parsed"
+    assert updated.research_assets[-1].parsed_artifact_id
+
+
+def test_research_assets_support_reference_and_data_upload_contexts(tmp_path: Path) -> None:
+    orchestrator = ResearchOrchestrator(tmp_path)
+    item = project(orchestrator)
+
+    updated = orchestrator.register_research_asset(
+        item.project_id,
+        "observations.csv",
+        "text/csv",
+        b"sample,value\na,1\n",
+        purpose="data",
+        description="Researcher-provided pilot observations.",
+        upload_context="project_creation",
+    )
+
+    asset = updated.research_assets[-1]
+    assert asset.filename == "observations.csv"
+    assert asset.purpose == "data"
+    assert asset.description == "Researcher-provided pilot observations."
+    assert asset.upload_context == "project_creation"
+    assert asset.parsing_status == "parsed"
+    assert asset.parsed_content is not None
+    assert asset.parsed_content.structured_summary["column_names"] == ["sample", "value"]
+    assert (tmp_path / item.project_id / asset.saved_path).read_bytes() == b"sample,value\na,1\n"
+    assert orchestrator.list_events(item.project_id)[-1].status == "research_asset_parsed"
+
+
+def test_research_asset_rejects_unsupported_or_oversized_files(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    orchestrator = ResearchOrchestrator(tmp_path)
+    item = project(orchestrator)
+
+    with pytest.raises(ValueError, match="Unsupported research asset type"):
+        orchestrator.register_research_asset(
+            item.project_id, "program.exe", "application/octet-stream", b"binary"
+        )
+
+    monkeypatch.setenv("AI_SCIENTIST_MAX_ASSET_BYTES", "4")
+    with pytest.raises(ValueError, match="exceeds"):
+        orchestrator.register_research_asset(
+            item.project_id, "large.pdf", "application/pdf", b"12345"
+        )
+
+
+def test_research_asset_open_path_is_project_scoped(tmp_path: Path) -> None:
+    orchestrator = ResearchOrchestrator(tmp_path)
+    item = project(orchestrator)
+    updated = orchestrator.register_research_asset(
+        item.project_id, "notes.txt", "text/plain", b"auditable notes"
+    )
+    asset = updated.research_assets[-1]
+
+    resolved_asset, resolved_path = orchestrator.get_research_asset(item.project_id, asset.asset_id)
+    assert resolved_asset.asset_id == asset.asset_id
+    assert resolved_path.read_bytes() == b"auditable notes"
+
+    with pytest.raises(ResearchAssetNotFoundError, match="not found"):
+        orchestrator.get_research_asset(item.project_id, "asset_missing")
+
+    updated.research_assets[-1].saved_path = "../outside.txt"
+    orchestrator.store.save(updated)
+    with pytest.raises(ResearchAssetNotFoundError, match="unavailable"):
+        orchestrator.get_research_asset(item.project_id, asset.asset_id)
 
 
 def test_zero_evidence_returns_to_source_review_and_claim_mapper_is_not_called(
