@@ -1,0 +1,12 @@
+{
+  "provider": "Alibaba Cloud Bailian / Qwen",
+  "model": "qwen3.8-max",
+  "base_url": "https://ws-dwlzbrjotdgkhmrl.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+  "verified_at": "2026-08-31T11:37:45.935618+00:00",
+  "status": "PASSED",
+  "response_marker": "QWEN_SMOKE_OK",
+  "success": true,
+  "error_type": null,
+  "error_message": null,
+  "latency_ms": 4079
+}

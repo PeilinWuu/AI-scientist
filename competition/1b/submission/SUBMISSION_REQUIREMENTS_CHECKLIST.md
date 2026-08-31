@@ -11,7 +11,7 @@
 | FastAPI 演示 | complete | `API_DEMO.md`、`competition_api.py` | 现场启动 | Presenter |
 | Streamlit 演示 | complete | `app_streamlit.py` Competition Demo | 截图/现场启动 | Presenter |
 | Qwen 代码路径 | complete | `QWEN_EVIDENCE_CHECKLIST.md` | 无 | Codex |
-| Qwen 真实成功证据 | blocked_external | `results/qwen_smoke_test.json` | 更换有效参赛凭证并重跑 | Account owner |
+| Qwen 真实成功证据 | complete | `results/qwen_smoke_evidence.json` | 截图用于 PPT | Submission owner |
 | 20 页 PPT/PDF | draft | `PPT_CONTENT_DRAFT.md` | 美化、截图、导出 | Submission owner |
 | 演示视频 | missing_manual | `DEMO_SCRIPT.md` | 录制并上传 | Submission owner |
 | 官网/报名材料 | missing_manual | 本清单 | 填写和上传 | Submission owner |

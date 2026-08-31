@@ -74,7 +74,7 @@ def model_config() -> dict:
 
     return {
         "pure_qwen": {
-            "default_model": os.getenv("LLM_MODEL", "qwen-turbo"),
+            "default_model": os.getenv("LLM_MODEL", "qwen3.8-max"),
         },
         "qwen_search": {
             "default_model": os.getenv("LLM_SEARCH_MODEL", "qwen3.7-plus"),

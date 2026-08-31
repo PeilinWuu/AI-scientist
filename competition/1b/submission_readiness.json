@@ -10,18 +10,18 @@
   "api_demo_present": true,
   "streamlit_demo_present": true,
   "qwen_config_present": true,
-  "qwen_real_smoke_test_status": "BLOCKED_EXTERNAL_INVALID_CREDENTIAL",
-  "qwen_real_smoke_test_passed": false,
+  "qwen_real_smoke_test_status": "PASSED",
+  "qwen_real_smoke_test_passed": true,
+  "qwen_real_smoke_test_evidence": "results/qwen_smoke_evidence.json",
   "documentation_complete": true,
-  "readiness_percent": 92.3,
+  "readiness_percent": 100.0,
   "test_summary": {
     "passed": true,
     "exit_code": 0,
-    "output": "........................................................................ [ 42%]\n........................................................................ [ 85%]\n........................                                                 [100%]\n============================== warnings summary ===============================\nD:\\anaconda\\Lib\\site-packages\\fastapi\\testclient.py:1\n  D:\\anaconda\\Lib\\site-packages\\fastapi\\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n168 passed, 1 warning in 9.99s"
+    "output": "........................................................................ [ 41%]\n........................................................................ [ 82%]\n...............................                                          [100%]\n============================== warnings summary ===============================\nD:\\anaconda\\Lib\\site-packages\\fastapi\\testclient.py:1\n  D:\\anaconda\\Lib\\site-packages\\fastapi\\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n175 passed, 1 warning in 10.17s"
   },
   "unresolved_manual_items": [
-    "Capture real Qwen/DashScope call evidence with the competition credential.",
-    "Capture Streamlit and API screenshots after final UI review.",
+    "Capture Streamlit, API, and authenticated Qwen evidence screenshots after final UI review.",
     "Polish and export the <=20-page PPT/PDF.",
     "Record/upload the demo video and complete official submission forms."
   ]

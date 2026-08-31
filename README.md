@@ -113,7 +113,7 @@ request. The API and UI can start, and the local tests can run, without a key.
 
 ```env
 DASHSCOPE_API_KEY=
-LLM_MODEL=qwen-turbo
+LLM_MODEL=qwen3.8-max
 LLM_SEARCH_MODEL=qwen3.7-plus
 LLM_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 RESPONSES_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
@@ -338,6 +338,14 @@ python -m src.ai_scientist.competition_cli run-flagship --output competition/1b
 The FastAPI routes are under `/api/competition/1b`, and Streamlit exposes a
 `Competition Demo / 反馈迭代` mode. Submission evidence and reproduction instructions
 are under `competition/1b/`. Arbitrary Python or LLM-generated code is never executed.
+
+Run one authenticated Qwen competition smoke test explicitly, then reuse its redacted evidence
+without paying for another API call on each readiness check:
+
+```powershell
+python -m src.ai_scientist.competition_readiness --run-qwen-smoke
+python -m src.ai_scientist.competition_readiness
+```
 
 ## Existing API Verification
 

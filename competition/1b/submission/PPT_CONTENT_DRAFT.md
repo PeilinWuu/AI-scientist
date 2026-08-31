@@ -26,7 +26,7 @@ FastAPI + Streamlit + Pydantic + 项目持久化 + 追加事件 + 白名单 Exec
 
 ## 7. Qwen 与上下文工程
 
-Qwen 负责结构化规划与解释；程序负责数据和数值。真实 smoke 已尝试，但当前本地凭证返回 401，须更换参赛凭证后补成功证据。
+Qwen 负责结构化规划与解释；程序负责数据和数值。已使用 Alibaba Cloud Bailian authenticated endpoint 和 `qwen3.8-max` 完成真实 smoke test，精确响应 `QWEN_SMOKE_OK`；脱敏证据随仓库交付。
 
 ## 8. 任务规划
 
@@ -74,7 +74,7 @@ flagship Round 2 RMSE 0.033089，较 Round 1 改善 42.64%，达到阈值；代�
 
 ## 19. 总体结果、失败和边界
 
-闭环、审计、失败保留均已运行；当前边界包括简化噪声模型、数值仿真非硬件实验，以及真实 Qwen 凭证待更换。
+闭环、审计、失败保留和真实 Qwen authenticated smoke 均已运行；当前边界包括简化噪声模型和数值仿真非硬件实验。
 
 ## 20. 复现、API、前端与材料
 

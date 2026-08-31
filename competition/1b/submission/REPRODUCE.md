@@ -23,6 +23,11 @@ python -m venv .venv
 
 # 提交准备度；会再次运行全量 pytest
 .\.venv\Scripts\python -m src.ai_scientist.competition_readiness
+
+# 仅在需要刷新 Qwen 证据时显式产生一次真实调用
+.\.venv\Scripts\python -m src.ai_scientist.competition_readiness --run-qwen-smoke
 ```
 
-结果位于 `competition/1b/cases/flagship/` 和 `competition/1b/results/`。Qwen 最小 smoke 命令见 `QWEN_EVIDENCE_CHECKLIST.md`。
+结果位于 `competition/1b/cases/flagship/` 和 `competition/1b/results/`。普通 readiness 不会调用
+外部 API；它读取默认 168 小时内的脱敏 `qwen_smoke_evidence.json`。详情见
+`QWEN_EVIDENCE_CHECKLIST.md`。

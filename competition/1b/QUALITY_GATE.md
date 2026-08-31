@@ -2,7 +2,7 @@
 
 - Original baseline: 161 passed, 1 third-party warning.
 - Local sprint runtime: Python 3.12.7; CI target: Python 3.13.
-- Current full suite: 168 passed, 1 third-party `StarletteDeprecationWarning`.
+- Current full suite: 175 passed, 1 third-party `StarletteDeprecationWarning`.
 - New Competition 1B focused suite: 7 passed.
 - New core-module statement coverage: 84% (560 statements, 88 missed).
 - Coverage scope: `competition_schemas.py`, `competition_runtime.py`, and `tools/execution_adapter.py`.

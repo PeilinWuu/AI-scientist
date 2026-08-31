@@ -397,7 +397,7 @@ def render_chat_mode(backend_url: str, mode: str, show_debug: bool) -> None:
         if st.sidebar.button("测试搜索模型"):
             render_model_test_result(test_model(backend_url, model, "search"))
     else:
-        default_model = model_default(config, "pure_qwen", os.getenv("LLM_MODEL", "qwen-turbo"))
+        default_model = model_default(config, "pure_qwen", os.getenv("LLM_MODEL", "qwen3.8-max"))
         key = "pure_qwen_model_input"
         if key not in st.session_state:
             st.session_state[key] = default_model

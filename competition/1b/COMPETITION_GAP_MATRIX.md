@@ -20,7 +20,7 @@
 | FastAPI 比赛入口 | 部分完成 | 现有研究 API 完整，无执行迭代 API | 增加 competition demo 创建、执行、历史、artifact/readiness 路由 | 避免路由重复 | P0 |
 | Streamlit 最短演示路径 | 部分完成 | `app_streamlit.py` 有三模式工作台 | 在 AI Scientist 内增加 Competition Demo 区块 | 不能破坏原 UI | P0 |
 | 原始数据、分析、diff、审计落盘 | 部分完成 | 已有项目 store、artifact、events | competition 案例使用独立稳定目录并保存 checksum/provenance | 命名覆盖旧结果 | P0 |
-| Qwen 参赛证据 | 部分完成 | `structured_client.py`、Qwen client 与模型注册表 | 生成清单并运行凭证状态检查；无有效调用不得声称通过 | 外部凭证/网络 | P1 |
+| Qwen 参赛证据 | 已完成 | `structured_client.py`、Qwen client、`results/qwen_smoke_evidence.json` | 已运行 authenticated smoke 并保存脱敏证据 | 后续刷新仍依赖外部网络 | P1 |
 | 一键复现和 readiness | 缺失 | 仅有 pytest/启动命令 | 新增 CLI runner 和 readiness JSON | 必须检查实际产物而非代码 | P0 |
 | PPT、演示、证据索引 | 缺失 | 无 competition submission 目录 | 仅以真实运行数据生成材料骨架 | 截图需人工完成 | P1 |
 | README/config 一致性 | 部分完成 | README 前后冲突，timeout 重复 | 低风险修正 | 无 | P1 |

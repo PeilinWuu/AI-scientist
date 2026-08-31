@@ -27,7 +27,7 @@ class PureQwenClient:
             raise ValueError("DASHSCOPE_API_KEY is missing. Please set it in .env.")
 
         self.api_key = api_key
-        self.model = os.getenv("LLM_MODEL", "qwen-turbo")
+        self.model = os.getenv("LLM_MODEL", "qwen3.8-max")
         self.base_url = os.getenv("LLM_BASE_URL", DEFAULT_BASE_URL).rstrip("/")
         self.timeout = float(os.getenv("LLM_TIMEOUT", "60"))
         self.http_client = httpx.Client(
@@ -67,7 +67,7 @@ def pure_qwen_metadata() -> dict[str, object]:
 
     return {
         "mode": "pure_qwen",
-        "model": os.getenv("LLM_MODEL", "qwen-turbo"),
+        "model": os.getenv("LLM_MODEL", "qwen3.8-max"),
         "base_url": os.getenv("LLM_BASE_URL", DEFAULT_BASE_URL).rstrip("/"),
         "api_key_configured": bool(os.getenv("DASHSCOPE_API_KEY", "")),
     }

@@ -17,7 +17,7 @@ class Settings:
 
     def __init__(self) -> None:
         self.dashscope_api_key = os.getenv("DASHSCOPE_API_KEY", "")
-        self.llm_model = os.getenv("LLM_MODEL", "qwen-turbo")
+        self.llm_model = os.getenv("LLM_MODEL", "qwen3.8-max")
         self.llm_search_model = os.getenv("LLM_SEARCH_MODEL", "qwen3.7-plus")
         self.llm_base_url = os.getenv(
             "LLM_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"
