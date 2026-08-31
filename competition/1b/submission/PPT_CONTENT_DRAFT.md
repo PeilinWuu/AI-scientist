@@ -78,6 +78,6 @@ flagship Round 2 RMSE 0.033089，较 Round 1 改善 42.64%，达到阈值；代�
 
 ## 20. 复现、API、前端与材料
 
-一键案例、pytest、FastAPI `/docs`、Streamlit Competition Demo、readiness JSON 和 evidence index 均随仓库交付。
+AI Scientist 首页可加载但不会自动运行旗舰示例；pytest、FastAPI `/docs`、readiness JSON、benchmark artifacts 和 evidence index 均随仓库交付。
 
 [SCREENSHOT REQUIRED: API OpenAPI 与 readiness 页面]

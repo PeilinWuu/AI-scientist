@@ -39,8 +39,7 @@
 
 ## 删除后的入口
 
-- Streamlit 默认直接进入 `Competition Demo / 科学实验任务规划与反馈迭代`。
-- 侧栏只允许在 `Competition Demo` 与完整 `AI Scientist` 工作区之间切换。
+- Streamlit 只有一个 `AI Scientist` 产品入口，首屏从用户科学问题和可选附件开始。
+- Competition 1B 阻尼振子只作为可编辑的“加载示例”存在；加载不会创建项目或执行 benchmark。
 - OpenAPI 只保留 Competition 1B、AI Scientist、内部模型诊断和 health/readiness；不再暴露独立聊天 endpoints。
 - Qwen 推理和联网检索仍作为 AI Scientist 内部能力存在，不作为独立产品呈现。
-

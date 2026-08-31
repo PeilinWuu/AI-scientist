@@ -9,7 +9,7 @@
 | 多 seed 重复 | complete | `results/seed_runs/` | 无 | Codex |
 | 3+ 失败案例 | complete | `results/failure_cases.json` | 无 | Codex |
 | FastAPI 演示 | complete | `API_DEMO.md`、`competition_api.py` | 现场启动 | Presenter |
-| Streamlit 演示 | complete | `app_streamlit.py` Competition Demo | 截图/现场启动 | Presenter |
+| Streamlit 演示 | complete | `app_streamlit.py` AI Scientist 单入口与可编辑 flagship example | 截图/现场启动 | Presenter |
 | Qwen 代码路径 | complete | `QWEN_EVIDENCE_CHECKLIST.md` | 无 | Codex |
 | Qwen 真实成功证据 | complete | `results/qwen_smoke_evidence.json` | 截图用于 PPT | Submission owner |
 | 20 页 PPT/PDF | draft | `PPT_CONTENT_DRAFT.md` | 美化、截图、导出 | Submission owner |

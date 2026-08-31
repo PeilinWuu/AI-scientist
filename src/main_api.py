@@ -38,7 +38,7 @@ from src.model_utils import normalize_model_name
 
 
 app = FastAPI(
-    title="AI Scientist Competition 1B API",
+    title="AI Scientist API",
     description="Scientific task planning, controlled execution, evidence research, and feedback iteration.",
     version="1.0.0",
 )
@@ -65,7 +65,7 @@ def health() -> dict:
 
     return {
         "status": "ok",
-        "product": "ai_scientist_competition_1b",
+        "product": "ai_scientist",
         "qwen_configured": bool(os.getenv("DASHSCOPE_API_KEY", "")),
     }
 
@@ -173,6 +173,7 @@ def research_start(request: ResearchStartRequest) -> dict:
             max_iterations=request.max_iterations,
             planning_only=request.planning_only,
             evidence_review_mode=request.evidence_review_mode,
+            reproducibility_seed=request.reproducibility_seed,
         )
         return {
             "project_id": project.project_id,
@@ -425,6 +426,9 @@ def research_upload_asset(project_id: str, request: ResearchAssetUploadRequest) 
             purpose=request.purpose,
             description=request.description,
             upload_context=request.upload_context,
+            asset_role=request.asset_role,
+            research_round=request.research_round,
+            source=request.source,
         )
         return {
             "project_id": project.project_id,
@@ -435,6 +439,17 @@ def research_upload_asset(project_id: str, request: ResearchAssetUploadRequest) 
                 else "文件已登记，但解析未完成；可在项目文件区查看原因并重试。"
             ),
         }
+    except Exception as exc:  # noqa: BLE001
+        raise _research_http_error(exc) from exc
+
+
+@app.delete("/api/research/{project_id}/research-assets/{asset_id}")
+def research_delete_asset(project_id: str, asset_id: str) -> dict:
+    """Delete an unused mistaken upload; used assets remain immutable for provenance."""
+
+    try:
+        project = research_orchestrator.delete_research_asset(project_id, asset_id)
+        return {"project_id": project.project_id, "asset_id": asset_id, "status": "deleted"}
     except Exception as exc:  # noqa: BLE001
         raise _research_http_error(exc) from exc
 
@@ -701,7 +716,9 @@ def _research_http_error(exc: Exception) -> HTTPException:
     error_type = type(exc).__name__
     status_code = (
         404
-        if error_type in {"ProjectNotFoundError", "ResearchAssetNotFoundError"}
+        if error_type in {"ProjectNotFoundError", "ResearchAssetNotFoundError", "FileNotFoundError"}
+        else 400
+        if error_type == "ValueError"
         else 409
         if error_type == "InvalidTransitionError"
         else 500

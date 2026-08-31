@@ -399,6 +399,9 @@ class ResearchAsset(StrictModel):
     saved_path: str
     size_bytes: int = Field(default=0, ge=0)
     purpose: Literal["reference", "data", "other"] = "reference"
+    asset_role: Literal["research_material", "experimental_result"] = "research_material"
+    research_round: int | None = Field(default=None, ge=0)
+    source: str = Field(default="user_upload", max_length=500)
     description: str = Field(default="", max_length=2000)
     upload_context: Literal[
         "project_creation",
@@ -407,6 +410,7 @@ class ResearchAsset(StrictModel):
         "revision_review",
         "human_approval",
         "project_workspace",
+        "experimental_result",
     ] = "project_workspace"
     parsing_status: Literal["registered_only", "parsing", "parsed", "failed"] = "registered_only"
     parsed_content: ParsedAssetContent | None = None
@@ -1133,6 +1137,8 @@ class ResearchProject(StrictModel):
     model_overrides: dict[str, str] = Field(default_factory=dict)
     phase: ResearchPhase = ResearchPhase.INTAKE
     constraints: dict[str, Any] = Field(default_factory=dict)
+    reproducibility_seed: int | None = Field(default=None, ge=0, le=2_147_483_647)
+    workflow_version: str = "general_research_v1@1.0"
     question: ResearchQuestion | None = None
     evidence: list[EvidenceItem] = Field(default_factory=list)
     evidence_review_mode: EvidenceReviewMode = "ASSISTED"
@@ -1300,6 +1306,15 @@ class ResearchStartRequest(StrictModel):
         in {"1", "true", "yes", "on"}
     )
     evidence_review_mode: EvidenceReviewMode = "ASSISTED"
+    reproducibility_seed: int | None = Field(default=None, ge=0, le=2_147_483_647)
+
+    @field_validator("objective")
+    @classmethod
+    def validate_objective(cls, value: str) -> str:
+        objective = value.strip()
+        if not objective:
+            raise ValueError("Research question is required.")
+        return objective
 
 
 class RevisionRequest(StrictModel):
@@ -1383,6 +1398,9 @@ class ResearchAssetUploadRequest(StrictModel):
     content_type: str = "application/octet-stream"
     content_base64: str = Field(min_length=1)
     purpose: Literal["reference", "data", "other"] = "reference"
+    asset_role: Literal["research_material", "experimental_result"] = "research_material"
+    research_round: int | None = Field(default=None, ge=0)
+    source: str = Field(default="user_upload", max_length=500)
     description: str = Field(default="", max_length=2000)
     upload_context: Literal[
         "project_creation",
@@ -1391,6 +1409,7 @@ class ResearchAssetUploadRequest(StrictModel):
         "revision_review",
         "human_approval",
         "project_workspace",
+        "experimental_result",
     ] = "project_workspace"
 
 

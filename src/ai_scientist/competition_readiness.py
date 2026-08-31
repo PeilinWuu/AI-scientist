@@ -36,6 +36,7 @@ def check_readiness(root: str | Path = "competition/1b", run_tests: bool = True)
         json.dumps(test_result, ensure_ascii=False, indent=2), encoding="utf-8"
     )
     qwen_smoke = _qwen_smoke_status(root)
+    streamlit_source = (repository / "app_streamlit.py").read_text(encoding="utf-8")
     checks = {
         "tests_passed": test_result.get("passed", False),
         "flagship_case_complete": _json_value(flagship / "audit/run_state.json", "status") == "complete",
@@ -46,7 +47,10 @@ def check_readiness(root: str | Path = "competition/1b", run_tests: bool = True)
         "comparison_present": _all(root, ["results/benchmark_summary.json", "cases/flagship/comparison/baseline_comparison.json"]),
         "failure_cases_present": _valid_failure_cases(root / "results/failure_cases.json"),
         "api_demo_present": (root / "API_DEMO.md").exists() and (repository / "src/ai_scientist/competition_api.py").exists(),
-        "streamlit_demo_present": "Competition Demo" in (repository / "app_streamlit.py").read_text(encoding="utf-8"),
+        "streamlit_demo_present": all(
+            marker in streamlit_source
+            for marker in ["render_research_workspace", "DAMPED_OSCILLATOR_EXAMPLE", "加载示例：阻尼振子参数辨识"]
+        ) and "render_competition_demo" not in streamlit_source,
         "qwen_config_present": "DASHSCOPE_API_KEY" in (repository / ".env.example").read_text(encoding="utf-8"),
         "qwen_real_smoke_test_status": qwen_smoke["status"],
         "qwen_real_smoke_test_passed": qwen_smoke["passed"],

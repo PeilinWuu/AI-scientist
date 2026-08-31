@@ -32,5 +32,6 @@ python -m venv .venv
 外部 API；它读取默认 168 小时内的脱敏 `qwen_smoke_evidence.json`。详情见
 `QWEN_EVIDENCE_CHECKLIST.md`。
 
-Streamlit 默认进入 Competition Demo，侧栏可切换到完整 AI Scientist 工作区。Qwen
-结构化推理与受控联网证据检索均由工作流内部调用，不作为独立聊天产品暴露。
+Streamlit 只有一个 AI Scientist 产品入口。首页可输入任意科学问题并上传资料；“加载示例：
+阻尼振子参数辨识”只填入可编辑的问题、约束和 seed 20260831，不会自动执行 benchmark。
+Qwen 结构化推理与受控联网证据检索均由工作流内部调用，不作为独立聊天产品暴露。

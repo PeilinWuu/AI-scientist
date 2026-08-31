@@ -1,9 +1,10 @@
-"""Streamlit frontend for AI Scientist and the Competition 1B demo."""
+"""Unified Streamlit frontend for AI Scientist."""
 
 from __future__ import annotations
 
 import json
 import base64
+import logging
 import os
 import time
 from pathlib import Path
@@ -26,10 +27,24 @@ ROOT_DIR = Path(__file__).resolve().parent
 load_dotenv(ROOT_DIR / ".env")
 
 DEFAULT_BACKEND_URL = "http://localhost:8000"
-PRODUCT_VIEWS = ["Competition Demo", "AI Scientist"]
 RESEARCH_STEP_TIMEOUT = int(os.getenv("AI_SCIENTIST_FRONTEND_STEP_TIMEOUT", "600"))
 RESEARCH_ASSET_EXTENSIONS = ["pdf", "md", "txt", "csv", "tsv", "json", "xml", "xlsx", "xls"]
 RESEARCH_ASSET_MAX_BYTES = int(os.getenv("AI_SCIENTIST_MAX_ASSET_BYTES", str(25 * 1024 * 1024)))
+LOGGER = logging.getLogger(__name__)
+
+DAMPED_OSCILLATOR_EXAMPLE = {
+    "objective": (
+        "研究如何从带噪位移观测中辨识阻尼振子的阻尼系数与角频率，并根据第一轮拟合结果"
+        "调整第二轮参数搜索范围，在受控计算预算内降低拟合 RMSE。"
+    ),
+    "domain_hint": "physics",
+    "constraints_text": (
+        "使用有界参数搜索；Round 1 采用宽范围粗网格，Round 2 必须引用第一轮实际结果再细化；"
+        "禁止执行任意 LLM 生成代码。建议初始范围：damping=[0.05, 0.35]，omega=[2.0, 2.8]。"
+    ),
+    "seed": 20260831,
+    "case_id": "competition_1b_damped_oscillator",
+}
 
 SCIENTIST_MODEL_KEYS = {
     "research_director": ("scientist_director_model", "研究总监模型"),
@@ -76,6 +91,13 @@ def post_json(
     return response.json()
 
 
+def delete_json(backend_url: str, path: str, timeout: int = 60) -> dict:
+    response = requests.delete(f"{backend_url.rstrip('/')}{path}", timeout=timeout)
+    if not response.ok:
+        raise BackendAPIError(response.status_code, _extract_error_detail(response))
+    return response.json()
+
+
 def get_json(backend_url: str, path: str) -> object:
     url = f"{backend_url.rstrip('/')}{path}"
     response = requests.get(url, timeout=60)
@@ -92,6 +114,18 @@ def get_text(backend_url: str, path: str) -> str:
     return response.text
 
 
+def render_artifact_image(image_url: str, caption: str = "") -> None:
+    """Render an artifact with the Streamlit 1.37 image API and a safe failure state."""
+
+    try:
+        response = requests.get(image_url, timeout=30)
+        response.raise_for_status()
+        st.image(response.content, caption=caption or None, use_column_width=True)
+    except Exception as exc:  # noqa: BLE001 - preview failure must not break the product page
+        LOGGER.warning("Artifact preview unavailable for %s: %s", image_url, exc)
+        st.warning("Artifact preview unavailable")
+
+
 def _save_research_assets(
     backend_url: str,
     project_id: str,
@@ -99,6 +133,10 @@ def _save_research_assets(
     purpose: str,
     description: str,
     upload_context: str,
+    *,
+    asset_role: str = "research_material",
+    research_round: int | None = None,
+    source: str = "user_upload",
 ) -> tuple[list[dict], list[str]]:
     """Persist uploaded files through the project asset API and report partial failures."""
 
@@ -120,6 +158,9 @@ def _save_research_assets(
                     "content_type": upload.type or "application/octet-stream",
                     "content_base64": base64.b64encode(content).decode("ascii"),
                     "purpose": purpose,
+                    "asset_role": asset_role,
+                    "research_round": research_round,
+                    "source": source,
                     "description": description.strip(),
                     "upload_context": upload_context,
                 },
@@ -142,6 +183,7 @@ def _render_research_asset_uploader(
     title: str = "上传补充资料或数据",
     expanded: bool = False,
     embedded: bool = False,
+    allow_experimental_results: bool = False,
 ) -> None:
     """Render one auditable multi-file upload entry for an existing project."""
 
@@ -160,17 +202,46 @@ def _render_research_asset_uploader(
             accept_multiple_files=True,
             key=f"{key_prefix}_files_{project_id}",
         )
-        purpose = st.radio(
-            "文件用途",
-            options=["reference", "data", "other"],
-            format_func=lambda value: {
-                "reference": "参考资料",
-                "data": "数据来源",
-                "other": "其他项目文件",
-            }[value],
-            horizontal=True,
-            key=f"{key_prefix}_purpose_{project_id}",
-        )
+        asset_role = "research_material"
+        research_round = None
+        source = "user_upload"
+        if allow_experimental_results:
+            asset_role = st.radio(
+                "添加类型",
+                options=["research_material", "experimental_result"],
+                format_func=lambda value: {
+                    "research_material": "Add Research Material",
+                    "experimental_result": "Add Experimental Result",
+                }[value],
+                horizontal=True,
+                key=f"{key_prefix}_role_{project_id}",
+            )
+        if asset_role == "experimental_result":
+            purpose = "data"
+            research_round = int(st.number_input(
+                "实验轮次",
+                min_value=1,
+                value=max(1, int(project.get("iteration") or 0) + 1),
+                key=f"{key_prefix}_round_{project_id}",
+            ))
+            source = st.text_input(
+                "数据来源",
+                value="human_experiment",
+                key=f"{key_prefix}_source_{project_id}",
+                help="例如：human_experiment、instrument_export 或 external_lab。",
+            )
+        else:
+            purpose = st.radio(
+                "文件用途",
+                options=["reference", "data", "other"],
+                format_func=lambda value: {
+                    "reference": "参考资料",
+                    "data": "数据来源",
+                    "other": "其他项目文件",
+                }[value],
+                horizontal=True,
+                key=f"{key_prefix}_purpose_{project_id}",
+            )
         description = st.text_area(
             "文件说明（可选）",
             placeholder="例如：研究者提供的原始数据、需要复核的方法附件或补充文献。",
@@ -187,10 +258,27 @@ def _render_research_asset_uploader(
                 list(uploads or []),
                 purpose,
                 description,
-                upload_context,
+                "experimental_result" if asset_role == "experimental_result" else upload_context,
+                asset_role=asset_role,
+                research_round=research_round,
+                source=source,
             )
             if saved:
                 st.success(f"已保存 {len(saved)} 个文件。")
+                if asset_role == "experimental_result":
+                    try:
+                        post_json(
+                            backend_url,
+                            f"/api/research/{project_id}/provide-data",
+                            {
+                                "artifact_paths": [str(item.get("saved_path") or item.get("asset_id")) for item in saved],
+                                "description": description or f"Round {research_round} experimental result",
+                                "data_type": ",".join(sorted({str(item.get("content_type") or "data") for item in saved})),
+                            },
+                        )
+                    except BackendAPIError as exc:
+                        st.warning("文件已保存，但当前工作流阶段尚不能登记为待分析实验结果。")
+                        LOGGER.warning("Experimental result registration deferred: %s", exc.detail)
                 refresh_research_project(backend_url)
             for error in errors:
                 st.error(error)
@@ -222,6 +310,13 @@ def _render_research_asset_uploader(
                     f"{purpose_label} · {round(float(item.get('size_bytes') or 0) / 1024, 1)} KB · "
                     f"{status_label}"
                 )
+                if item.get("asset_role") == "experimental_result":
+                    st.caption(
+                        f"实验结果 · Round {item.get('research_round') or '未指定'} · "
+                        f"来源：{item.get('source') or 'user_upload'} · asset id: {item.get('asset_id')}"
+                    )
+                else:
+                    st.caption(f"asset id: {item.get('asset_id')}")
                 if item.get("description"):
                     st.caption(str(item.get("description")))
                 parsed = item.get("parsed_content") or {}
@@ -250,6 +345,23 @@ def _render_research_asset_uploader(
                                 f"/api/research/{project_id}/research-assets/{item.get('asset_id')}/parse",
                                 {},
                                 timeout=120,
+                            )
+                            refresh_research_project(backend_url)
+                            st.rerun()
+                        except BackendAPIError as exc:
+                            st.error(exc.detail)
+                delete_key = f"{key_prefix}_delete_confirm_{project_id}_{item.get('asset_id')}"
+                if not item.get("used_by_agents"):
+                    allow_delete = st.checkbox("允许删除此误上传文件", key=delete_key)
+                    if st.button(
+                        "删除文件",
+                        disabled=not allow_delete,
+                        key=f"{key_prefix}_delete_{project_id}_{item.get('asset_id')}",
+                    ):
+                        try:
+                            delete_json(
+                                backend_url,
+                                f"/api/research/{project_id}/research-assets/{item.get('asset_id')}",
                             )
                             refresh_research_project(backend_url)
                             st.rerun()
@@ -406,12 +518,105 @@ def render_scientist_model_config(backend_url: str) -> dict[str, str]:
     return defaults
 
 
+def _load_damped_oscillator_example() -> None:
+    """Populate editable intake fields without creating or running anything."""
+
+    current_question = str(st.session_state.get("research_objective") or "").strip()
+    if current_question and current_question != DAMPED_OSCILLATOR_EXAMPLE["objective"]:
+        st.session_state.research_example_notice = "preserved_user_input"
+        return
+    st.session_state.research_objective = DAMPED_OSCILLATOR_EXAMPLE["objective"]
+    st.session_state.research_domain_hint = DAMPED_OSCILLATOR_EXAMPLE["domain_hint"]
+    st.session_state.research_constraints_text = DAMPED_OSCILLATOR_EXAMPLE["constraints_text"]
+    st.session_state.research_seed_mode = "Custom"
+    st.session_state.research_custom_seed = DAMPED_OSCILLATOR_EXAMPLE["seed"]
+    st.session_state.research_example_case = DAMPED_OSCILLATOR_EXAMPLE["case_id"]
+    st.session_state.research_example_notice = "loaded"
+
+
+def _clear_example_marker() -> None:
+    """Detach benchmark behavior while preserving user-editable text."""
+
+    st.session_state.research_example_case = ""
+    st.session_state.research_example_notice = "detached"
+
+
+def _on_research_question_change() -> None:
+    """Detach the example marker when the researcher turns it into a custom question."""
+
+    if (
+        st.session_state.get("research_example_case")
+        and st.session_state.get("research_objective") != DAMPED_OSCILLATOR_EXAMPLE["objective"]
+    ):
+        st.session_state.research_example_case = ""
+        st.session_state.research_example_notice = "detached"
+
+
+def build_research_start_payload(
+    *,
+    objective: str,
+    domain_hint: str,
+    constraints_text: str,
+    model_overrides: dict[str, str],
+    max_iterations: int,
+    planning_only: bool,
+    evidence_review_mode: str,
+    seed_mode: str,
+    custom_seed: int,
+    example_case: str = "",
+) -> dict:
+    """Build project intake without creating a project or starting a workflow stage."""
+
+    question = objective.strip()
+    if not question:
+        raise ValueError("请输入科学问题后再创建研究项目。")
+    seed = int(custom_seed) if seed_mode == "Custom" else None
+    constraints: dict[str, object] = {"reproducibility_seed_mode": seed_mode.lower()}
+    if example_case:
+        constraints["example_case"] = example_case
+    return {
+        "objective": question,
+        "domain_hint": domain_hint.strip() or None,
+        "constraints_text": constraints_text.strip(),
+        "constraints": constraints,
+        "model_overrides": model_overrides,
+        "max_iterations": int(max_iterations),
+        "planning_only": bool(planning_only),
+        "evidence_review_mode": evidence_review_mode,
+        "reproducibility_seed": seed,
+    }
+
+
 def render_research_workspace(backend_url: str, show_debug: bool) -> None:
     st.title("AI Scientist")
-    model_defaults = render_scientist_model_config(backend_url)
-    st.caption("多个 Qwen 角色通过状态机协作。当前模式只生成科研规划，不虚构实验或分析结果。")
+    st.caption("输入科学问题和已有资料，系统将形成可审计的实验规划、执行、分析与反馈迭代流程。")
+    model_defaults = scientist_default_models(get_model_config(backend_url))
 
-    with st.expander("创建研究项目", expanded=not bool(st.session_state.research_project_id)):
+    if not st.session_state.research_project_id:
+        st.subheader("你想研究什么？")
+        example_columns = st.columns([3, 1])
+        example_columns[0].caption(
+            "从自己的问题开始；Competition 1B 阻尼振子只是可编辑且不会自动运行的示例。"
+        )
+        example_columns[1].button(
+            "加载示例：阻尼振子参数辨识",
+            on_click=_load_damped_oscillator_example,
+            use_container_width=True,
+        )
+        if st.session_state.research_example_notice == "preserved_user_input":
+            st.warning("未加载示例：已保留你输入的科学问题。请先清空问题，再主动加载示例。")
+        elif st.session_state.research_example_case:
+            st.info("示例问题、参数约束和推荐 seed 已填入；所有内容仍可编辑，尚未创建或运行项目。")
+            st.button("移除示例标记（保留文本）", on_click=_clear_example_marker)
+        elif st.session_state.research_example_notice == "detached":
+            st.info("已保留编辑后的内容，并解除 Competition 示例标记；不会自动运行 benchmark。")
+
+    intake_container = (
+        st.container(border=True)
+        if not st.session_state.research_project_id
+        else st.expander("新建或加载其他研究项目", expanded=False)
+    )
+    with intake_container:
         existing_project_id = st.text_input("加载已有项目 ID", key="existing_research_project_id")
         if st.button("加载项目"):
             try:
@@ -420,7 +625,13 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
                 st.rerun()
             except BackendAPIError as exc:
                 st.error(exc.detail)
-        objective = st.text_area("研究目标", key="research_objective")
+        objective = st.text_area(
+            "科学问题 / Research Question",
+            key="research_objective",
+            height=180,
+            placeholder="请描述你希望研究的科学问题、目标、已有条件和限制。",
+            on_change=_on_research_question_change,
+        )
         domain_hint = st.text_input("领域提示（可选）", key="research_domain_hint")
         constraints_text = st.text_area(
             "补充要求与约束",
@@ -428,18 +639,40 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
             key="research_constraints_text",
             placeholder="例如：目标人群、可用数据、时间范围、约束条件，以及是否允许因果推断。",
         )
-        max_iterations = st.number_input("最大修订次数", min_value=0, max_value=10, value=2)
-        planning_only = st.checkbox("仅规划模式", value=True)
-        evidence_review_mode = st.selectbox(
-            "证据审查模式",
-            options=["ASSISTED", "MANUAL", "AUTO"],
-            format_func=lambda value: {
-                "ASSISTED": "辅助审查（推荐）：AI 推荐，人工决定",
-                "MANUAL": "人工审查：所有候选来源均由人工明确决定",
-                "AUTO": "自动审查：用于低风险开发验证",
-            }[value],
-            index=0,
-        )
+        with st.expander("Advanced Settings / 高级设置", expanded=False):
+            seed_mode = st.radio(
+                "Reproducibility seed",
+                options=["Auto", "Custom"],
+                horizontal=True,
+                key="research_seed_mode",
+                help="seed 只控制可复现随机性，不会选择问题、加载案例或启动执行。",
+            )
+            custom_seed = st.number_input(
+                "Custom seed",
+                min_value=0,
+                max_value=2_147_483_647,
+                step=1,
+                key="research_custom_seed",
+                disabled=seed_mode != "Custom",
+            )
+            if st.session_state.research_example_case:
+                st.caption("Competition reproducibility seed：20260831（可修改）")
+            max_iterations = st.number_input("最大修订次数", min_value=0, max_value=10, value=2)
+            planning_only = st.checkbox(
+                "仅规划模式",
+                value=True,
+                help="关闭后，如无真实执行器，项目会明确等待外部执行或用户上传结果。",
+            )
+            evidence_review_mode = st.selectbox(
+                "证据审查模式",
+                options=["ASSISTED", "MANUAL", "AUTO"],
+                format_func=lambda value: {
+                    "ASSISTED": "辅助审查（推荐）：AI 推荐，人工决定",
+                    "MANUAL": "人工审查：所有候选来源均由人工明确决定",
+                    "AUTO": "自动审查：用于低风险开发验证",
+                }[value],
+                index=0,
+            )
         creation_uploads = st.file_uploader(
             "项目初始资料或数据（可选）",
             type=RESEARCH_ASSET_EXTENSIONS,
@@ -464,21 +697,24 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
             placeholder="例如：已有文献、实验记录或待分析数据。",
         )
         st.caption("上传文件会随项目保存并在本地解析；解析摘要会进入后续研究角色的结构化输入。")
-        if st.button("创建项目", type="primary"):
+        if st.button("Start Research / 创建研究项目", type="primary", disabled=not objective.strip()):
             try:
+                payload = build_research_start_payload(
+                    objective=objective,
+                    domain_hint=domain_hint,
+                    constraints_text=constraints_text,
+                    model_overrides=scientist_model_overrides(model_defaults),
+                    max_iterations=int(max_iterations),
+                    planning_only=planning_only,
+                    evidence_review_mode=evidence_review_mode,
+                    seed_mode=seed_mode,
+                    custom_seed=int(custom_seed),
+                    example_case=st.session_state.research_example_case,
+                )
                 created = post_json(
                     backend_url,
                     "/api/research/start",
-                    {
-                        "objective": objective,
-                        "domain_hint": domain_hint or None,
-                        "constraints_text": constraints_text,
-                        "constraints": {},
-                        "model_overrides": scientist_model_overrides(model_defaults),
-                        "max_iterations": int(max_iterations),
-                        "planning_only": planning_only,
-                        "evidence_review_mode": evidence_review_mode,
-                    },
+                    payload,
                 )
                 st.session_state.research_project_id = created["project_id"]
                 saved, upload_errors = _save_research_assets(
@@ -498,6 +734,8 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
             except (ValueError, BackendAPIError) as exc:
                 st.error(exc.detail if isinstance(exc, BackendAPIError) else str(exc))
 
+    render_scientist_model_config(backend_url)
+
     project = st.session_state.research_project
     if not project:
         st.info("请先创建项目，再逐阶段运行科研工作流。")
@@ -505,7 +743,13 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
 
     st.subheader("项目状态")
     columns = st.columns(5)
-    columns[0].metric("当前阶段", PHASE_LABELS.get(project.get("phase", ""), project.get("phase", "")))
+    phase = project.get("phase", "")
+    phase_label = PHASE_LABELS.get(phase, phase)
+    if phase == "EXECUTION_WAITING" and not project.get("planning_only", True):
+        phase_label = "EXTERNAL_EXECUTION_REQUIRED"
+    elif phase == "HUMAN_INTERVENTION_REQUIRED":
+        phase_label = "HUMAN_ACTION_REQUIRED"
+    columns[0].metric("当前阶段", phase_label)
     columns[1].metric("研究模式", project.get("research_mode") or "待选择")
     columns[2].metric("研究领域", project.get("domain") or "通用")
     pending_cycle = 1 if project.get("phase") == "HUMAN_REVISION_REVIEW" and project.get("revision_issues") else 0
@@ -513,6 +757,15 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
     budget = project.get("budget") or {}
     columns[4].metric("模型调用", f"{budget.get('used_model_calls', 0)}/{budget.get('max_model_calls', 0)}")
     st.caption(f"项目 ID：{project.get('project_id')}")
+    seed_label = project.get("reproducibility_seed")
+    st.caption(
+        f"Workflow：{project.get('workflow_version') or 'general_research_v1'} · "
+        f"Reproducibility seed：{seed_label if seed_label is not None else 'Auto'}"
+    )
+    if phase == "EXECUTION_WAITING" and not project.get("planning_only", True):
+        st.warning("EXTERNAL_EXECUTION_REQUIRED：当前问题没有已批准的自动执行器。请完成外部实验并上传实验结果。")
+    elif phase == "DATA_ANALYSIS":
+        st.info("实验结果已登记。系统只会在已接入真实分析能力时继续，不会伪造分析结果。")
     if project.get("model_overrides"):
         st.caption("该项目使用创建时保存的模型覆盖配置。")
         if show_debug:
@@ -525,6 +778,7 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
         key_prefix="project_workspace_asset",
         title="项目资料与数据",
         expanded=bool(project.get("research_assets")),
+        allow_experimental_results=True,
     )
 
     metrics = project.get("quality_metrics") or {}
@@ -700,9 +954,24 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
 
     capability_columns = st.columns(2)
     capability_columns[0].write("**当前可用能力**")
-    capability_columns[0].write(["联网搜索", "网页内容提取", "研究产物持久化"])
+    capability_labels = {
+        "web_search": "联网搜索",
+        "web_extractor": "网页内容提取",
+        "file_search": "上传资料检索",
+        "dataset_inspector": "数据结构与质量检查",
+        "statistical_analyzer": "白名单确定性统计分析",
+        "artifact_store": "研究产物持久化",
+        "python_executor": "任意 Python 执行",
+        "code_runner": "任意代码运行器",
+        "citation_manager": "外部引用管理器",
+    }
+    capability_columns[0].write([
+        capability_labels.get(name, name) for name in project.get("available_tools") or []
+    ])
     capability_columns[1].write("**尚未接入的能力**")
-    capability_columns[1].write(["文件分析", "Python 执行", "统计分析", "代码运行器"])
+    capability_columns[1].write([
+        capability_labels.get(name, name) for name in project.get("missing_capabilities") or []
+    ])
     if show_debug:
         st.write("**原始能力 ID**")
         render_debug_object({"available_tools": project.get("available_tools") or [], "missing_capabilities": project.get("missing_capabilities") or []})
@@ -1470,137 +1739,25 @@ def _research_patch(backend_url: str, path: str, payload: dict) -> None:
         raise
 
 
-def render_competition_demo(backend_url: str) -> None:
-    """Render the shortest judge-facing path through the real two-round loop."""
-
-    st.title("Competition 1B · 科学实验反馈迭代演示")
-    st.caption("阻尼振子参数辨识：程序执行和计算指标，Round 1 的真实结果驱动 Round 2。")
-    try:
-        readiness = get_json(backend_url, "/api/competition/1b/readiness")
-        if isinstance(readiness, dict) and readiness.get("output_root_writable"):
-            st.success("受控确定性执行器已就绪；不允许任意代码执行。")
-        else:
-            st.warning("执行输出目录当前不可写。")
-    except Exception as exc:
-        st.error(f"比赛演示后端不可用：{exc}")
-        return
-
-    seed = st.number_input("可复现 seed", min_value=0, max_value=2_147_483_647, value=20260831, step=1)
-    left, right = st.columns(2)
-    if left.button("运行完整两轮 + Baseline", type="primary", use_container_width=True):
-        try:
-            with st.spinner("正在生成观测、执行两轮拟合并计算 baseline…"):
-                st.session_state.competition_demo_state = post_json(
-                    backend_url, "/api/competition/1b/demo/run", {"seed": int(seed)}, timeout=180
-                )
-            st.success("真实闭环运行完成。")
-        except BackendAPIError as exc:
-            st.error(exc.detail)
-    if right.button("运行失败/人工接管检查", use_container_width=True):
-        try:
-            st.session_state.competition_failure_cases = post_json(
-                backend_url, "/api/competition/1b/demo/failure-cases", {}, timeout=60
-            )
-        except BackendAPIError as exc:
-            st.error(exc.detail)
-
-    state = st.session_state.get("competition_demo_state")
-    if not state:
-        try:
-            state = get_json(backend_url, "/api/competition/1b/demo")
-            st.session_state.competition_demo_state = state
-        except Exception:
-            st.info("点击按钮运行旗舰案例；所有展示值都来自本次实际执行 artifact。")
-            return
-    if not isinstance(state, dict):
-        return
-
-    comparison = state.get("comparison") or {}
-    iteration = comparison.get("iteration") or {}
-    baseline = comparison.get("baseline") or {}
-    metrics = st.columns(5)
-    metrics[0].metric("Round 1 RMSE", f"{iteration.get('round_1_rmse', 0):.6f}")
-    metrics[1].metric("Round 2 RMSE", f"{iteration.get('round_2_rmse', 0):.6f}")
-    metrics[2].metric("迭代改善", f"{iteration.get('relative_rmse_gain_percent', 0):.2f}%")
-    metrics[3].metric("Baseline RMSE", f"{baseline.get('one_shot_baseline_rmse', 0):.6f}")
-    metrics[4].metric("执行状态", state.get("status", "unknown"))
-
-    st.subheader("研究问题与硬约束")
-    st.write("从固定 seed 的带噪位移观测中估计阻尼系数与角频率；数值必须由白名单执行器计算。")
-    st.write("约束：参数有界、最多两轮、每轮计划执行前保存、禁止 LLM 生成代码执行。")
-
-    plans = state.get("plans") or []
-    if len(plans) >= 2:
-        st.subheader("Round 1 → Round 2 计划变化")
-        fields = ["damping_min", "damping_max", "damping_points", "omega_min", "omega_max", "omega_points", "resource_budget_evaluations"]
-        st.dataframe([
-            {"field": field, "Round 1": plans[0].get(field), "Round 2": plans[1].get(field)}
-            for field in fields
-        ], use_container_width=True, hide_index=True)
-        adjustments = ((state.get("iterations") or [{}])[0].get("adjustments") or [])
-        if adjustments:
-            st.markdown("**调整依据（含 old/new 与证据引用）**")
-            st.dataframe(normalize_records(adjustments), use_container_width=True, hide_index=True)
-
-    st.subheader("原始观测与两轮实际拟合")
-    images = st.columns(3)
-    for column, title, artifact in zip(images, ["原始观测", "Round 1", "Round 2"], [
-        "input/observations.png", "round_1/execution/fit.png", "round_2/execution/fit.png"
-    ]):
-        column.markdown(f"**{title}**")
-        column.image(f"{backend_url.rstrip('/')}/api/competition/1b/demo/artifacts/{artifact}", use_container_width=True)
-
-    st.subheader("一次性规划 Baseline vs 反馈迭代")
-    st.dataframe([
-        {"system": "Proposed feedback iteration", "final_rmse": baseline.get("iterative_final_rmse"), "evaluations": baseline.get("iterative_total_evaluations")},
-        {"system": "One-shot baseline", "final_rmse": baseline.get("one_shot_baseline_rmse"), "evaluations": baseline.get("baseline_total_evaluations")},
-    ], use_container_width=True, hide_index=True)
-    st.caption(iteration.get("limitation", ""))
-
-    failures = st.session_state.get("competition_failure_cases")
-    if failures:
-        st.subheader("失败检测与人工接管")
-        st.dataframe(normalize_records(failures), use_container_width=True, hide_index=True)
-
-    with st.expander("Audit / provenance", expanded=False):
-        try:
-            history = get_json(backend_url, "/api/competition/1b/demo/history")
-            artifacts = get_json(backend_url, "/api/competition/1b/demo/artifacts")
-            st.markdown("**事件历史**")
-            st.dataframe(normalize_records(history), use_container_width=True, hide_index=True)
-            st.markdown("**Artifact checksums**")
-            st.dataframe(normalize_records(artifacts), use_container_width=True, hide_index=True)
-        except BackendAPIError as exc:
-            st.error(exc.detail)
-
-
-st.set_page_config(page_title="AI Scientist Competition 1B", layout="wide")
+st.set_page_config(page_title="AI Scientist", layout="wide")
 
 STATE_DEFAULTS = {
     "research_project_id": None,
     "research_project": None,
     "research_job_id": None,
-    "competition_demo_state": None,
-    "competition_failure_cases": None,
+    "research_objective": "",
+    "research_domain_hint": "",
+    "research_constraints_text": "",
+    "research_seed_mode": "Auto",
+    "research_custom_seed": 20260831,
+    "research_example_case": "",
+    "research_example_notice": "",
 }
 for key, value in STATE_DEFAULTS.items():
     if key not in st.session_state:
         st.session_state[key] = value
 
-st.sidebar.header("AI Scientist Competition 1B")
+st.sidebar.header("AI Scientist")
 backend_url = st.sidebar.text_input("后端地址", value=DEFAULT_BACKEND_URL)
-view = st.sidebar.radio(
-    "产品入口",
-    PRODUCT_VIEWS,
-    horizontal=False,
-    format_func=lambda value: {
-        "AI Scientist": "AI Scientist",
-        "Competition Demo": "Competition Demo / 科学实验任务规划与反馈迭代",
-    }[value],
-)
 show_debug = st.sidebar.checkbox("开发者调试", value=False)
-
-if view == "AI Scientist":
-    render_research_workspace(backend_url, show_debug)
-else:
-    render_competition_demo(backend_url)
+render_research_workspace(backend_url, show_debug)

@@ -1,1 +1,1 @@
-"""AI Scientist Competition 1B application package."""
+"""AI Scientist application package."""

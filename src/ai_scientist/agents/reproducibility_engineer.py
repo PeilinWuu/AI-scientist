@@ -9,4 +9,12 @@ class ReproducibilityEngineerAgent(BaseResearchAgent[ReproducibilityOutput]):
     output_model = ReproducibilityOutput
 
     def build_payload(self, project: ResearchProject) -> dict:
-        return project_snapshot(project, ["research_mode", "study_design", "analysis_plan", "available_tools", "artifacts"])
+        return project_snapshot(project, [
+            "research_mode",
+            "study_design",
+            "analysis_plan",
+            "reproducibility_seed",
+            "workflow_version",
+            "available_tools",
+            "artifacts",
+        ])

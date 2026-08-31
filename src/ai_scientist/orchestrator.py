@@ -144,6 +144,7 @@ RESEARCH_ASSET_UPLOAD_CONTEXTS = {
     "revision_review",
     "human_approval",
     "project_workspace",
+    "experimental_result",
 }
 
 
@@ -176,17 +177,22 @@ class ResearchOrchestrator:
         max_iterations: int = 2,
         planning_only: bool = True,
         evidence_review_mode: EvidenceReviewMode = "ASSISTED",
+        reproducibility_seed: int | None = None,
     ) -> ResearchProject:
+        objective = objective.strip()
+        if not objective:
+            raise ValueError("Research question is required.")
         max_calls = int(os.getenv("AI_SCIENTIST_MAX_MODEL_CALLS", "50"))
         project = ResearchProject(
-            title=objective.strip()[:100] or "Untitled research project",
-            objective=objective.strip(),
+            title=objective[:100],
+            objective=objective,
             domain_hint=domain_hint,
             constraints={**(constraints or {}), **({"constraints_text": constraints_text} if constraints_text else {})},
             model_overrides=normalize_model_overrides(model_overrides),
             max_iterations=max_iterations,
             planning_only=planning_only,
             evidence_review_mode=evidence_review_mode,
+            reproducibility_seed=reproducibility_seed,
             budget={
                 "max_model_calls": max_calls,
                 "max_iterations": max_iterations,
@@ -664,6 +670,9 @@ class ResearchOrchestrator:
         purpose: str = "reference",
         description: str = "",
         upload_context: str = "project_workspace",
+        asset_role: str = "research_material",
+        research_round: int | None = None,
+        source: str = "user_upload",
     ) -> ResearchProject:
         project = self.get_project(project_id)
         safe_name = Path(filename).name
@@ -675,6 +684,8 @@ class ResearchOrchestrator:
             raise ValueError(f"Unsupported research asset purpose: {purpose}.")
         if upload_context not in RESEARCH_ASSET_UPLOAD_CONTEXTS:
             raise ValueError(f"Unsupported research asset upload context: {upload_context}.")
+        if asset_role not in {"research_material", "experimental_result"}:
+            raise ValueError(f"Unsupported research asset role: {asset_role}.")
         if len(safe_name) > 255:
             raise ValueError("Research asset filename must be 255 characters or fewer.")
         if len(description) > 2000:
@@ -696,6 +707,9 @@ class ResearchOrchestrator:
             saved_path=str(target.relative_to(self.store.project_dir(project_id))),
             size_bytes=len(content),
             purpose=purpose,
+            asset_role=asset_role,
+            research_round=research_round,
+            source=source.strip() or "user_upload",
             description=description.strip(),
             upload_context=upload_context,
             parsing_status="registered_only",
@@ -722,6 +736,37 @@ class ResearchOrchestrator:
             return self.parse_research_asset(project_id, asset.asset_id)
         return project
 
+    def delete_research_asset(self, project_id: str, asset_id: str) -> ResearchProject:
+        """Delete an unused mistaken upload while preserving the audit event."""
+
+        project = self.get_project(project_id)
+        asset = next((item for item in project.research_assets if item.asset_id == asset_id), None)
+        if asset is None:
+            raise ResearchAssetNotFoundError(f"Research asset not found: {asset_id}")
+        if asset.used_by_agents:
+            raise ValueError("Research assets already used by agents cannot be deleted; retain provenance.")
+        project_directory = self.store.project_dir(project_id).resolve()
+        target = (project_directory / asset.saved_path).resolve()
+        if not target.is_relative_to(project_directory):
+            raise ResearchAssetNotFoundError(f"Research asset path is unsafe: {asset_id}")
+        if target.is_file():
+            target.unlink()
+        project.research_assets = [item for item in project.research_assets if item.asset_id != asset_id]
+        self._append_event(
+            project,
+            completed_event(
+                project.project_id,
+                project.phase,
+                "human_reviewer",
+                status="research_asset_deleted",
+                visibility="user",
+                display_key=f"research_asset_deleted_{asset.asset_id}",
+                display_markdown=f"已删除尚未被科研角色使用的误上传文件：{asset.filename}。",
+            ),
+        )
+        self.store.save(project)
+        return project
+
     def parse_research_asset(self, project_id: str, asset_id: str) -> ResearchProject:
         """Parse one registered file locally and persist an auditable parse artifact."""
 
@@ -742,6 +787,9 @@ class ResearchOrchestrator:
                     "asset_id": asset.asset_id,
                     "filename": asset.filename,
                     "purpose": asset.purpose,
+                    "asset_role": asset.asset_role,
+                    "research_round": asset.research_round,
+                    "source": asset.source,
                     "description": asset.description,
                     "parsed_content": parsed.model_dump(mode="json"),
                 },

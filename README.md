@@ -1,4 +1,4 @@
-# AI Scientist Competition 1B
+# AI Scientist
 
 This project exposes one product: a domain-neutral AI Scientist workflow with a
 deterministic Competition 1B feedback demo. The workflow uses shared Qwen clients
@@ -193,8 +193,10 @@ Frontend:
 streamlit run app_streamlit.py
 ```
 
-The default view is `Competition Demo`; switch to `AI Scientist` in the sidebar for
-the complete research-planning workspace.
+Streamlit opens directly into the single `AI Scientist` product. Enter a scientific
+question, optionally upload research materials, choose advanced reproducibility
+settings, and create a persisted project. The damped-oscillator competition case is
+available only as an editable example loader and never runs automatically.
 
 ### Project reference and data uploads
 
@@ -333,9 +335,11 @@ and controlled failure cases without a model credential:
 python -m src.ai_scientist.competition_cli run-flagship --output competition/1b
 ```
 
-The FastAPI routes are under `/api/competition/1b`, and Streamlit opens the
-`Competition Demo / 反馈迭代` view by default. Submission evidence and reproduction instructions
-are under `competition/1b/`. Arbitrary Python or LLM-generated code is never executed.
+The benchmark verification routes remain under `/api/competition/1b`. In Streamlit,
+use `加载示例：阻尼振子参数辨识` on the AI Scientist intake page to populate the
+editable research question, constraints, and reproducibility seed without executing
+the benchmark. Submission evidence and reproduction instructions are under
+`competition/1b/`. Arbitrary Python or LLM-generated code is never executed.
 
 Run one authenticated Qwen competition smoke test explicitly, then reuse its redacted evidence
 without paying for another API call on each readiness check:

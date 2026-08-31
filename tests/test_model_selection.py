@@ -162,7 +162,11 @@ def test_evidence_search_ping_uses_project_override(tmp_path: Path, monkeypatch:
 def test_streamlit_exposes_only_scientist_product_views_and_role_model_inputs() -> None:
     source = Path("app_streamlit.py").read_text(encoding="utf-8")
 
-    assert 'PRODUCT_VIEWS = ["Competition Demo", "AI Scientist"]' in source
+    assert "PRODUCT_VIEWS" not in source
+    assert "render_competition_demo" not in source
+    assert 'render_research_workspace(backend_url, show_debug)' in source
+    assert "科学问题 / Research Question" in source
+    assert "加载示例：阻尼振子参数辨识" in source
     assert "pure_qwen_model_input" not in source
     assert "qwen_search_model_input" not in source
     assert "render_chat_mode" not in source

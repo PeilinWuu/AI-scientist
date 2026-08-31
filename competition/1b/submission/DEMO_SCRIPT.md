@@ -1,8 +1,8 @@
 # 5–8 Minute Demo Script
 
-1. **0:00–0:40 — 首页**：默认打开 Competition Demo；说明这是 AI Scientist 的比赛主入口、完整科研工作流可从侧栏进入，并说明数值由程序计算、Qwen 与执行器边界。若 API 未启动，切换到已生成 `benchmark_summary.md`。
-2. **0:40–1:20 — 问题与 Round 1**：展示阻尼振子问题、硬约束、Round 1 宽范围粗网格。
-3. **1:20–2:20 — 点击完整运行**：seed 20260831；预期状态 `complete`，RMSE 0.057684→0.033089。
+1. **0:00–0:40 — AI Scientist 首页**：展示唯一产品入口、用户科学问题与附件上传；点击“加载示例：阻尼振子参数辨识”，说明只填充可编辑输入且不会自动执行。
+2. **0:40–1:20 — 问题与可复现设置**：展示示例问题、硬约束和 Advanced Settings 中的 Competition seed 20260831；说明用户仍可修改。
+3. **1:20–2:20 — 创建项目与已验证结果**：点击 Start Research 创建真实项目；评审演示的确定性 benchmark 结果通过已保存 evidence 或 `/api/competition/1b` 验证，预期 RMSE 0.057684→0.033089。
 4. **2:20–3:15 — 原始数据和图**：展示观测、Round 1、Round 2 PNG；说明图来自 artifact endpoint。
 5. **3:15–4:10 — Feedback/diff**：展示 old/new 范围、`derived_from_execution_id` 和 evidence refs，强调不是重新生成方案。
 6. **4:10–5:00 — Baseline**：展示 184 vs 182 次评价，反馈 RMSE 0.033089，baseline 0.050483；再展示 5-seed 5/5 获胜。
