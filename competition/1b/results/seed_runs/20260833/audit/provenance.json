@@ -1,0 +1,8 @@
+{
+  "run_id": "flagship_b8c3c1f90e0e473dab5eff699bfd50d1",
+  "case": "damped_oscillator_parameter_identification",
+  "seed": 20260833,
+  "numeric_source": "controlled_local_deterministic",
+  "llm_generated_metrics": false,
+  "created_at": "2026-08-31T05:34:39.606669+00:00"
+}

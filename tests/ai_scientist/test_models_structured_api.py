@@ -337,7 +337,7 @@ def test_research_async_step_rejects_duplicate_active_job(
 
 
 def test_existing_qwen_routes_remain_registered() -> None:
-    paths = {route.path for route in main_api.app.routes}
+    paths = {route.path for route in main_api.app.routes if hasattr(route, "path")}
     assert {
         "/api/chat", "/api/debug_payload", "/api/qwen_ping",
         "/api/chat_search", "/api/debug_search_payload", "/api/search_ping",

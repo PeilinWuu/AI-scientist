@@ -1,0 +1,13 @@
+{
+  "status": "passed",
+  "tested_at": "2026-08-31",
+  "base_url": "http://127.0.0.1:8765",
+  "readiness_status": 200,
+  "output_root_writable": true,
+  "demo_run_status": "complete",
+  "round_1_rmse": 0.05768367179165266,
+  "round_2_rmse": 0.03308926031835558,
+  "event_count": 5,
+  "artifact_count": 34,
+  "openapi_status": 200
+}

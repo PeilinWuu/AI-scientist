@@ -1,0 +1,11 @@
+{
+  "round_1_rmse": 0.055395251646448485,
+  "round_2_rmse": 0.032546926192034656,
+  "absolute_rmse_gain": 0.02284832545441383,
+  "relative_rmse_gain_percent": 41.24599992836875,
+  "round_1_parameter_l1_error": 0.05699999999999983,
+  "round_2_parameter_l1_error": 0.012999999999999762,
+  "round_1_evaluations": 63,
+  "round_2_evaluations": 121,
+  "limitation": "Round 2 adds execution cost and remains sensitive to the assumed oscillator model."
+}

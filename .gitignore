@@ -5,6 +5,7 @@
 .venv-*/
 __pycache__/
 .pytest_cache/
+.coverage
 runs/*
 !runs/.gitkeep
 data/research_projects/*

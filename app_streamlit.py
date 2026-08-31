@@ -1,4 +1,4 @@
-"""Streamlit frontend for three isolated Qwen application modes."""
+"""Streamlit frontend for Qwen modes and the Competition 1B demo."""
 
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ ROOT_DIR = Path(__file__).resolve().parent
 load_dotenv(ROOT_DIR / ".env")
 
 DEFAULT_BACKEND_URL = "http://localhost:8000"
-APP_MODES = ["Pure Qwen", "Qwen Search", "AI Scientist"]
+APP_MODES = ["Pure Qwen", "Qwen Search", "AI Scientist", "Competition Demo"]
 RESEARCH_STEP_TIMEOUT = int(os.getenv("AI_SCIENTIST_FRONTEND_STEP_TIMEOUT", "600"))
 RESEARCH_ASSET_EXTENSIONS = ["pdf", "md", "txt", "csv", "tsv", "json", "xml", "xlsx", "xls"]
 RESEARCH_ASSET_MAX_BYTES = int(os.getenv("AI_SCIENTIST_MAX_ASSET_BYTES", str(25 * 1024 * 1024)))
@@ -1626,6 +1626,110 @@ def _research_patch(backend_url: str, path: str, payload: dict) -> None:
         raise
 
 
+def render_competition_demo(backend_url: str) -> None:
+    """Render the shortest judge-facing path through the real two-round loop."""
+
+    st.title("Competition 1B · 科学实验反馈迭代演示")
+    st.caption("阻尼振子参数辨识：程序执行和计算指标，Round 1 的真实结果驱动 Round 2。")
+    try:
+        readiness = get_json(backend_url, "/api/competition/1b/readiness")
+        if isinstance(readiness, dict) and readiness.get("output_root_writable"):
+            st.success("受控确定性执行器已就绪；不允许任意代码执行。")
+        else:
+            st.warning("执行输出目录当前不可写。")
+    except Exception as exc:
+        st.error(f"比赛演示后端不可用：{exc}")
+        return
+
+    seed = st.number_input("可复现 seed", min_value=0, max_value=2_147_483_647, value=20260831, step=1)
+    left, right = st.columns(2)
+    if left.button("运行完整两轮 + Baseline", type="primary", use_container_width=True):
+        try:
+            with st.spinner("正在生成观测、执行两轮拟合并计算 baseline…"):
+                st.session_state.competition_demo_state = post_json(
+                    backend_url, "/api/competition/1b/demo/run", {"seed": int(seed)}, timeout=180
+                )
+            st.success("真实闭环运行完成。")
+        except BackendAPIError as exc:
+            st.error(exc.detail)
+    if right.button("运行失败/人工接管检查", use_container_width=True):
+        try:
+            st.session_state.competition_failure_cases = post_json(
+                backend_url, "/api/competition/1b/demo/failure-cases", {}, timeout=60
+            )
+        except BackendAPIError as exc:
+            st.error(exc.detail)
+
+    state = st.session_state.get("competition_demo_state")
+    if not state:
+        try:
+            state = get_json(backend_url, "/api/competition/1b/demo")
+            st.session_state.competition_demo_state = state
+        except Exception:
+            st.info("点击按钮运行旗舰案例；所有展示值都来自本次实际执行 artifact。")
+            return
+    if not isinstance(state, dict):
+        return
+
+    comparison = state.get("comparison") or {}
+    iteration = comparison.get("iteration") or {}
+    baseline = comparison.get("baseline") or {}
+    metrics = st.columns(5)
+    metrics[0].metric("Round 1 RMSE", f"{iteration.get('round_1_rmse', 0):.6f}")
+    metrics[1].metric("Round 2 RMSE", f"{iteration.get('round_2_rmse', 0):.6f}")
+    metrics[2].metric("迭代改善", f"{iteration.get('relative_rmse_gain_percent', 0):.2f}%")
+    metrics[3].metric("Baseline RMSE", f"{baseline.get('one_shot_baseline_rmse', 0):.6f}")
+    metrics[4].metric("执行状态", state.get("status", "unknown"))
+
+    st.subheader("研究问题与硬约束")
+    st.write("从固定 seed 的带噪位移观测中估计阻尼系数与角频率；数值必须由白名单执行器计算。")
+    st.write("约束：参数有界、最多两轮、每轮计划执行前保存、禁止 LLM 生成代码执行。")
+
+    plans = state.get("plans") or []
+    if len(plans) >= 2:
+        st.subheader("Round 1 → Round 2 计划变化")
+        fields = ["damping_min", "damping_max", "damping_points", "omega_min", "omega_max", "omega_points", "resource_budget_evaluations"]
+        st.dataframe([
+            {"field": field, "Round 1": plans[0].get(field), "Round 2": plans[1].get(field)}
+            for field in fields
+        ], use_container_width=True, hide_index=True)
+        adjustments = ((state.get("iterations") or [{}])[0].get("adjustments") or [])
+        if adjustments:
+            st.markdown("**调整依据（含 old/new 与证据引用）**")
+            st.dataframe(normalize_records(adjustments), use_container_width=True, hide_index=True)
+
+    st.subheader("原始观测与两轮实际拟合")
+    images = st.columns(3)
+    for column, title, artifact in zip(images, ["原始观测", "Round 1", "Round 2"], [
+        "input/observations.png", "round_1/execution/fit.png", "round_2/execution/fit.png"
+    ]):
+        column.markdown(f"**{title}**")
+        column.image(f"{backend_url.rstrip('/')}/api/competition/1b/demo/artifacts/{artifact}", use_container_width=True)
+
+    st.subheader("一次性规划 Baseline vs 反馈迭代")
+    st.dataframe([
+        {"system": "Proposed feedback iteration", "final_rmse": baseline.get("iterative_final_rmse"), "evaluations": baseline.get("iterative_total_evaluations")},
+        {"system": "One-shot baseline", "final_rmse": baseline.get("one_shot_baseline_rmse"), "evaluations": baseline.get("baseline_total_evaluations")},
+    ], use_container_width=True, hide_index=True)
+    st.caption(iteration.get("limitation", ""))
+
+    failures = st.session_state.get("competition_failure_cases")
+    if failures:
+        st.subheader("失败检测与人工接管")
+        st.dataframe(normalize_records(failures), use_container_width=True, hide_index=True)
+
+    with st.expander("Audit / provenance", expanded=False):
+        try:
+            history = get_json(backend_url, "/api/competition/1b/demo/history")
+            artifacts = get_json(backend_url, "/api/competition/1b/demo/artifacts")
+            st.markdown("**事件历史**")
+            st.dataframe(normalize_records(history), use_container_width=True, hide_index=True)
+            st.markdown("**Artifact checksums**")
+            st.dataframe(normalize_records(artifacts), use_container_width=True, hide_index=True)
+        except BackendAPIError as exc:
+            st.error(exc.detail)
+
+
 st.set_page_config(page_title="Qwen 科研工作台", layout="wide")
 
 STATE_DEFAULTS = {
@@ -1639,6 +1743,8 @@ STATE_DEFAULTS = {
     "research_project_id": None,
     "research_project": None,
     "research_job_id": None,
+    "competition_demo_state": None,
+    "competition_failure_cases": None,
 }
 for key, value in STATE_DEFAULTS.items():
     if key not in st.session_state:
@@ -1654,6 +1760,7 @@ mode = st.sidebar.radio(
         "Pure Qwen": "纯 Qwen 对话",
         "Qwen Search": "Qwen 联网搜索",
         "AI Scientist": "AI Scientist",
+        "Competition Demo": "Competition Demo / 反馈迭代",
     }[value],
 )
 show_debug = st.sidebar.checkbox("开发者调试", value=False)
@@ -1661,5 +1768,8 @@ show_debug = st.sidebar.checkbox("开发者调试", value=False)
 if mode == "AI Scientist":
     st.session_state.search_previous_response_id = None
     render_research_workspace(backend_url, show_debug)
+elif mode == "Competition Demo":
+    st.session_state.search_previous_response_id = None
+    render_competition_demo(backend_url)
 else:
     render_chat_mode(backend_url, mode, show_debug)

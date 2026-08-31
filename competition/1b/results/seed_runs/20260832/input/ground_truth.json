@@ -1,0 +1,7 @@
+{
+  "damping": 0.173,
+  "omega": 2.37,
+  "amplitude": 1.0,
+  "phase": 0.2,
+  "noise_std": 0.03
+}

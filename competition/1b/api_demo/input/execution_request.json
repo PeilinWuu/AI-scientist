@@ -1,0 +1,26 @@
+{
+  "request_id": "request_1caaade4bb8b4936992d9e3df2b38403",
+  "operation": "run_simulation",
+  "inputs": {},
+  "parameters": {
+    "mode": "generate_damped_oscillator",
+    "damping": 0.173,
+    "omega": 2.37,
+    "amplitude": 1.0,
+    "phase": 0.2,
+    "noise_std": 0.03,
+    "duration": 12.0,
+    "samples": 360
+  },
+  "expected_outputs": [
+    "observations.csv",
+    "ground_truth.json",
+    "observations.png"
+  ],
+  "provenance": {
+    "case": "damped_oscillator_parameter_identification",
+    "role": "synthetic_observation_generation"
+  },
+  "seed": 20260831,
+  "output_directory": "input"
+}

@@ -1,0 +1,22 @@
+{
+  "signal_id": "feedback_935eecdd0752438d9bda098af8f7244c",
+  "source_artifact_ids": [
+    "artifact_ba4997d4fb1b45de8bb0e1e23106af51",
+    "artifact_0039acafb7ec40738e6e559b70b104dd",
+    "artifact_ad98cd2539b24b6db149ee98ecb5b93a"
+  ],
+  "observed_result": {
+    "rmse": 0.05592823496672121,
+    "best_damping": 0.2,
+    "best_omega": 2.4,
+    "evaluations": 63
+  },
+  "expected_result": {
+    "rmse_lte": 0.04
+  },
+  "quality_flags": [
+    "rmse_above_success_threshold"
+  ],
+  "trigger": "round_1_deterministic_fit_evaluation",
+  "confidence": 1.0
+}

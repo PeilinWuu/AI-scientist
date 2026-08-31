@@ -1,0 +1,11 @@
+{
+  "status": "success",
+  "rmse": 0.03308926031835558,
+  "success_threshold": 0.04,
+  "threshold_met": true,
+  "best_damping": 0.17,
+  "best_omega": 2.36,
+  "evaluations": 121,
+  "source_execution_id": "execution_dc02405a87b54067a453dc6e1d303071",
+  "source_observation_execution_id": "execution_9553e80227744d4381a51d4fc2015cb3"
+}

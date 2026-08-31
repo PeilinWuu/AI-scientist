@@ -1,0 +1,62 @@
+{
+  "execution_id": "execution_fb44e65d6cf44777b0a85c2738ac36a3",
+  "request_id": "request_1caaade4bb8b4936992d9e3df2b38403",
+  "operation": "run_simulation",
+  "status": "success",
+  "started_at": "2026-08-31T05:42:42.749814Z",
+  "finished_at": "2026-08-31T05:42:42.814368Z",
+  "duration_ms": 65,
+  "seed": 20260831,
+  "input_fingerprint": "eefe81529215fecda2b9e0c398e95e53387ef847673e8b855d83d9cee9f02bf1",
+  "input_checksums": {},
+  "actual_parameters": {
+    "mode": "generate_damped_oscillator",
+    "damping": 0.173,
+    "omega": 2.37,
+    "amplitude": 1.0,
+    "phase": 0.2,
+    "noise_std": 0.03,
+    "duration": 12.0,
+    "samples": 360
+  },
+  "software_versions": {
+    "python": "3.12.7",
+    "numpy": "1.26.4",
+    "pandas": "2.2.3",
+    "platform": "win32"
+  },
+  "metrics": {
+    "samples": 360,
+    "noise_std": 0.03
+  },
+  "artifacts": [
+    {
+      "artifact_id": "artifact_133431f36b3c4597837e35504ce56e8c",
+      "artifact_type": "observations",
+      "relative_path": "input/observations.csv",
+      "media_type": "text/csv",
+      "checksum_sha256": "eeda48d77cfc67cd728fa2964098f712db5cdbd1d2320d6532cdf616e66ea95c",
+      "size_bytes": 21468
+    },
+    {
+      "artifact_id": "artifact_1790e36584414bb3af6dfac3267d2508",
+      "artifact_type": "ground_truth",
+      "relative_path": "input/ground_truth.json",
+      "media_type": "application/json",
+      "checksum_sha256": "0cbfdc1dbf4aed2be892bcdedc4828bf817f7c83af4c52f7679f637a91ebbcb8",
+      "size_bytes": 102
+    },
+    {
+      "artifact_id": "artifact_565a1e09756e4496afeadfa6c8548085",
+      "artifact_type": "observations",
+      "relative_path": "input/observations.png",
+      "media_type": "image/png",
+      "checksum_sha256": "780a86c75e4e66819332ff0b8cec7cbfd3551f9f92ebb30cd4a330a4ae549df2",
+      "size_bytes": 9389
+    }
+  ],
+  "run_log": [
+    "Generated seeded damped-oscillator observations."
+  ],
+  "failure_reason": null
+}

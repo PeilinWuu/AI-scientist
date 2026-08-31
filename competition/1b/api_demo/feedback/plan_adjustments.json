@@ -1,0 +1,42 @@
+[
+  {
+    "adjustment_id": "adjustment_635ddc3f604147f3a995640122b27dff",
+    "target_task_id": "fit_damped_oscillator",
+    "field": "search_bounds_and_resolution",
+    "old_value": {
+      "damping": [
+        0.05,
+        0.35
+      ],
+      "omega": [
+        2.0,
+        2.8
+      ],
+      "points": [
+        7,
+        9
+      ]
+    },
+    "new_value": {
+      "damping": [
+        0.15000000000000002,
+        0.25
+      ],
+      "omega": [
+        2.3,
+        2.5
+      ],
+      "points": [
+        11,
+        11
+      ]
+    },
+    "reason": "Round 1 located an interior optimum; refine one coarse step around the observed best fit.",
+    "evidence_refs": [
+      "artifact_a7a17f73aba5426b9c5c80e21ab52714",
+      "artifact_365e769dcf454991a4afcd28d81fc9ca",
+      "artifact_d3a97bdbd99e433aba594997c761f16f"
+    ],
+    "decision": "modify"
+  }
+]

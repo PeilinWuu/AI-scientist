@@ -14,6 +14,7 @@ from fastapi import FastAPI, HTTPException, status
 from fastapi.responses import FileResponse, PlainTextResponse
 
 from src.ai_scientist.job_store import ResearchJobStore, fail_job
+from src.ai_scientist.competition_api import router as competition_router
 from src.ai_scientist.model_registry import ModelRegistry
 from src.ai_scientist.orchestrator import ResearchOrchestrator
 from src.ai_scientist.schemas import (
@@ -43,6 +44,7 @@ app = FastAPI(
     description="A minimal Qwen pass-through API with pure chat and optional native Qwen search.",
     version="0.1.0",
 )
+app.include_router(competition_router)
 
 INLINE_ASSET_MEDIA_TYPES = {
     ".pdf": "application/pdf",

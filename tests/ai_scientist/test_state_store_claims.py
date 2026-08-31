@@ -114,11 +114,14 @@ def test_reviewer_cannot_approve_low_score() -> None:
         )
 
 
-def test_execution_adapter_never_fabricates_results() -> None:
+def test_execution_adapter_exposes_only_controlled_operations() -> None:
     adapter = ExecutionAdapter()
-    assert adapter.capabilities()["execution_available"] is False
-    with pytest.raises(NotImplementedError, match="No execution backend"):
-        adapter.execute({"task": "run"})
+    capabilities = adapter.capabilities()
+    assert capabilities["execution_available"] is True
+    assert capabilities["arbitrary_code_execution"] is False
+    result = adapter.execute({"task": "run"})
+    assert result["status"] == "rejected"
+    assert result["artifacts"] == []
 
 
 def test_orchestrator_waits_for_execution_and_supports_planning_only(tmp_path: Path) -> None:

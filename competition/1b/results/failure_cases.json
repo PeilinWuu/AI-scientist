@@ -1,0 +1,30 @@
+[
+  {
+    "case": "missing_file",
+    "detected": true,
+    "status": "rejected",
+    "error": "input file does not exist: input/not_found.csv",
+    "next_action": "correct_input"
+  },
+  {
+    "case": "invalid_operation",
+    "detected": true,
+    "status": "rejected",
+    "error": "1 validation error for ExecutionRequest\noperation\n  Input should be 'inspect_dataset', 'describe_dataset', 'missingness', 'correlation', 'linear_regression', 'plot_histogram', 'plot_scatter' or 'run_simulation' [type=literal_error, input_value='run_arbitrary_code', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/literal_error",
+    "next_action": "correct_input"
+  },
+  {
+    "case": "parameter_out_of_range",
+    "detected": true,
+    "status": "rejected",
+    "error": "damping must be between 0.001 and 5",
+    "next_action": "correct_input"
+  },
+  {
+    "case": "path_escape",
+    "detected": true,
+    "status": "rejected",
+    "error": "path escapes the project boundary",
+    "next_action": "human_review"
+  }
+]

@@ -1,0 +1,14 @@
+{
+  "plan_version": "round_1_v1",
+  "task_id": "fit_damped_oscillator",
+  "damping_min": 0.05,
+  "damping_max": 0.35,
+  "damping_points": 7,
+  "omega_min": 2.0,
+  "omega_max": 2.8,
+  "omega_points": 9,
+  "success_rmse": 0.04,
+  "resource_budget_evaluations": 63,
+  "derived_from_execution_id": null,
+  "rationale": "Pre-registered broad coarse grid before observing fit results."
+}

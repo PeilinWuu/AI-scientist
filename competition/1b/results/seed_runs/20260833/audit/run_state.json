@@ -1,0 +1,442 @@
+{
+  "run_id": "flagship_b8c3c1f90e0e473dab5eff699bfd50d1",
+  "case_name": "damped_oscillator_parameter_identification",
+  "status": "complete",
+  "seed": 20260833,
+  "root_directory": "C:\\Users\\Administrator\\Documents\\Codex\\2026-07-05\\flowscientist-loop-qwen-api-ai-scientist\\competition\\1b\\results\\seed_runs\\20260833",
+  "plans": [
+    {
+      "plan_version": "round_1_v1",
+      "task_id": "fit_damped_oscillator",
+      "damping_min": 0.05,
+      "damping_max": 0.35,
+      "damping_points": 7,
+      "omega_min": 2.0,
+      "omega_max": 2.8,
+      "omega_points": 9,
+      "success_rmse": 0.04,
+      "resource_budget_evaluations": 63,
+      "derived_from_execution_id": null,
+      "rationale": "Pre-registered broad coarse grid before observing fit results."
+    },
+    {
+      "plan_version": "round_2_v1",
+      "task_id": "fit_damped_oscillator",
+      "damping_min": 0.15000000000000002,
+      "damping_max": 0.25,
+      "damping_points": 11,
+      "omega_min": 2.3,
+      "omega_max": 2.5,
+      "omega_points": 11,
+      "success_rmse": 0.04,
+      "resource_budget_evaluations": 121,
+      "derived_from_execution_id": "execution_f53d13cf70b5451ba053b4e1f59a5a8c",
+      "rationale": "Deterministic feedback refinement around the Round 1 observed optimum."
+    }
+  ],
+  "executions": [
+    {
+      "execution_id": "execution_409a21a0a89746fb97a3f4d4a2119df0",
+      "request_id": "request_28571db370de498487473184e1a1ca17",
+      "operation": "run_simulation",
+      "status": "success",
+      "started_at": "2026-08-31T05:34:39.607669Z",
+      "finished_at": "2026-08-31T05:34:39.631276Z",
+      "duration_ms": 23,
+      "seed": 20260833,
+      "input_fingerprint": "dc85a2cfcf16a6482dd86f41554f6215732594718038d57e8ef41c3f03cdcf86",
+      "input_checksums": {},
+      "actual_parameters": {
+        "mode": "generate_damped_oscillator",
+        "damping": 0.173,
+        "omega": 2.37,
+        "amplitude": 1.0,
+        "phase": 0.2,
+        "noise_std": 0.03,
+        "duration": 12.0,
+        "samples": 360
+      },
+      "software_versions": {
+        "python": "3.12.7",
+        "numpy": "1.26.4",
+        "pandas": "2.2.3",
+        "platform": "win32"
+      },
+      "metrics": {
+        "samples": 360,
+        "noise_std": 0.03
+      },
+      "artifacts": [
+        {
+          "artifact_id": "artifact_886edfb1b727449ebb08eacf1e7339a0",
+          "artifact_type": "observations",
+          "relative_path": "input/observations.csv",
+          "media_type": "text/csv",
+          "checksum_sha256": "b8b119faa75ef96c57f19b044b0e99fd9befaac832dea8993cd73e7106ffcfc4",
+          "size_bytes": 21490
+        },
+        {
+          "artifact_id": "artifact_657f3083f65e4d39820669e13d628f82",
+          "artifact_type": "ground_truth",
+          "relative_path": "input/ground_truth.json",
+          "media_type": "application/json",
+          "checksum_sha256": "0cbfdc1dbf4aed2be892bcdedc4828bf817f7c83af4c52f7679f637a91ebbcb8",
+          "size_bytes": 102
+        },
+        {
+          "artifact_id": "artifact_49d362f6cf3347c7bf287d922f6eeb83",
+          "artifact_type": "observations",
+          "relative_path": "input/observations.png",
+          "media_type": "image/png",
+          "checksum_sha256": "bdf1c558b92c479e6ed8616cf2e72ae4906a2325e3efc4d8c5c30559dd722c67",
+          "size_bytes": 9613
+        }
+      ],
+      "run_log": [
+        "Generated seeded damped-oscillator observations."
+      ],
+      "failure_reason": null
+    },
+    {
+      "execution_id": "execution_f53d13cf70b5451ba053b4e1f59a5a8c",
+      "request_id": "request_e007a528bdc64f07992c94014f292979",
+      "operation": "run_simulation",
+      "status": "success",
+      "started_at": "2026-08-31T05:34:39.635276Z",
+      "finished_at": "2026-08-31T05:34:39.662338Z",
+      "duration_ms": 28,
+      "seed": 20260833,
+      "input_fingerprint": "19308bb0496d8d7b4e1f8011714c77205ccb974c05ade1b7125a5f3d8c57abaa",
+      "input_checksums": {
+        "observations_path": "b8b119faa75ef96c57f19b044b0e99fd9befaac832dea8993cd73e7106ffcfc4"
+      },
+      "actual_parameters": {
+        "mode": "fit_damped_oscillator",
+        "damping_min": 0.05,
+        "damping_max": 0.35,
+        "damping_points": 7,
+        "omega_min": 2.0,
+        "omega_max": 2.8,
+        "omega_points": 9,
+        "amplitude": 1.0,
+        "phase": 0.2
+      },
+      "software_versions": {
+        "python": "3.12.7",
+        "numpy": "1.26.4",
+        "pandas": "2.2.3",
+        "platform": "win32"
+      },
+      "metrics": {
+        "rmse": 0.055655602246394834,
+        "best_damping": 0.2,
+        "best_omega": 2.4,
+        "evaluations": 63,
+        "damping_step": 0.05,
+        "omega_step": 0.10000000000000009,
+        "best_on_boundary": false
+      },
+      "artifacts": [
+        {
+          "artifact_id": "artifact_5fdd26e44cfe42e285dccbb5048f809b",
+          "artifact_type": "fit_result",
+          "relative_path": "round_1/execution/fit_result.json",
+          "media_type": "application/json",
+          "checksum_sha256": "a760619529427a93e62106c184b27ac22bb82437d2280c65bbdd9d182faa600e",
+          "size_bytes": 197
+        },
+        {
+          "artifact_id": "artifact_c2454e47cf124492a43008402f7b86ce",
+          "artifact_type": "fit_grid",
+          "relative_path": "round_1/execution/fit_grid.csv",
+          "media_type": "text/csv",
+          "checksum_sha256": "697057ea997848a10351163fef996a2b6f213de272e948bf664eefbdd87f6f81",
+          "size_bytes": 2073
+        },
+        {
+          "artifact_id": "artifact_11958a10110d4a02a450befe21803dba",
+          "artifact_type": "fit",
+          "relative_path": "round_1/execution/fit.png",
+          "media_type": "image/png",
+          "checksum_sha256": "3f22dd0160362a66da3e079a5a7c36bafbe84703f73588039806f440a9b0e225",
+          "size_bytes": 9776
+        }
+      ],
+      "run_log": [
+        "Evaluated 63 parameter combinations."
+      ],
+      "failure_reason": null
+    },
+    {
+      "execution_id": "execution_5746c4ecb55e4e6bb61c3833b9c8b5f3",
+      "request_id": "request_ec20f15a97484a29b527bd32c218b3dc",
+      "operation": "run_simulation",
+      "status": "success",
+      "started_at": "2026-08-31T05:34:39.672984Z",
+      "finished_at": "2026-08-31T05:34:39.719630Z",
+      "duration_ms": 47,
+      "seed": 20260833,
+      "input_fingerprint": "9e0d0f043a9c09ccb3f5da20e812ed67324a98c8869f6c17fa66e4bf57e6480e",
+      "input_checksums": {
+        "observations_path": "b8b119faa75ef96c57f19b044b0e99fd9befaac832dea8993cd73e7106ffcfc4"
+      },
+      "actual_parameters": {
+        "mode": "fit_damped_oscillator",
+        "damping_min": 0.15000000000000002,
+        "damping_max": 0.25,
+        "damping_points": 11,
+        "omega_min": 2.3,
+        "omega_max": 2.5,
+        "omega_points": 11,
+        "amplitude": 1.0,
+        "phase": 0.2
+      },
+      "software_versions": {
+        "python": "3.12.7",
+        "numpy": "1.26.4",
+        "pandas": "2.2.3",
+        "platform": "win32"
+      },
+      "metrics": {
+        "rmse": 0.03259670204470579,
+        "best_damping": 0.17,
+        "best_omega": 2.36,
+        "evaluations": 121,
+        "damping_step": 0.010000000000000009,
+        "omega_step": 0.020000000000000018,
+        "best_on_boundary": false
+      },
+      "artifacts": [
+        {
+          "artifact_id": "artifact_f0ab2d5dd252495aa2a6591fc732f032",
+          "artifact_type": "fit_result",
+          "relative_path": "round_2/execution/fit_result.json",
+          "media_type": "application/json",
+          "checksum_sha256": "e7b0d29da92a603b8bcf32af586d5c4e1adfb8725d5131375553664b39999622",
+          "size_bytes": 216
+        },
+        {
+          "artifact_id": "artifact_c7625435a39c4de495cc2f533b0c96fb",
+          "artifact_type": "fit_grid",
+          "relative_path": "round_2/execution/fit_grid.csv",
+          "media_type": "text/csv",
+          "checksum_sha256": "bbcfec263265ec41336b7def4efec9e475f0755f4936f7511e72fe7faa614062",
+          "size_bytes": 4543
+        },
+        {
+          "artifact_id": "artifact_4122f4be6c6041c196fe54b3998cd011",
+          "artifact_type": "fit",
+          "relative_path": "round_2/execution/fit.png",
+          "media_type": "image/png",
+          "checksum_sha256": "18f8ae8747fdd2afc61bb31e01c990ca54c3706e918a10b29f0efc04661b4a99",
+          "size_bytes": 9588
+        }
+      ],
+      "run_log": [
+        "Evaluated 121 parameter combinations."
+      ],
+      "failure_reason": null
+    }
+  ],
+  "iterations": [
+    {
+      "iteration": 1,
+      "plan_version": "round_1_v1",
+      "execution_ids": [
+        "execution_f53d13cf70b5451ba053b4e1f59a5a8c"
+      ],
+      "analysis_artifact_ids": [
+        "artifact_5fdd26e44cfe42e285dccbb5048f809b",
+        "artifact_c2454e47cf124492a43008402f7b86ce",
+        "artifact_11958a10110d4a02a450befe21803dba"
+      ],
+      "feedback_signals": [
+        {
+          "signal_id": "feedback_c86f388c3817414e8c766a30bce28d3f",
+          "source_artifact_ids": [
+            "artifact_5fdd26e44cfe42e285dccbb5048f809b",
+            "artifact_c2454e47cf124492a43008402f7b86ce",
+            "artifact_11958a10110d4a02a450befe21803dba"
+          ],
+          "observed_result": {
+            "rmse": 0.055655602246394834,
+            "best_damping": 0.2,
+            "best_omega": 2.4,
+            "evaluations": 63
+          },
+          "expected_result": {
+            "rmse_lte": 0.04
+          },
+          "quality_flags": [
+            "rmse_above_success_threshold"
+          ],
+          "trigger": "round_1_deterministic_fit_evaluation",
+          "confidence": 1.0
+        }
+      ],
+      "adjustments": [
+        {
+          "adjustment_id": "adjustment_a2443429120543859b1f08c20860b15f",
+          "target_task_id": "fit_damped_oscillator",
+          "field": "search_bounds_and_resolution",
+          "old_value": {
+            "damping": [
+              0.05,
+              0.35
+            ],
+            "omega": [
+              2.0,
+              2.8
+            ],
+            "points": [
+              7,
+              9
+            ]
+          },
+          "new_value": {
+            "damping": [
+              0.15000000000000002,
+              0.25
+            ],
+            "omega": [
+              2.3,
+              2.5
+            ],
+            "points": [
+              11,
+              11
+            ]
+          },
+          "reason": "Round 1 located an interior optimum; refine one coarse step around the observed best fit.",
+          "evidence_refs": [
+            "artifact_5fdd26e44cfe42e285dccbb5048f809b",
+            "artifact_c2454e47cf124492a43008402f7b86ce",
+            "artifact_11958a10110d4a02a450befe21803dba"
+          ],
+          "decision": "modify"
+        }
+      ],
+      "next_plan_version": "round_2_v1",
+      "decision": "continue",
+      "created_at": "2026-08-31T05:34:39.671477Z"
+    },
+    {
+      "iteration": 2,
+      "plan_version": "round_2_v1",
+      "execution_ids": [
+        "execution_5746c4ecb55e4e6bb61c3833b9c8b5f3"
+      ],
+      "analysis_artifact_ids": [
+        "artifact_f0ab2d5dd252495aa2a6591fc732f032",
+        "artifact_c7625435a39c4de495cc2f533b0c96fb",
+        "artifact_4122f4be6c6041c196fe54b3998cd011"
+      ],
+      "feedback_signals": [],
+      "adjustments": [],
+      "next_plan_version": null,
+      "decision": "stop",
+      "created_at": "2026-08-31T05:34:39.725776Z"
+    }
+  ],
+  "baseline_execution": {
+    "execution_id": "execution_0cf7d175b84144ff9d80e8d1b82b74e1",
+    "request_id": "request_a0462f46bc75441f88fbede46f8a8411",
+    "operation": "run_simulation",
+    "status": "success",
+    "started_at": "2026-08-31T05:34:39.726780Z",
+    "finished_at": "2026-08-31T05:34:39.768938Z",
+    "duration_ms": 43,
+    "seed": 20260833,
+    "input_fingerprint": "70e5c69686648ea739884ede077f8a5057d1417be8337d8527e906362d919f03",
+    "input_checksums": {
+      "observations_path": "b8b119faa75ef96c57f19b044b0e99fd9befaac832dea8993cd73e7106ffcfc4"
+    },
+    "actual_parameters": {
+      "mode": "fit_damped_oscillator",
+      "damping_min": 0.05,
+      "damping_max": 0.35,
+      "damping_points": 14,
+      "omega_min": 2.0,
+      "omega_max": 2.8,
+      "omega_points": 13,
+      "amplitude": 1.0,
+      "phase": 0.2
+    },
+    "software_versions": {
+      "python": "3.12.7",
+      "numpy": "1.26.4",
+      "pandas": "2.2.3",
+      "platform": "win32"
+    },
+    "metrics": {
+      "rmse": 0.04979270850987465,
+      "best_damping": 0.16538461538461538,
+      "best_omega": 2.4,
+      "evaluations": 182,
+      "damping_step": 0.023076923076923078,
+      "omega_step": 0.06666666666666643,
+      "best_on_boundary": false
+    },
+    "artifacts": [
+      {
+        "artifact_id": "artifact_1a957a328f7c46a6a964616a615ef693",
+        "artifact_type": "fit_result",
+        "relative_path": "comparison/baseline_execution/fit_result.json",
+        "media_type": "application/json",
+        "checksum_sha256": "536462b536e3ca1174850e91d80cf20ac6c4931a1e1d5d19e71487555e579310",
+        "size_bytes": 229
+      },
+      {
+        "artifact_id": "artifact_1f5737f8448244b3924533a1704876c7",
+        "artifact_type": "fit_grid",
+        "relative_path": "comparison/baseline_execution/fit_grid.csv",
+        "media_type": "text/csv",
+        "checksum_sha256": "e65bd180892ef6cd99c7f60dfa3f791333b8a9efb3335f149dc9343cabeed8de",
+        "size_bytes": 9547
+      },
+      {
+        "artifact_id": "artifact_ef252c72141f4afe97c0f72553676ca5",
+        "artifact_type": "fit",
+        "relative_path": "comparison/baseline_execution/fit.png",
+        "media_type": "image/png",
+        "checksum_sha256": "c450a5c13eab35b24fe6bbe5dea88d25509b2ecbe8f9de57931aaa017cffbce1",
+        "size_bytes": 9906
+      }
+    ],
+    "run_log": [
+      "Evaluated 182 parameter combinations."
+    ],
+    "failure_reason": null
+  },
+  "comparison": {
+    "iteration": {
+      "round_1_rmse": 0.055655602246394834,
+      "round_2_rmse": 0.03259670204470579,
+      "absolute_rmse_gain": 0.02305890020168904,
+      "relative_rmse_gain_percent": 41.43140900641806,
+      "round_1_parameter_l1_error": 0.05699999999999983,
+      "round_2_parameter_l1_error": 0.013000000000000206,
+      "round_1_evaluations": 63,
+      "round_2_evaluations": 121,
+      "limitation": "Round 2 adds execution cost and remains sensitive to the assumed oscillator model."
+    },
+    "baseline": {
+      "iterative_final_rmse": 0.03259670204470579,
+      "one_shot_baseline_rmse": 0.04979270850987465,
+      "iterative_advantage_rmse": 0.017196006465168855,
+      "iterative_parameter_l1_error": 0.013000000000000206,
+      "baseline_parameter_l1_error": 0.03761538461538441,
+      "iterative_total_evaluations": 184,
+      "baseline_total_evaluations": 182,
+      "constraint_satisfied": true
+    },
+    "provenance": {
+      "observation_execution_id": "execution_409a21a0a89746fb97a3f4d4a2119df0",
+      "round_1_execution_id": "execution_f53d13cf70b5451ba053b4e1f59a5a8c",
+      "round_2_execution_id": "execution_5746c4ecb55e4e6bb61c3833b9c8b5f3",
+      "baseline_execution_id": "execution_0cf7d175b84144ff9d80e8d1b82b74e1"
+    }
+  },
+  "created_at": "2026-08-31T05:34:39.606669Z",
+  "updated_at": "2026-08-31T05:34:39.779124Z"
+}

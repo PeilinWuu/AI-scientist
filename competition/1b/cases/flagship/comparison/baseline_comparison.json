@@ -1,0 +1,10 @@
+{
+  "iterative_final_rmse": 0.03308926031835558,
+  "one_shot_baseline_rmse": 0.0504827477065955,
+  "iterative_advantage_rmse": 0.01739348738823992,
+  "iterative_parameter_l1_error": 0.013000000000000206,
+  "baseline_parameter_l1_error": 0.03761538461538441,
+  "iterative_total_evaluations": 184,
+  "baseline_total_evaluations": 182,
+  "constraint_satisfied": true
+}

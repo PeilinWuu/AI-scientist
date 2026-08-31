@@ -76,7 +76,7 @@ The current release can:
 
 Evidence acquisition is bounded, resumable, and human-curated. Evidence Researcher first creates an offline `SearchPlan` bound to the project and active research-question hash. In the default `ASSISTED` mode, the researcher must approve or edit that plan before any network request. Bounded queries then create `SourceCandidate` records, not evidence. The UI shows source metadata, AI recommendations, relevance, and verification signals; a human decides which candidates to keep, reject, or defer. Only kept candidates are extracted in small streaming batches, verified, and normalized into formal `EvidenceItem` records. Versioned checkpoints are bound to `project_id`, `question_hash`, and `search_plan_id`, so a plan or checkpoint cannot cross projects or questions.
 
-The governing rule is: **AI discovers sources, the researcher decides whether to adopt them, and the system verifies and builds the evidence chain.** Search results never become evidence automatically in `ASSISTED` or `MANUAL` mode. Uploaded PDF, Markdown, and TXT files are currently registered as research assets only; this release does not pretend to parse or analyze them.
+The governing rule is: **AI discovers sources, the researcher decides whether to adopt them, and the system verifies and builds the evidence chain.** Search results never become evidence automatically in `ASSISTED` or `MANUAL` mode. Supported uploaded research files are parsed locally into bounded, auditable context; parsing does not verify scientific claims or execute an analysis.
 
 The current release does not connect a real laboratory, simulation, code-execution, or statistical-analysis backend. `ExecutionAdapter.execute()` raises `NotImplementedError`. Without a real backend, projects wait for human data or execution and do not generate experimental data, analysis results, or scientific conclusions. Planning-only synthesis explicitly states that the plan has not been executed.
 
@@ -211,9 +211,10 @@ Registered filenames are clickable in the Streamlit project workspace. The backe
 request by project ID and asset ID, validates that the file remains inside the project directory,
 and returns it inline when the browser supports that format.
 
-This release registers files for review and provenance only. It does not yet parse PDF/XML content
-or feed uploaded bytes into a model, so the UI labels these assets as `registered_only` rather than
-claiming that they have already influenced the research output.
+Supported files are parsed locally after registration unless parsing is disabled. Parsed summaries,
+schemas, bounded samples, and excerpts can enter structured agent context and record which roles used
+them. A failed or unsupported parse remains visibly `registered_only`; parsing never turns a document
+into verified evidence and never executes statistical analysis.
 
 ## AI Scientist API
 
@@ -324,6 +325,19 @@ Create a YAML file in `skills/domains/`, add conservative routing signals, and w
 ### Add a Tool
 
 Add a `ToolDescriptor` to `tools/registry.py`, implement a bounded adapter, declare safety and approval requirements, and return structured outputs. Mark it unavailable until a real backend exists. Never use a placeholder to generate pretend results.
+
+## Competition 1B deterministic feedback demo
+
+Run the reproducible five-seed damped-oscillator benchmark, its one-shot baseline,
+and controlled failure cases without a model credential:
+
+```powershell
+python -m src.ai_scientist.competition_cli run-flagship --output competition/1b
+```
+
+The FastAPI routes are under `/api/competition/1b`, and Streamlit exposes a
+`Competition Demo / 反馈迭代` mode. Submission evidence and reproduction instructions
+are under `competition/1b/`. Arbitrary Python or LLM-generated code is never executed.
 
 ## Existing API Verification
 

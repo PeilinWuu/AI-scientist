@@ -1,0 +1,29 @@
+{
+  "request_id": "request_163dfa7ff52d4ec886f5386b17b094eb",
+  "operation": "run_simulation",
+  "inputs": {
+    "observations_path": "input/observations.csv"
+  },
+  "parameters": {
+    "mode": "fit_damped_oscillator",
+    "damping_min": 0.05,
+    "damping_max": 0.35,
+    "damping_points": 14,
+    "omega_min": 2.0,
+    "omega_max": 2.8,
+    "omega_points": 13,
+    "amplitude": 1.0,
+    "phase": 0.2
+  },
+  "expected_outputs": [
+    "fit_result.json",
+    "fit_grid.csv",
+    "fit.png"
+  ],
+  "provenance": {
+    "plan_version": "baseline_one_shot_v1",
+    "derived_from_execution_id": null
+  },
+  "seed": 20260831,
+  "output_directory": "comparison/baseline_execution"
+}

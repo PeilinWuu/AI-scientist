@@ -1,0 +1,70 @@
+{
+  "execution_id": "execution_5746c4ecb55e4e6bb61c3833b9c8b5f3",
+  "request_id": "request_ec20f15a97484a29b527bd32c218b3dc",
+  "operation": "run_simulation",
+  "status": "success",
+  "started_at": "2026-08-31T05:34:39.672984Z",
+  "finished_at": "2026-08-31T05:34:39.719630Z",
+  "duration_ms": 47,
+  "seed": 20260833,
+  "input_fingerprint": "9e0d0f043a9c09ccb3f5da20e812ed67324a98c8869f6c17fa66e4bf57e6480e",
+  "input_checksums": {
+    "observations_path": "b8b119faa75ef96c57f19b044b0e99fd9befaac832dea8993cd73e7106ffcfc4"
+  },
+  "actual_parameters": {
+    "mode": "fit_damped_oscillator",
+    "damping_min": 0.15000000000000002,
+    "damping_max": 0.25,
+    "damping_points": 11,
+    "omega_min": 2.3,
+    "omega_max": 2.5,
+    "omega_points": 11,
+    "amplitude": 1.0,
+    "phase": 0.2
+  },
+  "software_versions": {
+    "python": "3.12.7",
+    "numpy": "1.26.4",
+    "pandas": "2.2.3",
+    "platform": "win32"
+  },
+  "metrics": {
+    "rmse": 0.03259670204470579,
+    "best_damping": 0.17,
+    "best_omega": 2.36,
+    "evaluations": 121,
+    "damping_step": 0.010000000000000009,
+    "omega_step": 0.020000000000000018,
+    "best_on_boundary": false
+  },
+  "artifacts": [
+    {
+      "artifact_id": "artifact_f0ab2d5dd252495aa2a6591fc732f032",
+      "artifact_type": "fit_result",
+      "relative_path": "round_2/execution/fit_result.json",
+      "media_type": "application/json",
+      "checksum_sha256": "e7b0d29da92a603b8bcf32af586d5c4e1adfb8725d5131375553664b39999622",
+      "size_bytes": 216
+    },
+    {
+      "artifact_id": "artifact_c7625435a39c4de495cc2f533b0c96fb",
+      "artifact_type": "fit_grid",
+      "relative_path": "round_2/execution/fit_grid.csv",
+      "media_type": "text/csv",
+      "checksum_sha256": "bbcfec263265ec41336b7def4efec9e475f0755f4936f7511e72fe7faa614062",
+      "size_bytes": 4543
+    },
+    {
+      "artifact_id": "artifact_4122f4be6c6041c196fe54b3998cd011",
+      "artifact_type": "fit",
+      "relative_path": "round_2/execution/fit.png",
+      "media_type": "image/png",
+      "checksum_sha256": "18f8ae8747fdd2afc61bb31e01c990ca54c3706e918a10b29f0efc04661b4a99",
+      "size_bytes": 9588
+    }
+  ],
+  "run_log": [
+    "Evaluated 121 parameter combinations."
+  ],
+  "failure_reason": null
+}

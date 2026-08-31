@@ -29,16 +29,16 @@ class ToolRegistry:
                 "web_extractor", "Extract content from public pages selected by search", ["url"], ["text", "sources"], 120, "network", True, False
             ),
             "file_search": ToolDescriptor(
-                "file_search", "Inspect user-provided files", ["artifact_id"], ["excerpts"], 60, "local_read", False, True
+                "file_search", "Inspect user-provided files", ["artifact_id"], ["excerpts"], 60, "local_read", True, True
             ),
             "dataset_inspector": ToolDescriptor(
-                "dataset_inspector", "Inspect a supplied dataset schema and quality", ["artifact_id"], ["profile"], 60, "local_read", False, True
+                "dataset_inspector", "Inspect a supplied dataset schema and quality", ["artifact_id"], ["profile"], 60, "local_read", True, True
             ),
             "python_executor": ToolDescriptor(
                 "python_executor", "Execute Python in a controlled backend", ["code", "inputs"], ["logs", "artifacts"], 120, "execution", False, True
             ),
             "statistical_analyzer": ToolDescriptor(
-                "statistical_analyzer", "Run a pre-approved statistical analysis", ["analysis_plan", "dataset"], ["results"], 120, "execution", False, True
+                "statistical_analyzer", "Run a whitelisted deterministic statistical analysis", ["operation", "dataset", "parameters"], ["results", "artifacts"], 120, "execution", True, True
             ),
             "code_runner": ToolDescriptor(
                 "code_runner", "Run versioned research code", ["code_artifact", "parameters"], ["logs", "results"], 120, "execution", False, True
