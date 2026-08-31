@@ -22,7 +22,7 @@ FlowScientist：可审计科学实验任务规划与反馈迭代。5 个 seed �
 
 ## 6. 系统架构
 
-FastAPI + Streamlit + Pydantic + 项目持久化 + 追加事件 + 白名单 ExecutionAdapter；现有 AI Scientist 规划链保持隔离。
+FastAPI + Streamlit + Pydantic + 项目持久化 + 追加事件 + 白名单 ExecutionAdapter；AI Scientist 是统一科研工作流，Qwen 推理与受控证据检索作为内部能力调用。
 
 ## 7. Qwen 与上下文工程
 

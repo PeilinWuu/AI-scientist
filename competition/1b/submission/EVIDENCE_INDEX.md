@@ -10,5 +10,5 @@
 | 5-seed 重复 | CLI | CLI exit code | `results/seed_runs/` | benchmark summary |
 | 失败与 human review | `run_failure_cases()` | `test_failure_cases_*` | `failure_cases.json` | failure-cases endpoint/UI |
 | API happy/failure | `competition_api.py` | `test_competition_api_*` | API test output | `/docs` |
-| Qwen 路径真实存在 | structured/search clients | existing model tests | `qwen_smoke_evidence.json` | model endpoints |
+| AI Scientist 的 Qwen 路径真实存在 | 内部 structured/search adapters | shared model infrastructure tests | `qwen_smoke_evidence.json` | `/api/models/test` |
 | Qwen authenticated 调用成功 | `competition_readiness.run_qwen_smoke()` | `test_competition_qwen_readiness.py` | PASSED 脱敏证据、`QWEN_SMOKE_OK` | checklist |

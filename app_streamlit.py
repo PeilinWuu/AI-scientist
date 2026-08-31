@@ -1,4 +1,4 @@
-"""Streamlit frontend for Qwen modes and the Competition 1B demo."""
+"""Streamlit frontend for AI Scientist and the Competition 1B demo."""
 
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ ROOT_DIR = Path(__file__).resolve().parent
 load_dotenv(ROOT_DIR / ".env")
 
 DEFAULT_BACKEND_URL = "http://localhost:8000"
-APP_MODES = ["Pure Qwen", "Qwen Search", "AI Scientist", "Competition Demo"]
+PRODUCT_VIEWS = ["Competition Demo", "AI Scientist"]
 RESEARCH_STEP_TIMEOUT = int(os.getenv("AI_SCIENTIST_FRONTEND_STEP_TIMEOUT", "600"))
 RESEARCH_ASSET_EXTENSIONS = ["pdf", "md", "txt", "csv", "tsv", "json", "xml", "xlsx", "xls"]
 RESEARCH_ASSET_MAX_BYTES = int(os.getenv("AI_SCIENTIST_MAX_ASSET_BYTES", str(25 * 1024 * 1024)))
@@ -348,162 +348,6 @@ def _short_debug_value(value: object) -> str:
     if isinstance(value, (dict, list)):
         return f"{type(value).__name__} with {len(value)} item(s)"
     return "" if value is None else str(value)
-
-
-def chat_history() -> list[dict[str, str]]:
-    return [
-        {"role": item["role"], "content": item["content"]}
-        for item in st.session_state.messages
-        if item.get("role") in {"user", "assistant"}
-    ]
-
-
-def render_search_debug(metadata: dict) -> None:
-    with st.expander("搜索来源", expanded=bool(metadata.get("sources"))):
-        sources = metadata.get("sources") or []
-        if not sources:
-            st.info("当前 API 响应未包含可验证的搜索来源。")
-        for source in sources:
-            st.markdown(f"**[{source.get('index', '')}] {source.get('title') or '（无标题）'}**")
-            st.write(source.get("site_name") or "（未知网站）")
-            if source.get("url"):
-                st.write(source["url"])
-            if source.get("snippet"):
-                st.caption(source["snippet"])
-    with st.expander("响应元数据", expanded=False):
-        render_debug_object(metadata)
-
-
-def render_chat_mode(backend_url: str, mode: str, show_debug: bool) -> None:
-    search_enabled = mode == "Qwen Search"
-    config = get_model_config(backend_url)
-    if search_enabled:
-        default_model = model_default(config, "qwen_search", os.getenv("LLM_SEARCH_MODEL", "qwen3.7-plus"))
-        key = "qwen_search_model_input"
-        if key not in st.session_state:
-            st.session_state[key] = default_model
-        if st.sidebar.button("重置搜索模型"):
-            st.session_state[key] = default_model
-            st.rerun()
-        st.sidebar.text_input(
-            "搜索模型名称",
-            key=key,
-            placeholder="例如：qwen3.7-plus",
-            help="请输入 DashScope 模型 ID。搜索模型必须支持当前 Responses API 的联网搜索工具。",
-        )
-        model = effective_model_input(key, default_model)
-        if not model:
-            return
-        if st.sidebar.button("测试搜索模型"):
-            render_model_test_result(test_model(backend_url, model, "search"))
-    else:
-        default_model = model_default(config, "pure_qwen", os.getenv("LLM_MODEL", "qwen3.8-max"))
-        key = "pure_qwen_model_input"
-        if key not in st.session_state:
-            st.session_state[key] = default_model
-        if st.sidebar.button("重置模型"):
-            st.session_state[key] = default_model
-            st.rerun()
-        st.sidebar.text_input(
-            "模型名称",
-            key=key,
-            placeholder="例如：qwen-plus",
-            help="请输入 DashScope 模型 ID。留空时使用服务器默认模型。",
-        )
-        model = effective_model_input(key, default_model)
-        if not model:
-            return
-        if st.sidebar.button("测试模型"):
-            render_model_test_result(test_model(backend_url, model, "chat"))
-
-    if not search_enabled:
-        st.session_state.search_previous_response_id = None
-        st.session_state.last_search_model = None
-    elif st.session_state.last_search_model not in (None, model):
-        st.session_state.search_previous_response_id = None
-    if search_enabled:
-        st.session_state.last_search_model = model
-
-    if st.sidebar.button("清空对话"):
-        st.session_state.messages = []
-        st.session_state.search_previous_response_id = None
-        st.session_state.last_search_model = None
-        st.session_state.last_debug_payload = None
-        st.session_state.last_endpoint = None
-        st.session_state.last_chat_endpoint = None
-        st.session_state.last_response_metadata = None
-        st.rerun()
-
-    if show_debug and st.sidebar.button("查看发送载荷"):
-        if st.session_state.last_debug_payload is None:
-            st.sidebar.info("暂无载荷，请先发送一条消息。")
-        else:
-            st.sidebar.write(f"**聊天接口：** `{st.session_state.last_chat_endpoint}`")
-            st.sidebar.write(f"**调试接口：** `{st.session_state.last_endpoint}`")
-            st.sidebar.json(st.session_state.last_debug_payload)
-            if st.session_state.last_response_metadata:
-                st.sidebar.write("**最近一次响应元数据：**")
-                st.sidebar.json(st.session_state.last_response_metadata)
-
-    st.title({"Pure Qwen": "纯 Qwen 对话", "Qwen Search": "Qwen 联网搜索"}.get(mode, mode))
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.write(message["content"])
-
-    user_input = st.chat_input("输入消息")
-    if not user_input:
-        return
-    if search_enabled:
-        payload = {
-            "message": user_input,
-            "model": model,
-            "previous_response_id": st.session_state.search_previous_response_id,
-        }
-        chat_endpoint = "/api/chat_search"
-        debug_endpoint = "/api/debug_search_payload"
-    else:
-        payload = {"message": user_input, "history": chat_history(), "model": model}
-        chat_endpoint = "/api/chat"
-        debug_endpoint = "/api/debug_payload"
-
-    st.session_state.messages.append({"role": "user", "content": user_input})
-    with st.chat_message("user"):
-        st.write(user_input)
-    try:
-        debug_payload = post_json(backend_url, debug_endpoint, payload) if show_debug else None
-        st.session_state.last_debug_payload = debug_payload
-        st.session_state.last_endpoint = debug_endpoint if show_debug else None
-        st.session_state.last_chat_endpoint = chat_endpoint
-        with st.spinner("Qwen 正在回复……"):
-            response = post_json(backend_url, chat_endpoint, payload)
-        metadata_keys = ["mode", "model", "response_id", "request_id", "search_used", "sources", "tool_usage"]
-        st.session_state.last_response_metadata = {
-            key: response.get(key) for key in metadata_keys if key in response
-        }
-        if search_enabled:
-            st.session_state.search_previous_response_id = response.get("response_id")
-        reply = response.get("reply", "")
-        assistant_record = {"role": "assistant", "content": reply}
-        st.session_state.messages.append(assistant_record)
-        with st.chat_message("assistant"):
-            st.write(reply)
-        if show_debug:
-            with st.expander("发送给 Qwen 的调试载荷", expanded=False):
-                st.write(f"**聊天接口：** `{chat_endpoint}`")
-                st.write(f"**调试接口：** `{debug_endpoint}`")
-                render_debug_object(debug_payload)
-            if search_enabled:
-                render_search_debug(st.session_state.last_response_metadata or {})
-    except BackendAPIError as exc:
-        st.error("后端 Qwen 调用失败。")
-        if isinstance(exc.detail, dict):
-            render_debug_object(exc.detail)
-        else:
-            st.write(exc.detail)
-    except Exception as exc:  # noqa: BLE001
-        st.error("前端或后端调用失败。")
-        if show_debug:
-            st.exception(exc)
 
 
 def refresh_research_project(backend_url: str) -> dict | None:
@@ -1730,16 +1574,9 @@ def render_competition_demo(backend_url: str) -> None:
             st.error(exc.detail)
 
 
-st.set_page_config(page_title="Qwen 科研工作台", layout="wide")
+st.set_page_config(page_title="AI Scientist Competition 1B", layout="wide")
 
 STATE_DEFAULTS = {
-    "messages": [],
-    "last_debug_payload": None,
-    "last_endpoint": None,
-    "last_chat_endpoint": None,
-    "last_response_metadata": None,
-    "search_previous_response_id": None,
-    "last_search_model": None,
     "research_project_id": None,
     "research_project": None,
     "research_job_id": None,
@@ -1750,26 +1587,20 @@ for key, value in STATE_DEFAULTS.items():
     if key not in st.session_state:
         st.session_state[key] = value
 
-st.sidebar.header("Qwen 科研工作台")
+st.sidebar.header("AI Scientist Competition 1B")
 backend_url = st.sidebar.text_input("后端地址", value=DEFAULT_BACKEND_URL)
-mode = st.sidebar.radio(
-    "应用模式",
-    APP_MODES,
+view = st.sidebar.radio(
+    "产品入口",
+    PRODUCT_VIEWS,
     horizontal=False,
     format_func=lambda value: {
-        "Pure Qwen": "纯 Qwen 对话",
-        "Qwen Search": "Qwen 联网搜索",
         "AI Scientist": "AI Scientist",
-        "Competition Demo": "Competition Demo / 反馈迭代",
+        "Competition Demo": "Competition Demo / 科学实验任务规划与反馈迭代",
     }[value],
 )
 show_debug = st.sidebar.checkbox("开发者调试", value=False)
 
-if mode == "AI Scientist":
-    st.session_state.search_previous_response_id = None
+if view == "AI Scientist":
     render_research_workspace(backend_url, show_debug)
-elif mode == "Competition Demo":
-    st.session_state.search_previous_response_id = None
-    render_competition_demo(backend_url)
 else:
-    render_chat_mode(backend_url, mode, show_debug)
+    render_competition_demo(backend_url)

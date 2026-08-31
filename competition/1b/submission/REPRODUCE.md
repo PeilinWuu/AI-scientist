@@ -31,3 +31,6 @@ python -m venv .venv
 结果位于 `competition/1b/cases/flagship/` 和 `competition/1b/results/`。普通 readiness 不会调用
 外部 API；它读取默认 168 小时内的脱敏 `qwen_smoke_evidence.json`。详情见
 `QWEN_EVIDENCE_CHECKLIST.md`。
+
+Streamlit 默认进入 Competition Demo，侧栏可切换到完整 AI Scientist 工作区。Qwen
+结构化推理与受控联网证据检索均由工作流内部调用，不作为独立聊天产品暴露。

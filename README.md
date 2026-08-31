@@ -1,20 +1,10 @@
-# Qwen Research Shell
+# AI Scientist Competition 1B
 
-This project provides three isolated modes on one FastAPI and Streamlit application.
-
-## Modes
-
-### Pure Qwen
-
-`POST /api/chat` is a direct Chat Completions pass-through. It loads no skills, tools, research state, or hidden instructions. The Qwen call sends only `model` and visible `user`/`assistant` messages.
-
-### Qwen Search
-
-`POST /api/chat_search` uses the existing Responses API implementation with Qwen's built-in `web_search` and `web_extractor` tools. Search continuity uses `previous_response_id`; tool output is kept separate from the final assistant text.
-
-### AI Scientist
-
-AI Scientist is an independent, domain-neutral research-planning workflow under `src/ai_scientist/`. It does not modify or inject content into Pure Qwen or Qwen Search.
+This project exposes one product: a domain-neutral AI Scientist workflow with a
+deterministic Competition 1B feedback demo. The workflow uses shared Qwen clients
+internally for structured scientific roles, authenticated model diagnostics, and
+controlled evidence retrieval; those infrastructure capabilities are not separate
+end-user chat products.
 
 It combines:
 
@@ -66,7 +56,7 @@ Method skills contain research-method rules but no discipline-specific knowledge
 The current release can:
 
 - formulate research questions;
-- retrieve background evidence with the existing Qwen Search client;
+- retrieve background evidence through the controlled Qwen Responses search infrastructure;
 - map claims to explicit evidence;
 - generate falsifiable hypotheses;
 - select methods and domains;
@@ -78,7 +68,11 @@ Evidence acquisition is bounded, resumable, and human-curated. Evidence Research
 
 The governing rule is: **AI discovers sources, the researcher decides whether to adopt them, and the system verifies and builds the evidence chain.** Search results never become evidence automatically in `ASSISTED` or `MANUAL` mode. Supported uploaded research files are parsed locally into bounded, auditable context; parsing does not verify scientific claims or execute an analysis.
 
-The current release does not connect a real laboratory, simulation, code-execution, or statistical-analysis backend. `ExecutionAdapter.execute()` raises `NotImplementedError`. Without a real backend, projects wait for human data or execution and do not generate experimental data, analysis results, or scientific conclusions. Planning-only synthesis explicitly states that the plan has not been executed.
+The general AI Scientist workflow does not connect to an arbitrary laboratory,
+simulation, code-execution, or statistical-analysis backend. It waits for human data
+or execution and does not invent experimental results. Competition 1B adds only a
+whitelisted deterministic damped-oscillator executor for the documented benchmark;
+planning-only synthesis still states when a plan has not been executed.
 
 ## Installation
 
@@ -159,7 +153,10 @@ AI_SCIENTIST_SEARCH_FALLBACK_MODEL=
 
 Do not assume every account supports the same model IDs. If a role variable is empty, the registry uses `AI_SCIENTIST_FALLBACK_MODEL`, then `LLM_MODEL`, and finally the built-in `qwen-turbo` default. Configuration or runtime fallback is recorded in the event log through `requested_model`, `actual_model`, and `fallback_used`; it is never silent.
 
-The Streamlit UI no longer uses a fixed model dropdown. Pure Qwen, Qwen Search, and every AI Scientist role accept a free-form model ID. Values in `.env` are defaults only; frontend edits affect the current browser session, and AI Scientist model overrides are saved into the project at creation time. Updating `.env` later does not silently change an existing research project.
+The Streamlit UI lets each AI Scientist role accept a free-form model ID. Values in
+`.env` are defaults only; frontend edits affect the current browser session, and
+model overrides are saved into the project at creation time. Updating `.env` later
+does not silently change an existing research project.
 
 Model names are lightly sanitized before use: empty input falls back to the default, while line breaks, control characters, and names longer than 128 characters are rejected. The app does not guess, correct, or validate against a hard-coded model list. Use the built-in test buttons or the API below to verify real account support.
 
@@ -196,7 +193,8 @@ Frontend:
 streamlit run app_streamlit.py
 ```
 
-Select `Pure Qwen`, `Qwen Search`, or `AI Scientist` in the sidebar.
+The default view is `Competition Demo`; switch to `AI Scientist` in the sidebar for
+the complete research-planning workspace.
 
 ### Project reference and data uploads
 
@@ -335,8 +333,8 @@ and controlled failure cases without a model credential:
 python -m src.ai_scientist.competition_cli run-flagship --output competition/1b
 ```
 
-The FastAPI routes are under `/api/competition/1b`, and Streamlit exposes a
-`Competition Demo / 反馈迭代` mode. Submission evidence and reproduction instructions
+The FastAPI routes are under `/api/competition/1b`, and Streamlit opens the
+`Competition Demo / 反馈迭代` view by default. Submission evidence and reproduction instructions
 are under `competition/1b/`. Arbitrary Python or LLM-generated code is never executed.
 
 Run one authenticated Qwen competition smoke test explicitly, then reuse its redacted evidence
@@ -347,24 +345,6 @@ python -m src.ai_scientist.competition_readiness --run-qwen-smoke
 python -m src.ai_scientist.competition_readiness
 ```
 
-## Existing API Verification
-
-Pure Qwen remains available at:
-
-```text
-GET  /api/qwen_ping
-POST /api/debug_payload
-POST /api/chat
-```
-
-Qwen Search remains available at:
-
-```text
-GET  /api/search_ping
-POST /api/debug_search_payload
-POST /api/chat_search
-```
-
 ## Tests
 
 AI Scientist 项目的时间戳始终以 UTC 持久化。前端通过 `UI_TIMEZONE` 转换显示，默认值为 `Asia/Shanghai`；开发者调试区会同时显示本地时间和 UTC，便于审计。
@@ -373,4 +353,4 @@ AI Scientist 项目的时间戳始终以 UTC 持久化。前端通过 `UI_TIMEZO
 pytest -q
 ```
 
-Tests cover skill validation and core neutrality, state-machine transitions, atomic persistence, structured repair, model fallback, ClaimGraph traceability, reviewer gates, execution boundaries, cross-domain mode routing, API safety, and regression protection for Pure Qwen and Qwen Search.
+Tests cover skill validation and core neutrality, state-machine transitions, atomic persistence, structured repair, model fallback, ClaimGraph traceability, reviewer gates, execution boundaries, cross-domain mode routing, API safety, and the shared Qwen chat/search infrastructure used by AI Scientist.

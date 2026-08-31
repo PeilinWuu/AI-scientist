@@ -336,12 +336,15 @@ def test_research_async_step_rejects_duplicate_active_job(
     assert response.json()["detail"]["job_id"] == active_job.job_id
 
 
-def test_existing_qwen_routes_remain_registered() -> None:
-    paths = {route.path for route in main_api.app.routes if hasattr(route, "path")}
-    assert {
+def test_standalone_qwen_routes_are_removed_but_scientist_routes_remain() -> None:
+    paths = set(main_api.app.openapi()["paths"])
+    assert not {
         "/api/chat", "/api/debug_payload", "/api/qwen_ping",
         "/api/chat_search", "/api/debug_search_payload", "/api/search_ping",
-    } <= paths
+    } & paths
+    assert "/api/research/start" in paths
+    assert "/api/competition/1b/demo/run" in paths
+    assert "/api/research/debug/evidence-search-ping" in paths
 
 
 def test_evidence_search_tool_passes_previous_response_id_as_keyword(monkeypatch: pytest.MonkeyPatch) -> None:

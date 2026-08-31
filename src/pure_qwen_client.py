@@ -1,4 +1,4 @@
-"""Minimal OpenAI-compatible Qwen client for Pure Qwen Shell mode."""
+"""Minimal shared OpenAI-compatible Qwen client."""
 
 from __future__ import annotations
 
@@ -8,9 +8,6 @@ from pathlib import Path
 import httpx
 from dotenv import load_dotenv
 from openai import OpenAI
-
-from src.pure_schemas import ChatMessage
-
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 load_dotenv(ROOT_DIR / ".env")
@@ -40,17 +37,6 @@ class PureQwenClient:
             http_client=self.http_client,
         )
 
-    def build_messages(self, message: str, history: list[ChatMessage]) -> list[dict[str, str]]:
-        """Build the exact Qwen message list from user-visible chat history."""
-
-        messages: list[dict[str, str]] = [
-            {"role": item.role, "content": item.content}
-            for item in history
-            if item.role in {"user", "assistant"}
-        ]
-        messages.append({"role": "user", "content": message})
-        return messages
-
     def chat(self, messages: list[dict[str, str]], model: str | None = None) -> str:
         """Send only model and messages to the OpenAI-compatible chat endpoint."""
 
@@ -60,14 +46,3 @@ class PureQwenClient:
             messages=messages,
         )
         return response.choices[0].message.content or ""
-
-
-def pure_qwen_metadata() -> dict[str, object]:
-    """Return public configuration metadata without exposing secrets."""
-
-    return {
-        "mode": "pure_qwen",
-        "model": os.getenv("LLM_MODEL", "qwen3.8-max"),
-        "base_url": os.getenv("LLM_BASE_URL", DEFAULT_BASE_URL).rstrip("/"),
-        "api_key_configured": bool(os.getenv("DASHSCOPE_API_KEY", "")),
-    }

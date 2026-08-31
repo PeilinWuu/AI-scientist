@@ -30,9 +30,8 @@ def test_model_config_endpoint_returns_defaults_without_available_list(monkeypat
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["pure_qwen"]["default_model"] == "qwen-plus"
-    assert payload["qwen_search"]["default_model"] == "qwen3.7-plus"
-    assert "available_models" not in payload["pure_qwen"]
+    assert set(payload) == {"ai_scientist"}
+    assert "available_models" not in payload["ai_scientist"]
     assert "DASHSCOPE_API_KEY" not in str(payload)
 
 
@@ -160,11 +159,11 @@ def test_evidence_search_ping_uses_project_override(tmp_path: Path, monkeypatch:
     assert captured["previous_response_id"] is None
 
 
-def test_streamlit_uses_free_text_model_inputs() -> None:
+def test_streamlit_exposes_only_scientist_product_views_and_role_model_inputs() -> None:
     source = Path("app_streamlit.py").read_text(encoding="utf-8")
 
-    assert "pure_qwen_model_input" in source
-    assert "qwen_search_model_input" in source
-    assert "PURE_MODEL_OPTIONS" not in source
-    assert "SEARCH_MODEL_OPTIONS" not in source
-    assert 'st.sidebar.selectbox(\n            "Model"' not in source
+    assert 'PRODUCT_VIEWS = ["Competition Demo", "AI Scientist"]' in source
+    assert "pure_qwen_model_input" not in source
+    assert "qwen_search_model_input" not in source
+    assert "render_chat_mode" not in source
+    assert "scientist_director_model" in source

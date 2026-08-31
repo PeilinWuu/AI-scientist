@@ -1,6 +1,6 @@
 # 5–8 Minute Demo Script
 
-1. **0:00–0:40 — 首页**：打开 Competition Demo；说明数值由程序计算、Qwen 与执行器边界。若 API 未启动，切换到已生成 `benchmark_summary.md`。
+1. **0:00–0:40 — 首页**：默认打开 Competition Demo；说明这是 AI Scientist 的比赛主入口、完整科研工作流可从侧栏进入，并说明数值由程序计算、Qwen 与执行器边界。若 API 未启动，切换到已生成 `benchmark_summary.md`。
 2. **0:40–1:20 — 问题与 Round 1**：展示阻尼振子问题、硬约束、Round 1 宽范围粗网格。
 3. **1:20–2:20 — 点击完整运行**：seed 20260831；预期状态 `complete`，RMSE 0.057684→0.033089。
 4. **2:20–3:15 — 原始数据和图**：展示观测、Round 1、Round 2 PNG；说明图来自 artifact endpoint。

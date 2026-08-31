@@ -1,1 +1,1 @@
-"""Pure Qwen Shell package."""
+"""AI Scientist Competition 1B application package."""

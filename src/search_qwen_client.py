@@ -212,20 +212,6 @@ def extract_request_id(response: Any) -> str | None:
     return value.strip() if isinstance(value, str) and value.strip() else None
 
 
-def search_qwen_metadata() -> dict[str, object]:
-    """Return public Responses API configuration without secrets."""
-
-    base_url = os.getenv("RESPONSES_BASE_URL") or os.getenv("LLM_BASE_URL", DEFAULT_BASE_URL)
-    return {
-        "mode": "qwen_search",
-        "model": os.getenv("LLM_SEARCH_MODEL", "qwen3.7-plus"),
-        "base_url": base_url.rstrip("/"),
-        "api_key_configured": bool(os.getenv("DASHSCOPE_API_KEY", "")),
-        "search_method": "responses_api_builtin_tools",
-        "tools": resolve_search_tools(base_url),
-    }
-
-
 def validate_search_request(model: str | None, input_text: str | None, tools: list[dict[str, str]]) -> None:
     """Validate a minimal Responses API search request before provider I/O."""
 
