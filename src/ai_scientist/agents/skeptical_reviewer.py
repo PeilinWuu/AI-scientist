@@ -25,6 +25,7 @@ class SkepticalReviewerAgent(BaseResearchAgent[ReviewResult]):
                 "execution_requirements",
                 "accepted_limitations",
                 "internal_execution_summary",
+                "controlled_python_runs",
                 "approved_revision_plans",
                 "revision_verifications",
             ],

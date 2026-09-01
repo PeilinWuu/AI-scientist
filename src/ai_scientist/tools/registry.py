@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import asdict, dataclass
 
 
@@ -21,6 +22,9 @@ class ToolRegistry:
     """List connected and placeholder research capabilities."""
 
     def __init__(self) -> None:
+        controlled_python_enabled = os.getenv("AI_SCIENTIST_ENABLE_CONTROLLED_PYTHON", "0").lower() in {
+            "1", "true", "yes", "on",
+        }
         self._tools = {
             "web_search": ToolDescriptor(
                 "web_search", "Retrieve current public web evidence", ["query"], ["reply", "sources"], 120, "network", True, False
@@ -35,7 +39,7 @@ class ToolRegistry:
                 "dataset_inspector", "Inspect a supplied dataset schema and quality", ["artifact_id"], ["profile"], 60, "local_read", True, True
             ),
             "python_executor": ToolDescriptor(
-                "python_executor", "Execute Python in a controlled backend", ["code", "inputs"], ["logs", "artifacts"], 120, "execution", False, True
+                "python_executor", "Run restricted scientific Python in an audited child process", ["code", "registered_dataset"], ["logs", "results", "artifacts"], 30, "restricted_execution", controlled_python_enabled, True
             ),
             "statistical_analyzer": ToolDescriptor(
                 "statistical_analyzer", "Run a whitelisted deterministic statistical analysis", ["operation", "dataset", "parameters"], ["results", "artifacts"], 120, "execution", True, True

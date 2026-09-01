@@ -123,6 +123,7 @@ from src.ai_scientist.stagnation_detector import build_revision_snapshot, detect
 from src.ai_scientist.source_selector import select_sources
 from src.ai_scientist.structured_client import StructuredQwenClient, StructuredCallMetadata
 from src.ai_scientist.tools.execution_adapter import ExecutionAdapter
+from src.ai_scientist.tools.controlled_python_sandbox import ControlledPythonSandbox
 from src.ai_scientist.tools.registry import ToolRegistry
 from src.model_utils import normalize_model_overrides
 
@@ -1185,6 +1186,146 @@ class ResearchOrchestrator:
         )
         self.store.save(project)
         return project
+
+    def run_controlled_python(
+        self,
+        project_id: str,
+        *,
+        code: str,
+        asset_id: str | None = None,
+        timeout_seconds: int = 15,
+        memory_limit_mb: int = 1024,
+        seed: int | None = None,
+    ) -> tuple[ResearchProject, dict[str, Any]]:
+        """Run explicit restricted Python against one registered tabular asset."""
+
+        project = self.get_project(project_id)
+        if project.planning_only:
+            raise InvalidTransitionError("Planning-only projects cannot execute controlled Python.")
+        if project.phase not in {
+            ResearchPhase.EXECUTION_WAITING,
+            ResearchPhase.DATA_ANALYSIS,
+            ResearchPhase.CRITICAL_REVIEW,
+            ResearchPhase.SYNTHESIS,
+            ResearchPhase.COMPLETED,
+        }:
+            raise InvalidTransitionError("Controlled Python is unavailable in the current project phase.")
+        previous_phase = project.phase
+        compatible = [
+            item
+            for item in project.research_assets
+            if item.purpose == "data"
+            and item.parsing_status == "parsed"
+            and Path(item.filename).suffix.lower() in {".csv", ".tsv", ".json", ".xlsx", ".xls"}
+            and (asset_id is None or item.asset_id == asset_id)
+        ]
+        if not compatible:
+            raise InvalidTransitionError("A parsed registered tabular data asset is required.")
+        asset = compatible[-1]
+        _, dataset_path = self.get_research_asset(project_id, asset.asset_id)
+        audit = ControlledPythonSandbox(self.store.project_dir(project_id).resolve()).execute(
+            code=code,
+            dataset_path=dataset_path,
+            timeout_seconds=timeout_seconds,
+            memory_limit_mb=memory_limit_mb,
+            seed=(project.reproducibility_seed or 0) if seed is None else seed,
+        )
+        audit["dataset_asset_id"] = asset.asset_id
+        audit["dataset_filename"] = asset.filename
+        record = self.artifacts.save_json(
+            project.project_id,
+            "controlled_python_run",
+            audit,
+            "controlled_python_sandbox_v1",
+        )
+        audit["audit_artifact_id"] = record.artifact_id
+        project.artifacts.append(record)
+        project.controlled_python_runs.append(audit)
+        project.controlled_python_runs = project.controlled_python_runs[-20:]
+        if "python_executor" not in project.available_tools:
+            project.available_tools.append("python_executor")
+        project.missing_capabilities = [
+            item for item in project.missing_capabilities if item != "python_executor"
+        ]
+        if audit["status"] == "success":
+            if "controlled_python_sandbox_v1" not in asset.used_by_agents:
+                asset.used_by_agents.append("controlled_python_sandbox_v1")
+            preview = json.dumps(audit.get("result"), ensure_ascii=False, default=str)[:1000]
+            evidence = EvidenceItem(
+                title=f"Controlled Python analysis of {asset.filename}",
+                source_type="dataset",
+                source_asset_id=asset.asset_id,
+                summary=(
+                    f"Restricted child-process analysis completed with code SHA-256 {audit['code_sha256']}. "
+                    f"Result preview: {preview}"
+                ),
+                extracted_claims=[],
+                reliability="audited restricted Python execution",
+                relevance="explicit analysis of the registered project dataset",
+                limitations=[
+                    "Generated analysis code requires independent scientific review.",
+                    "The restricted subprocess is defence in depth, not a container or VM security boundary.",
+                    "Associations or model outputs do not establish causality.",
+                ],
+                source_level="A",
+                is_primary_source=True,
+                verified=True,
+                verification_status="verified",
+                verification_method="none",
+                verification_note="Input/code hashes, resource limits, stdout, result and output checksums were recorded.",
+                reliability_score=0.9,
+                relevance_score=1.0,
+            )
+            project.evidence.append(evidence)
+            audit["execution_evidence_id"] = evidence.evidence_id
+            chinese_output = any("\u4e00" <= char <= "\u9fff" for char in project.objective)
+            execution_claim = Claim(
+                statement=(
+                    f"受控 Python 执行返回以下结构化结果：{preview}"
+                    if chinese_output
+                    else f"Controlled Python execution returned this structured result: {preview}"
+                ),
+                claim_type="observation",
+                supporting_evidence_ids=[evidence.evidence_id],
+                confidence=0.9,
+                assumptions=[
+                    "用户提交的分析代码与登记数据字段语义相符。"
+                    if chinese_output
+                    else "The submitted analysis code matches the semantics of the registered dataset fields."
+                ],
+                limitations=[
+                    "该主张只记录程序输出，科学含义仍需独立复审。"
+                    if chinese_output
+                    else "This claim records program output only; scientific meaning still requires independent review.",
+                    "受限子进程不是容器或虚拟机级隔离。"
+                    if chinese_output
+                    else "The restricted subprocess is not container- or VM-level isolation.",
+                ],
+                status="supported",
+            )
+            project.claims.append(execution_claim)
+            evidence.extracted_claims = [execution_claim.statement]
+            audit["generated_claim_id"] = execution_claim.claim_id
+            project.conclusion = None
+            project.phase = ResearchPhase.CRITICAL_REVIEW
+            self._refresh_quality_metrics(project)
+        self._append_event(
+            project,
+            completed_event(
+                project.project_id,
+                previous_phase,
+                "controlled_python_sandbox_v1",
+                status=f"controlled_python_{audit['status']}",
+                visibility="user",
+                display_key=audit["run_id"],
+                output_artifact_ids=[record.artifact_id],
+                display_markdown=(
+                    f"受控 Python 分析状态：{audit['status']}；代码与数据哈希、资源限制和输出校验和已保存。"
+                ),
+            ),
+        )
+        self.store.save(project)
+        return project, audit
 
     def _run_bound_internal_executor(self, project: ResearchProject) -> list[str]:
         """Run only the explicit, allowlisted executor bound at project creation."""

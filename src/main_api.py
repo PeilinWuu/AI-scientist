@@ -19,6 +19,7 @@ from src.ai_scientist.model_registry import ModelRegistry
 from src.ai_scientist.orchestrator import ResearchOrchestrator
 from src.ai_scientist.schemas import (
     ApprovalRequest,
+    ControlledPythonRunRequest,
     DeferApprovalRequest,
     EvidenceCreateRequest,
     HumanEditRequest,
@@ -59,6 +60,12 @@ research_job_store = ResearchJobStore(research_orchestrator.store.root)
 research_orchestrator.recover_revision_projects()
 
 
+def _controlled_python_enabled() -> bool:
+    return os.getenv("AI_SCIENTIST_ENABLE_CONTROLLED_PYTHON", "0").lower() in {
+        "1", "true", "yes", "on",
+    }
+
+
 @app.get("/health")
 def health() -> dict:
     """Return public backend status."""
@@ -67,6 +74,7 @@ def health() -> dict:
         "status": "ok",
         "product": "ai_scientist",
         "qwen_configured": bool(os.getenv("DASHSCOPE_API_KEY", "")),
+        "controlled_python_sandbox_enabled": _controlled_python_enabled(),
     }
 
 
@@ -598,6 +606,32 @@ def research_run_dataset_tools(project_id: str) -> dict:
             "phase": project.phase.value,
             "status": "dataset_tools_completed",
             "execution_summary": project.internal_execution_summary,
+        }
+    except Exception as exc:  # noqa: BLE001
+        raise _research_http_error(exc) from exc
+
+
+@app.post("/api/research/{project_id}/controlled-python")
+def research_run_controlled_python(project_id: str, request: ControlledPythonRunRequest) -> dict:
+    if not _controlled_python_enabled():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Controlled Python is disabled. Set AI_SCIENTIST_ENABLE_CONTROLLED_PYTHON=1 to enable the experimental runner.",
+        )
+    try:
+        project, audit = research_orchestrator.run_controlled_python(
+            project_id,
+            code=request.code,
+            asset_id=request.asset_id,
+            timeout_seconds=request.timeout_seconds,
+            memory_limit_mb=request.memory_limit_mb,
+            seed=request.seed,
+        )
+        return {
+            "project_id": project.project_id,
+            "phase": project.phase.value,
+            "status": audit["status"],
+            "audit": audit,
         }
     except Exception as exc:  # noqa: BLE001
         raise _research_http_error(exc) from exc

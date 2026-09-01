@@ -862,8 +862,18 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
     )
     capability_view = execution_capability_view(execution_capability)
     completed_execution = (project.get("internal_execution_summary") or {}).get("status") == "complete"
-    if execution_capability == "INTERNAL_EXECUTABLE" and completed_execution:
-        st.success("执行方式：项目内确定性执行已完成；真实结果及审计信息已进入复审与最终综合。")
+    completed_python = any(
+        item.get("status") == "success" for item in project.get("controlled_python_runs") or []
+    )
+    if completed_execution or completed_python:
+        execution_label = (
+            "项目内确定性执行与受控 Python 分析"
+            if completed_execution and completed_python
+            else "项目内确定性执行"
+            if completed_execution
+            else "受控 Python 分析"
+        )
+        st.success(f"执行方式：{execution_label}已完成；真实结果及审计信息已进入复审与最终综合。")
     else:
         st.info(f"执行方式：{capability_view['label']}。{capability_view['description']}")
     if phase == "EXECUTION_WAITING" and execution_capability == "INTERNAL_EXECUTABLE":
@@ -895,7 +905,7 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
             result_columns[0].metric("执行状态", status_label(execution_summary.get("status", "unknown")))
             result_columns[1].metric("数据文件", execution_summary.get("dataset_filename") or "未知")
             result_columns[2].metric("白名单操作", execution_summary.get("operation_count", 0))
-            result_columns[3].metric("任意代码执行", "禁止")
+            result_columns[3].metric("任意本机代码执行", "禁止")
             st.caption(
                 f"输入 SHA-256：{execution_summary.get('dataset_content_sha256') or '未记录'}。"
                 "每项操作均保存参数、软件版本、运行时长和输出校验和。"
@@ -945,6 +955,91 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
                 )
             except BackendAPIError as exc:
                 st.error(f"项目内分析失败：{exc.detail}")
+
+    controlled_runs = project.get("controlled_python_runs") or []
+    if controlled_runs:
+        latest_python_run = controlled_runs[-1]
+        st.subheader("受控 Python 分析记录")
+        run_columns = st.columns(4)
+        run_columns[0].metric("状态", status_label(latest_python_run.get("status")))
+        run_columns[1].metric("耗时（毫秒）", latest_python_run.get("duration_ms", 0))
+        run_columns[2].metric("峰值内存（MB）", latest_python_run.get("peak_memory_mb", 0))
+        run_columns[3].metric("输出产物", len(latest_python_run.get("artifacts") or []))
+        st.caption(f"代码 SHA-256：{latest_python_run.get('code_sha256') or '未记录'}")
+        if latest_python_run.get("result") is not None:
+            st.json(latest_python_run["result"])
+        if latest_python_run.get("error"):
+            st.warning(latest_python_run["error"])
+
+    if (
+        data_assets
+        and not project.get("planning_only", True)
+        and phase in {"EXECUTION_WAITING", "DATA_ANALYSIS", "CRITICAL_REVIEW", "SYNTHESIS", "COMPLETED"}
+    ):
+        try:
+            sandbox_enabled = bool((get_json(backend_url, "/health") or {}).get(
+                "controlled_python_sandbox_enabled", False
+            ))
+        except BackendAPIError:
+            sandbox_enabled = False
+        with st.expander("受控 Python 沙箱（实验性）", expanded=False):
+            st.warning(
+                "这是带 AST 审查、独立进程、禁导入/禁文件 API/禁网、超时和内存监控的受限分析器，"
+                "但不等同于容器、虚拟机或独立系统账户。请勿粘贴密钥或私人信息。"
+            )
+            if not sandbox_enabled:
+                st.info("后端默认关闭该实验功能。设置 AI_SCIENTIST_ENABLE_CONTROLLED_PYTHON=1 并重启后端后可使用。")
+            asset_options = {f"{item.get('filename')} · {item.get('asset_id')}": item.get("asset_id") for item in data_assets}
+            selected_asset_label = st.selectbox(
+                "分析数据",
+                list(asset_options),
+                key=f"controlled_python_asset_{project.get('project_id')}",
+            )
+            example_code = (
+                "overall = float(data['sepal_length_cm'].corr(data['petal_length_cm']))\n"
+                "by_group = data.groupby('species').apply(\n"
+                "    lambda frame: float(frame['sepal_length_cm'].corr(frame['petal_length_cm'])),\n"
+                "    include_groups=False,\n"
+                ").to_dict()\n"
+                "result = {'overall_correlation': overall, 'by_species': by_group}"
+            )
+            sandbox_code = st.text_area(
+                "分析代码（必须把最终值赋给 result）",
+                value=example_code,
+                height=190,
+                key=f"controlled_python_code_{project.get('project_id')}",
+            )
+            limit_columns = st.columns(2)
+            timeout_seconds = limit_columns[0].number_input(
+                "超时（秒）", min_value=1, max_value=30, value=15,
+                key=f"controlled_python_timeout_{project.get('project_id')}",
+            )
+            memory_limit_mb = limit_columns[1].number_input(
+                "内存上限（MB）", min_value=256, max_value=1536, value=1024, step=128,
+                key=f"controlled_python_memory_{project.get('project_id')}",
+            )
+            acknowledged = st.checkbox(
+                "我确认代码不含密钥，并理解这不是容器级隔离。",
+                key=f"controlled_python_ack_{project.get('project_id')}",
+            )
+            if st.button(
+                "运行受控 Python 分析",
+                disabled=not sandbox_enabled or not acknowledged or not sandbox_code.strip(),
+                key=f"controlled_python_run_{project.get('project_id')}",
+            ):
+                try:
+                    _research_action(
+                        backend_url,
+                        f"/api/research/{project['project_id']}/controlled-python",
+                        {
+                            "code": sandbox_code,
+                            "asset_id": asset_options[selected_asset_label],
+                            "timeout_seconds": int(timeout_seconds),
+                            "memory_limit_mb": int(memory_limit_mb),
+                        },
+                    )
+                except BackendAPIError as exc:
+                    st.error(f"受控 Python 分析失败：{exc.detail}")
 
     if execution_summary and execution_summary.get("executor_binding") != "deterministic_data_analysis_v1":
         _render_execution_round("第一轮执行结果", execution_summary.get("round_1") or {})
@@ -1151,14 +1246,19 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
         "data_visualizer": "确定性直方图与散点图",
         "deterministic_data_analysis_v1": "项目内确定性数据分析执行器",
         "artifact_store": "研究产物持久化",
-        "python_executor": "任意 Python 执行",
+        "python_executor": "受控 Python 分析沙箱（实验性）",
         "code_runner": "任意代码运行器",
         "citation_manager": "外部引用管理器",
     }
     available_labels = [capability_labels.get(name, name) for name in project.get("available_tools") or []]
     capability_columns[0].markdown("\n".join(f"- {item}" for item in available_labels) or "- 暂无")
     capability_columns[1].write("**尚未接入的能力**")
-    missing_labels = [capability_labels.get(name, name) for name in project.get("missing_capabilities") or []]
+    available_capability_ids = set(project.get("available_tools") or [])
+    missing_labels = [
+        capability_labels.get(name, name)
+        for name in project.get("missing_capabilities") or []
+        if name not in available_capability_ids
+    ]
     capability_columns[1].markdown("\n".join(f"- {item}" for item in missing_labels) or "- 暂无")
     if show_debug:
         st.write("**原始能力 ID**")

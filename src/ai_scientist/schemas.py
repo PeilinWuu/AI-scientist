@@ -1194,6 +1194,7 @@ class ResearchProject(StrictModel):
     ] = "PLANNING_ONLY"
     executor_binding: str | None = None
     internal_execution_summary: dict[str, Any] = Field(default_factory=dict)
+    controlled_python_runs: list[dict[str, Any]] = Field(default_factory=list)
     domain_hint: str | None = None
     method_rationale: str = ""
     validity_threats: list[str] = Field(default_factory=list)
@@ -1416,6 +1417,21 @@ class ResearchAssetUploadRequest(StrictModel):
         "project_workspace",
         "experimental_result",
     ] = "project_workspace"
+
+
+class ControlledPythonRunRequest(StrictModel):
+    code: str = Field(min_length=1, max_length=20_000)
+    asset_id: str | None = None
+    timeout_seconds: int = Field(default=15, ge=1, le=30)
+    memory_limit_mb: int = Field(default=1024, ge=256, le=1536)
+    seed: int | None = Field(default=None, ge=0, le=2_147_483_647)
+
+    @field_validator("code")
+    @classmethod
+    def reject_blank_code(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("controlled Python code must not be blank")
+        return value
 
 
 class AgentStageResult(StrictModel):
