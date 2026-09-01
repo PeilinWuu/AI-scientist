@@ -40,6 +40,18 @@ class ToolRegistry:
             "statistical_analyzer": ToolDescriptor(
                 "statistical_analyzer", "Run a whitelisted deterministic statistical analysis", ["operation", "dataset", "parameters"], ["results", "artifacts"], 120, "execution", True, True
             ),
+            "categorical_analyzer": ToolDescriptor(
+                "categorical_analyzer", "Compute bounded frequencies, grouped summaries, contingency tables, and seeded group comparisons", ["dataset", "columns"], ["tables", "metrics", "artifacts"], 120, "execution", True, True
+            ),
+            "time_series_analyzer": ToolDescriptor(
+                "time_series_analyzer", "Compute deterministic temporal coverage, trend, and lag summaries", ["dataset", "time_column", "value_columns"], ["series_summary", "artifacts"], 120, "execution", True, True
+            ),
+            "text_analyzer": ToolDescriptor(
+                "text_analyzer", "Compute bounded lexical corpus summaries without semantic inference", ["dataset", "text_columns"], ["token_counts", "artifacts"], 120, "execution", True, True
+            ),
+            "data_visualizer": ToolDescriptor(
+                "data_visualizer", "Render deterministic histogram and scatter plot artifacts", ["dataset", "columns"], ["png_artifacts"], 120, "execution", True, True
+            ),
             "code_runner": ToolDescriptor(
                 "code_runner", "Run versioned research code", ["code_artifact", "parameters"], ["logs", "results"], 120, "execution", False, True
             ),

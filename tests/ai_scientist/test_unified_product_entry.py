@@ -16,7 +16,7 @@ from src.ai_scientist.agents.base_agent import parsed_asset_context
 from src.ai_scientist.agents.reproducibility_engineer import ReproducibilityEngineerAgent
 from src.ai_scientist.job_store import ResearchJobStore
 from src.ai_scientist.orchestrator import ResearchOrchestrator
-from src.ai_scientist.schemas import ResearchPhase
+from src.ai_scientist.schemas import Conclusion, ResearchMode, ResearchPhase
 
 
 def api_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[TestClient, ResearchOrchestrator]:
@@ -339,6 +339,131 @@ def test_external_project_never_fakes_execution_and_resumes_with_uploaded_result
     assert payload["analysis_source"] == "researcher_provided_external_result"
     assert payload["generated_metrics"] == {}
     assert resumed.internal_execution_summary == {}
+
+
+def test_general_data_analysis_project_runs_allowlisted_internal_tools(tmp_path: Path) -> None:
+    orchestrator = ResearchOrchestrator(tmp_path)
+    project = orchestrator.create_project(
+        "Compare x and y overall and by species",
+        planning_only=False,
+        reproducibility_seed=17,
+    )
+    project.research_mode = ResearchMode.DATA_ANALYSIS
+    orchestrator.store.save(project)
+    project = orchestrator.register_research_asset(
+        project.project_id,
+        "observations.csv",
+        "text/csv",
+        b"species,x,y\na,1,2\na,2,4\na,3,6\na,4,8\nb,1,5\nb,2,4\nb,3,3\nb,4,2\n",
+        purpose="data",
+        source="test_dataset",
+    )
+    project.phase = ResearchPhase.EXECUTION_WAITING
+    orchestrator.store.save(project)
+
+    orchestrator.run_next_step(project.project_id)
+    assert orchestrator.get_project(project.project_id).phase == ResearchPhase.EXECUTION
+    orchestrator.run_next_step(project.project_id)
+    executed = orchestrator.get_project(project.project_id)
+
+    assert executed.phase == ResearchPhase.DATA_ANALYSIS
+    assert executed.executor_binding == "deterministic_data_analysis_v1"
+    assert executed.internal_execution_summary["status"] == "complete"
+    assert executed.internal_execution_summary["arbitrary_code_execution"] is False
+    operations = executed.internal_execution_summary["operations"]
+    assert any(item["operation"] == "correlation" for item in operations)
+    assert all(item["input_checksums"]["dataset_path"] for item in operations)
+    assert executed.internal_execution_summary["generated_claim_ids"]
+    assert any(item.source_asset_id == project.research_assets[-1].asset_id for item in executed.evidence)
+
+    orchestrator.run_next_step(project.project_id)
+    analyzed = orchestrator.get_project(project.project_id)
+    assert analyzed.phase == ResearchPhase.CRITICAL_REVIEW
+    record = next(item for item in analyzed.artifacts if item.artifact_type == "execution_analysis")
+    payload = json.loads((tmp_path / project.project_id / "artifacts" / record.filename).read_text(encoding="utf-8"))
+    assert payload["analysis_source"] == "internal_deterministic_executor"
+    assert any(item["operation"] == "correlation" for item in payload["operations"])
+
+
+def test_completed_external_project_can_reproduce_with_registered_dataset_tools(tmp_path: Path) -> None:
+    orchestrator = ResearchOrchestrator(tmp_path)
+    project = orchestrator.create_project("Analyze x and y", planning_only=False)
+    project.research_mode = ResearchMode.DATA_ANALYSIS
+    orchestrator.store.save(project)
+    project = orchestrator.register_research_asset(
+        project.project_id,
+        "data.csv",
+        "text/csv",
+        b"x,y\n1,2\n2,4\n3,6\n4,8\n",
+        purpose="data",
+    )
+    project.phase = ResearchPhase.COMPLETED
+    project.conclusion = Conclusion()
+    orchestrator.store.save(project)
+
+    reproduced = orchestrator.run_registered_dataset_tools(project.project_id)
+
+    assert reproduced.phase == ResearchPhase.CRITICAL_REVIEW
+    assert reproduced.conclusion is None
+    assert reproduced.internal_execution_summary["status"] == "complete"
+    assert any(item.artifact_type == "internal_data_analysis_run" for item in reproduced.artifacts)
+
+
+def test_registered_dataset_tools_support_relative_project_store(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    orchestrator = ResearchOrchestrator(Path("relative_projects"))
+    project = orchestrator.create_project("Analyze x and y", planning_only=False)
+    project.research_mode = ResearchMode.DATA_ANALYSIS
+    orchestrator.store.save(project)
+    project = orchestrator.register_research_asset(
+        project.project_id,
+        "data.csv",
+        "text/csv",
+        b"group,x,y\na,1,2\na,2,4\nb,3,6\nb,4,8\n",
+        purpose="data",
+    )
+    project.phase = ResearchPhase.COMPLETED
+    orchestrator.store.save(project)
+
+    reproduced = orchestrator.run_registered_dataset_tools(project.project_id)
+
+    assert reproduced.phase == ResearchPhase.CRITICAL_REVIEW
+    assert reproduced.internal_execution_summary["status"] == "complete"
+    assert reproduced.internal_execution_summary["operation_count"] >= 4
+
+
+def test_run_dataset_tools_api_executes_registered_data(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, orchestrator = api_client(tmp_path, monkeypatch)
+    project_id = create_project(
+        client,
+        objective="Compare measurements by group",
+        planning_only=False,
+    )["project_id"]
+    upload(
+        client,
+        project_id,
+        "measurements.csv",
+        b"group,x,y\na,1,2\na,2,4\nb,3,5\nb,4,7\n",
+        purpose="data",
+    )
+    project = orchestrator.get_project(project_id)
+    project.research_mode = ResearchMode.DATA_ANALYSIS
+    project.phase = ResearchPhase.COMPLETED
+    orchestrator.store.save(project)
+
+    response = client.post(f"/api/research/{project_id}/run-dataset-tools")
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["phase"] == ResearchPhase.CRITICAL_REVIEW.value
+    assert payload["execution_summary"]["status"] == "complete"
+    assert payload["execution_summary"]["arbitrary_code_execution"] is False
 
 
 def test_existing_project_workspace_does_not_nest_streamlit_expanders(

@@ -102,6 +102,7 @@ from src.ai_scientist.schemas import (
     HumanRevisionRecord,
     MethodologyOutput,
     ResearchEvent,
+    ResearchMode,
     ResearchPhase,
     ResearchQuestion,
     ResearchProject,
@@ -298,6 +299,7 @@ class ResearchOrchestrator:
                 project.validity_threats = run.output.validity_threats
                 project.required_controls = run.output.required_controls
                 project.human_actions_required = run.output.human_actions_required
+                self._refresh_internal_data_executor_binding(project)
                 produced_artifacts += self._record_agent_output(project, previous_phase, run, "research_mode_selection")
                 self.state_machine.transition(project, "next")
             elif project.phase == ResearchPhase.DOMAIN_SELECTION:
@@ -349,6 +351,7 @@ class ResearchOrchestrator:
                 project.validity_threats = run.output.validity_threats
                 project.required_controls = run.output.required_controls
                 project.human_actions_required.extend(run.output.human_actions_required)
+                self._refresh_internal_data_executor_binding(project)
                 produced_artifacts += self._record_agent_output(project, previous_phase, run, "methodology")
                 self.state_machine.transition(project, "next")
             elif project.phase == ResearchPhase.STUDY_DESIGN:
@@ -854,6 +857,7 @@ class ResearchOrchestrator:
             asset.parsed_content = parsed
             asset.parsed_artifact_id = record.artifact_id
             asset.parsing_status = "parsed"
+            self._refresh_internal_data_executor_binding(project)
             self._append_event(
                 project,
                 completed_event(
@@ -941,6 +945,7 @@ class ResearchOrchestrator:
         )
         project.approval_valid_for_versions = dict(package.artifact_versions)
         project.approval_status = "valid"
+        self._refresh_internal_data_executor_binding(project)
         approval_next_step = (
             "项目将进入内部确定性执行阶段。"
             if project.execution_capability == "INTERNAL_EXECUTABLE"
@@ -1134,9 +1139,58 @@ class ResearchOrchestrator:
         self.store.save(project)
         return project
 
+    def run_registered_dataset_tools(self, project_id: str) -> ResearchProject:
+        """Explicitly execute the safe dataset toolchain for an approved or completed project."""
+
+        project = self.get_project(project_id)
+        if project.phase not in {
+            ResearchPhase.EXECUTION_WAITING,
+            ResearchPhase.DATA_ANALYSIS,
+            ResearchPhase.COMPLETED,
+        }:
+            raise InvalidTransitionError(
+                "Registered dataset tools can run only while waiting for execution, during data analysis, or after completion."
+            )
+        if project.planning_only:
+            raise InvalidTransitionError("Planning-only projects cannot execute dataset tools.")
+        previous_phase = project.phase
+        self._refresh_internal_data_executor_binding(project)
+        if project.executor_binding != "deterministic_data_analysis_v1":
+            raise InvalidTransitionError(
+                "No parsed tabular data asset is available for the selected research mode."
+            )
+        previous_claim_ids = set(project.internal_execution_summary.get("generated_claim_ids") or [])
+        previous_evidence_id = project.internal_execution_summary.get("execution_evidence_id")
+        if previous_claim_ids:
+            project.claims = [item for item in project.claims if item.claim_id not in previous_claim_ids]
+        if previous_evidence_id:
+            project.evidence = [item for item in project.evidence if item.evidence_id != previous_evidence_id]
+        project.conclusion = None
+        project.phase = ResearchPhase.EXECUTION
+        self._run_deterministic_data_analysis(project)
+        project.phase = ResearchPhase.DATA_ANALYSIS
+        self._record_execution_analysis(project)
+        project.phase = ResearchPhase.CRITICAL_REVIEW
+        self._append_event(
+            project,
+            completed_event(
+                project.project_id,
+                previous_phase,
+                "human_researcher",
+                status="registered_dataset_tools_executed",
+                visibility="user",
+                display_key=f"registered_dataset_tools_{len(project.artifacts)}",
+                display_markdown="已使用项目内白名单工具复现数据分析；下一阶段将独立复审执行结果。",
+            ),
+        )
+        self.store.save(project)
+        return project
+
     def _run_bound_internal_executor(self, project: ResearchProject) -> list[str]:
         """Run only the explicit, allowlisted executor bound at project creation."""
 
+        if project.executor_binding == "deterministic_data_analysis_v1":
+            return self._run_deterministic_data_analysis(project)
         if project.executor_binding != "damped_oscillator_v1":
             raise InvalidTransitionError(f"Unsupported executor binding: {project.executor_binding}")
         compatible_assets = [
@@ -1216,6 +1270,187 @@ class ResearchOrchestrator:
         )
         return [record.artifact_id]
 
+    def _refresh_internal_data_executor_binding(self, project: ResearchProject) -> None:
+        """Bind the safe dataset executor only when mode, data, and user intent permit it."""
+
+        if project.executor_binding == "damped_oscillator_v1" or project.planning_only:
+            return
+        eligible_modes = {
+            ResearchMode.DATA_ANALYSIS,
+            ResearchMode.OBSERVATIONAL,
+            ResearchMode.MIXED_METHODS,
+        }
+        compatible = [
+            item
+            for item in project.research_assets
+            if item.purpose == "data"
+            and item.parsing_status == "parsed"
+            and Path(item.filename).suffix.lower() in {".csv", ".tsv", ".json", ".xlsx", ".xls"}
+        ]
+        if project.research_mode in eligible_modes and compatible:
+            project.executor_binding = "deterministic_data_analysis_v1"
+            project.execution_capability = "INTERNAL_EXECUTABLE"
+            if project.executor_binding not in project.available_tools:
+                project.available_tools.append(project.executor_binding)
+
+    @staticmethod
+    def _analysis_preferred_terms(project: ResearchProject) -> str:
+        parts = [project.objective]
+        if project.question:
+            parts.extend([
+                project.question.normalized_question,
+                " ".join(project.question.operational_definitions),
+            ])
+        if project.analysis_plan:
+            parts.extend([
+                " ".join(project.analysis_plan.input_data),
+                " ".join(project.analysis_plan.metrics),
+                " ".join(project.analysis_plan.statistical_methods),
+            ])
+        return " ".join(parts)
+
+    def _run_deterministic_data_analysis(self, project: ResearchProject) -> list[str]:
+        compatible = [
+            item
+            for item in project.research_assets
+            if item.purpose == "data"
+            and item.parsing_status == "parsed"
+            and Path(item.filename).suffix.lower() in {".csv", ".tsv", ".json", ".xlsx", ".xls"}
+        ]
+        if not compatible:
+            raise InvalidTransitionError("The deterministic data analyzer requires a parsed tabular data asset.")
+        asset = compatible[-1]
+        _, dataset_path = self.get_research_asset(project.project_id, asset.asset_id)
+        # Resolve both sides before deriving the project-relative path.  The
+        # production store commonly uses a relative root (data/research_projects),
+        # while get_research_asset deliberately returns a resolved safe path.
+        project_root = self.store.project_dir(project.project_id).resolve()
+        relative_dataset_path = dataset_path.relative_to(project_root).as_posix()
+        adapter = ExecutionAdapter(project_root)
+        seed = project.reproducibility_seed or 0
+        requests = adapter.default_dataset_requests(
+            relative_dataset_path,
+            "internal_execution/deterministic_data_analysis",
+            seed=seed,
+            preferred_terms=self._analysis_preferred_terms(project),
+        )
+        results = [adapter.execute(request) for request in requests]
+        failed = [item for item in results if item["status"] != "success"]
+        if failed:
+            failures = "; ".join(
+                f"{item['operation']}: {item.get('failure_reason') or item['status']}" for item in failed
+            )
+            raise AIScientistError(f"Deterministic dataset analysis failed: {failures}")
+        project.internal_execution_summary = {
+            "executor_binding": project.executor_binding,
+            "status": "complete",
+            "seed": seed,
+            "dataset_asset_id": asset.asset_id,
+            "dataset_filename": asset.filename,
+            "dataset_source": asset.source,
+            "dataset_content_sha256": asset.parsed_content.content_sha256 if asset.parsed_content else "",
+            "root_directory": "internal_execution/deterministic_data_analysis",
+            "operations": results,
+            "operation_count": len(results),
+            "arbitrary_code_execution": False,
+        }
+        execution_evidence = EvidenceItem(
+            title=f"Project-internal deterministic analysis of {asset.filename}",
+            source_type="dataset",
+            source_asset_id=asset.asset_id,
+            summary=(
+                f"The allowlisted project executor completed {len(results)} operations against input "
+                f"SHA-256 {project.internal_execution_summary['dataset_content_sha256']}."
+            ),
+            extracted_claims=[],
+            reliability="project-internal deterministic execution",
+            relevance="direct analysis of the approved dataset",
+            limitations=[
+                "Results apply only to the registered dataset and recorded parameters.",
+                "Descriptive associations do not establish causality.",
+            ],
+            source_level="A",
+            is_primary_source=True,
+            verified=True,
+            verification_status="verified",
+            verification_method="none",
+            verification_note="Verified by input checksum, fixed operation whitelist, saved parameters, and output checksums.",
+            reliability_score=1.0,
+            relevance_score=1.0,
+        )
+        project.evidence.append(execution_evidence)
+        generated_claims: list[Claim] = []
+        for result in results:
+            if result["operation"] == "inspect_dataset":
+                metrics = result.get("metrics") or {}
+                generated_claims.append(Claim(
+                    statement=(
+                        f"项目内工具读取了 {metrics.get('rows')} 行、{metrics.get('columns')} 列数据。"
+                        if any("\u4e00" <= char <= "\u9fff" for char in project.objective)
+                        else f"The project tool read {metrics.get('rows')} rows and {metrics.get('columns')} columns."
+                    ),
+                    claim_type="observation",
+                    supporting_evidence_ids=[execution_evidence.evidence_id],
+                    confidence=1.0,
+                    limitations=["Limited to the recorded input checksum."],
+                    status="supported",
+                ))
+            if result["operation"] == "correlation":
+                for pair in (result.get("metrics") or {}).get("pairs", [])[:20]:
+                    interval = pair.get("ci95_fisher_z")
+                    interval_text = (
+                        f", 95% CI [{interval[0]:.4f}, {interval[1]:.4f}]" if interval else ""
+                    )
+                    generated_claims.append(Claim(
+                        statement=(
+                            f"项目内确定性分析：{pair['group']} 组的 {pair['x']} 与 {pair['y']} "
+                            f"{pair['method']} 相关系数为 {pair['coefficient']:.4f}（n={pair['n']}）{interval_text}。"
+                            if any("\u4e00" <= char <= "\u9fff" for char in project.objective)
+                            else (
+                                f"Project-internal deterministic analysis: {pair['group']} {pair['x']} versus "
+                                f"{pair['y']} {pair['method']} correlation was {pair['coefficient']:.4f} "
+                                f"(n={pair['n']}){interval_text}."
+                            )
+                        ),
+                        claim_type="observation",
+                        supporting_evidence_ids=[execution_evidence.evidence_id],
+                        confidence=0.99,
+                        assumptions=["Recorded columns were interpreted as numeric measurements."],
+                        limitations=["Association is not causation."],
+                        status="supported",
+                    ))
+        execution_evidence.extracted_claims = [item.statement for item in generated_claims]
+        project.claims.extend(generated_claims)
+        project.internal_execution_summary["execution_evidence_id"] = execution_evidence.evidence_id
+        project.internal_execution_summary["generated_claim_ids"] = [item.claim_id for item in generated_claims]
+        self._refresh_quality_metrics(project)
+        record = self.artifacts.save_json(
+            project.project_id,
+            "internal_data_analysis_run",
+            project.internal_execution_summary,
+            project.executor_binding,
+        )
+        project.artifacts.append(record)
+        if project.executor_binding not in asset.used_by_agents:
+            asset.used_by_agents.append(project.executor_binding)
+        self._append_event(
+            project,
+            completed_event(
+                project.project_id,
+                ResearchPhase.EXECUTION,
+                project.executor_binding,
+                status="internal_data_analysis_completed",
+                visibility="user",
+                display_key=f"internal_data_analysis_{record.artifact_id}",
+                output_artifact_ids=[record.artifact_id],
+                display_markdown=(
+                    f"项目内白名单工具已对 {asset.filename} 完成 {len(results)} 项确定性分析；"
+                    "输入哈希、参数、软件版本和输出校验和均已保存。"
+                ),
+            ),
+        )
+        return [record.artifact_id]
+
     def _record_execution_analysis(self, project: ResearchProject) -> list[str]:
         """Persist analysis provenance without inventing results for external projects."""
 
@@ -1226,6 +1461,9 @@ class ResearchOrchestrator:
                 "comparison": project.internal_execution_summary.get("comparison", {}),
                 "feedback_signals": project.internal_execution_summary.get("feedback_signals", []),
                 "plan_adjustments": project.internal_execution_summary.get("plan_adjustments", []),
+                "dataset_asset_id": project.internal_execution_summary.get("dataset_asset_id"),
+                "dataset_content_sha256": project.internal_execution_summary.get("dataset_content_sha256"),
+                "operations": project.internal_execution_summary.get("operations", []),
             }
             status = "internal_execution_analyzed"
             markdown = "已从真实内部执行结果形成可审计分析，并将进入独立复审。"
@@ -1752,6 +1990,42 @@ class ResearchOrchestrator:
         self.store.save(project)
         return project
 
+    def resume_evidence_research(self, project_id: str) -> ResearchProject:
+        """Recover an evidence revision that cannot be completed by the revision agent."""
+        project = self.get_project(project_id)
+        if project.phase != ResearchPhase.HUMAN_REVISION_REVIEW:
+            raise InvalidTransitionError(
+                "Evidence research can only be resumed from HUMAN_REVISION_REVIEW."
+            )
+        active_plan = next(
+            (
+                item
+                for item in project.approved_revision_plans
+                if item.revision_plan_id == project.active_revision_plan_id
+            ),
+            None,
+        )
+        recoverable = bool(
+            active_plan
+            and any(
+                batch.target == "evidence" and batch.status == "needs_attention"
+                for batch in active_plan.target_batches
+            )
+        )
+        if not recoverable:
+            raise InvalidTransitionError("No failed evidence revision is available to resume.")
+
+        project.current_revision_action = None
+        project.active_revision_plan_id = None
+        message = (
+            "证据不能由自动修订器生成。请重新执行有界检索与来源人工筛选；"
+            "已上传并解析的项目资料会作为带来源标识的上下文保留。"
+        )
+        project.revision_recovery_messages.append(message)
+        self._targeted_rollback(project, "evidence", message, ["evidence"])
+        self.store.save(project)
+        return project
+
     @staticmethod
     def _normalize_revision_target(target: str) -> str:
         return {
@@ -1897,11 +2171,17 @@ class ResearchOrchestrator:
                 batch.status = "needs_attention"
                 batch.job_id = None
                 plan.status = "needs_attention"
-                project.current_revision_action = project.current_revision_action.model_copy(update={"status": "needs_attention"})
-                project.phase = ResearchPhase.HUMAN_REVISION_REVIEW
-                project.stage_messages.append("证据修订需要重新经过检索方案与来源人工筛选，已返回人工修订审查。")
+                project.current_revision_action = None
+                project.active_revision_plan_id = None
+                reason = (
+                    "证据不能由自动修订器生成。请重新执行有界检索与来源人工筛选；"
+                    "已上传并解析的项目资料会作为带来源标识的上下文保留。"
+                )
+                project.revision_recovery_messages.append(reason)
+                project.stage_messages.append(reason)
+                self._targeted_rollback(project, "evidence", reason, ["evidence"])
                 self.store.save(project)
-                return produced, "revision_needs_attention"
+                return produced, "revision_evidence_research_required"
             else:
                 old_artifact = self._current_revision_artifact(project, batch.target)
                 working_artifact = old_artifact

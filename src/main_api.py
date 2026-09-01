@@ -553,6 +553,19 @@ def research_revision_review_defer(project_id: str, request: RevisionReviewDefer
         raise _research_http_error(exc) from exc
 
 
+@app.post("/api/research/{project_id}/revision-review/resume-evidence-research")
+def research_revision_review_resume_evidence_research(project_id: str) -> dict:
+    try:
+        project = research_orchestrator.resume_evidence_research(project_id)
+        return {
+            "project_id": project.project_id,
+            "phase": project.phase.value,
+            "status": "evidence_research_resumed",
+        }
+    except Exception as exc:  # noqa: BLE001
+        raise _research_http_error(exc) from exc
+
+
 @app.post("/api/research/{project_id}/revision-review/cancel")
 def research_revision_review_cancel(project_id: str) -> dict:
     try:
@@ -572,6 +585,20 @@ def research_provide_data(project_id: str, request: ProvideDataRequest) -> dict:
             request.data_type,
         )
         return {"project_id": project.project_id, "phase": project.phase.value, "status": "data_registered"}
+    except Exception as exc:  # noqa: BLE001
+        raise _research_http_error(exc) from exc
+
+
+@app.post("/api/research/{project_id}/run-dataset-tools")
+def research_run_dataset_tools(project_id: str) -> dict:
+    try:
+        project = research_orchestrator.run_registered_dataset_tools(project_id)
+        return {
+            "project_id": project.project_id,
+            "phase": project.phase.value,
+            "status": "dataset_tools_completed",
+            "execution_summary": project.internal_execution_summary,
+        }
     except Exception as exc:  # noqa: BLE001
         raise _research_http_error(exc) from exc
 

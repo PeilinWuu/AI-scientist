@@ -9,8 +9,10 @@ import hashlib
 import json
 import math
 import platform
+import re
 import sys
 import time
+from collections import Counter
 from pathlib import Path
 from typing import Any, Callable
 
@@ -33,7 +35,9 @@ class ExecutionAdapter:
 
     OPERATIONS = {
         "inspect_dataset", "describe_dataset", "missingness", "correlation",
-        "linear_regression", "plot_histogram", "plot_scatter", "run_simulation",
+        "linear_regression", "grouped_summary", "frequency_table", "contingency_table",
+        "time_series_summary", "text_summary", "permutation_group_comparison",
+        "plot_histogram", "plot_scatter", "run_simulation",
     }
 
     def __init__(self, project_root: str | Path | None = None) -> None:
@@ -46,6 +50,102 @@ class ExecutionAdapter:
             "operations": sorted(self.OPERATIONS),
             "arbitrary_code_execution": False,
         }
+
+    def default_dataset_requests(
+        self,
+        dataset_path: str,
+        output_directory: str,
+        *,
+        seed: int = 0,
+        preferred_terms: str = "",
+    ) -> list[dict[str, Any]]:
+        """Build a bounded, deterministic analysis bundle from dataset structure."""
+
+        path = self._safe_path(dataset_path, must_exist=True)
+        frame = self._load_dataset(path)
+        if frame.empty:
+            raise ValueError("dataset contains no rows")
+        if len(frame) > 1_000_000 or len(frame.columns) > 500:
+            raise ValueError("dataset exceeds the automatic analysis boundary")
+
+        terms = set(re.findall(r"[a-z0-9\u4e00-\u9fff]+", preferred_terms.lower()))
+
+        def relevance(column: str) -> tuple[int, int]:
+            tokens = set(re.findall(r"[a-z0-9\u4e00-\u9fff]+", str(column).lower().replace("_", " ")))
+            return (len(tokens & terms), -list(map(str, frame.columns)).index(str(column)))
+
+        numeric = sorted(map(str, frame.select_dtypes(include="number").columns), key=relevance, reverse=True)[:8]
+        categorical = [
+            str(column)
+            for column in frame.columns
+            if not pd.api.types.is_numeric_dtype(frame[column])
+            and 2 <= frame[column].nunique(dropna=True) <= 50
+        ][:5]
+        datetime_columns: list[str] = []
+        text_columns: list[str] = []
+        for column in frame.select_dtypes(exclude="number").columns:
+            values = frame[column].dropna().astype(str)
+            if values.empty:
+                continue
+            name = str(column)
+            time_hint = bool(re.search(r"date|time|year|month|day|日期|时间", name, re.I))
+            # Require numeric date-like components; hyphenated category labels
+            # such as "Iris-setosa" must not be sent through the date parser.
+            formatted_ratio = float(values.str.contains(r"\d{1,4}[-/:]\d{1,2}").mean())
+            parsed_ratio = (
+                float(pd.to_datetime(values.head(500), errors="coerce", utc=True).notna().mean())
+                if time_hint or formatted_ratio >= 0.8
+                else 0.0
+            )
+            if parsed_ratio >= 0.8 and (time_hint or formatted_ratio >= 0.8):
+                datetime_columns.append(name)
+            elif frame[column].nunique(dropna=True) > 50 and float(values.str.len().mean()) >= 20:
+                text_columns.append(name)
+
+        def request(operation: str, parameters: dict[str, Any] | None = None) -> dict[str, Any]:
+            return {
+                "operation": operation,
+                "inputs": {"dataset_path": dataset_path},
+                "parameters": parameters or {},
+                "seed": seed,
+                # Artifact filenames already identify the operation. Keeping a
+                # shared run directory avoids exceeding Windows path limits in
+                # deeply nested project/test workspaces.
+                "output_directory": output_directory,
+                "provenance": {"selection": "deterministic_structure_and_question_match"},
+            }
+
+        requests = [request("inspect_dataset"), request("describe_dataset"), request("missingness")]
+        if numeric:
+            requests.append(request("plot_histogram", {"column": numeric[0], "bins": 20}))
+        if len(numeric) >= 2:
+            correlation_parameters: dict[str, Any] = {"columns": numeric, "method": "pearson"}
+            if categorical:
+                correlation_parameters["group_by"] = categorical[0]
+            requests.extend([
+                request("correlation", correlation_parameters),
+                request("plot_scatter", {"x": numeric[0], "y": numeric[1]}),
+                request("linear_regression", {"target": numeric[1], "features": [numeric[0]]}),
+            ])
+        if categorical:
+            requests.append(request("frequency_table", {"columns": categorical}))
+        if categorical and numeric:
+            requests.extend([
+                request("grouped_summary", {"group_by": categorical[0], "columns": numeric}),
+            ])
+        if len(categorical) >= 2:
+            requests.append(request("contingency_table", {"row": categorical[0], "column": categorical[1]}))
+        if categorical and len(numeric) >= 1 and frame[categorical[0]].nunique(dropna=True) == 2:
+            requests.append(request("permutation_group_comparison", {
+                "value": numeric[0], "group": categorical[0], "iterations": 2000,
+            }))
+        if datetime_columns and numeric:
+            requests.append(request("time_series_summary", {
+                "time_column": datetime_columns[0], "value_columns": numeric,
+            }))
+        if text_columns:
+            requests.append(request("text_summary", {"columns": text_columns}))
+        return requests
 
     def execute(self, task: ExecutionRequest | dict[str, Any]) -> dict[str, Any]:
         started = now_utc()
@@ -109,6 +209,12 @@ class ExecutionAdapter:
             "missingness": self._missingness,
             "correlation": self._correlation,
             "linear_regression": self._linear_regression,
+            "grouped_summary": self._grouped_summary,
+            "frequency_table": self._frequency_table,
+            "contingency_table": self._contingency_table,
+            "time_series_summary": self._time_series_summary,
+            "text_summary": self._text_summary,
+            "permutation_group_comparison": self._permutation_group_comparison,
             "plot_histogram": self._plot_histogram,
             "plot_scatter": self._plot_scatter,
             "run_simulation": self._run_simulation,
@@ -178,6 +284,9 @@ class ExecutionAdapter:
 
     @staticmethod
     def _write_json(path: Path, payload: Any) -> Path:
+        # Keep individual handlers independently robust when execution uses a
+        # relative project store or a caller invokes a handler-specific path.
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
         return path
 
@@ -211,13 +320,62 @@ class ExecutionAdapter:
         return {"total_missing": int(counts.sum())}, [path], ["Computed missing values without imputation."]
 
     def _correlation(self, request, paths, output_dir):
-        frame = self._load_dataset(paths["dataset_path"] ).select_dtypes(include="number")
-        if frame.shape[1] < 2:
+        source = self._load_dataset(paths["dataset_path"])
+        requested_columns = request.parameters.get("columns")
+        numeric = source.select_dtypes(include="number")
+        if isinstance(requested_columns, list) and requested_columns:
+            missing = [str(item) for item in requested_columns if str(item) not in numeric.columns]
+            if missing:
+                raise ValueError(f"correlation columns are missing or non-numeric: {missing}")
+            numeric = numeric[[str(item) for item in requested_columns]]
+        if numeric.shape[1] < 2:
             raise ValueError("correlation requires at least two numeric columns")
-        matrix = frame.corr()
+        method = str(request.parameters.get("method", "pearson")).lower()
+        if method not in {"pearson", "spearman"}:
+            raise ValueError("correlation method must be pearson or spearman")
+        matrix = numeric.corr(method=method)
         path = output_dir / "correlation.csv"
         matrix.to_csv(path)
-        return {"columns": list(matrix.columns)}, [path], ["Computed Pearson correlation matrix."]
+        pairs: list[dict[str, Any]] = []
+        group_by = str(request.parameters.get("group_by") or "")
+        group_values: list[tuple[str, pd.DataFrame]] = [("overall", source)]
+        if group_by:
+            if group_by not in source.columns:
+                raise ValueError("correlation group_by column does not exist")
+            if source[group_by].nunique(dropna=True) > 50:
+                raise ValueError("correlation group_by exceeds 50 groups")
+            group_values.extend((str(name), group) for name, group in source.groupby(group_by, dropna=False))
+        columns = list(numeric.columns)
+        for group_name, group in group_values:
+            for left_index, left in enumerate(columns):
+                for right in columns[left_index + 1 :]:
+                    clean = group[[left, right]].apply(pd.to_numeric, errors="coerce").dropna()
+                    if len(clean) < 4:
+                        continue
+                    r = float(clean[left].corr(clean[right], method=method))
+                    row: dict[str, Any] = {
+                        "group": group_name,
+                        "x": left,
+                        "y": right,
+                        "method": method,
+                        "n": int(len(clean)),
+                        "coefficient": r,
+                    }
+                    if method == "pearson" and abs(r) < 1:
+                        z = math.atanh(r)
+                        margin = 1.959963984540054 / math.sqrt(len(clean) - 3)
+                        row["ci95_fisher_z"] = [math.tanh(z - margin), math.tanh(z + margin)]
+                        slope, intercept = np.polyfit(clean[left].to_numpy(), clean[right].to_numpy(), 1)
+                        row.update({"slope": float(slope), "intercept": float(intercept), "r_squared": r * r})
+                    pairs.append(row)
+        details_path = self._write_json(output_dir / "correlation_details.json", pairs)
+        return {
+            "columns": columns,
+            "method": method,
+            "group_by": group_by or None,
+            "pair_count": len(pairs),
+            "pairs": pairs,
+        }, [path, details_path], [f"Computed deterministic {method.title()} correlations."]
 
     def _linear_regression(self, request, paths, output_dir):
         frame = self._load_dataset(paths["dataset_path"])
@@ -242,6 +400,151 @@ class ExecutionAdapter:
         }
         path = self._write_json(output_dir / "linear_regression.json", result)
         return result, [path], [f"Fit deterministic least-squares regression on {len(clean)} rows."]
+
+    def _grouped_summary(self, request, paths, output_dir):
+        frame = self._load_dataset(paths["dataset_path"])
+        group_by = str(request.parameters.get("group_by") or "")
+        if group_by not in frame.columns:
+            raise ValueError("grouped_summary group_by column does not exist")
+        if frame[group_by].nunique(dropna=True) > 100:
+            raise ValueError("grouped_summary exceeds 100 groups")
+        columns = request.parameters.get("columns")
+        numeric = list(frame.select_dtypes(include="number").columns)
+        if isinstance(columns, list) and columns:
+            numeric = [str(item) for item in columns]
+            if any(item not in frame.columns for item in numeric):
+                raise ValueError("one or more grouped_summary columns do not exist")
+        if not numeric:
+            raise ValueError("grouped_summary requires numeric columns")
+        result: list[dict[str, Any]] = []
+        for name, group in frame.groupby(group_by, dropna=False):
+            for column in numeric:
+                values = pd.to_numeric(group[column], errors="coerce").dropna()
+                if values.empty:
+                    continue
+                result.append({
+                    "group": str(name), "column": column, "n": int(len(values)),
+                    "mean": float(values.mean()), "std": float(values.std(ddof=1)) if len(values) > 1 else None,
+                    "min": float(values.min()), "median": float(values.median()), "max": float(values.max()),
+                })
+        path = self._write_json(output_dir / "grouped_summary.json", result)
+        return {"group_by": group_by, "groups": int(frame[group_by].nunique(dropna=False)), "summaries": result}, [path], ["Computed grouped descriptive statistics."]
+
+    def _frequency_table(self, request, paths, output_dir):
+        frame = self._load_dataset(paths["dataset_path"])
+        columns = request.parameters.get("columns")
+        if not isinstance(columns, list) or not columns:
+            columns = list(frame.select_dtypes(exclude="number").columns)[:10]
+        if any(str(item) not in frame.columns for item in columns):
+            raise ValueError("one or more frequency columns do not exist")
+        result: dict[str, list[dict[str, Any]]] = {}
+        for column in map(str, columns):
+            counts = frame[column].fillna("<MISSING>").astype(str).value_counts().head(100)
+            result[column] = [
+                {"value": value, "count": int(count), "fraction": float(count / max(len(frame), 1))}
+                for value, count in counts.items()
+            ]
+        path = self._write_json(output_dir / "frequency_tables.json", result)
+        return {"columns": list(result), "tables": result}, [path], ["Computed bounded categorical frequency tables."]
+
+    def _contingency_table(self, request, paths, output_dir):
+        frame = self._load_dataset(paths["dataset_path"])
+        row = str(request.parameters.get("row") or "")
+        column = str(request.parameters.get("column") or "")
+        if row not in frame.columns or column not in frame.columns or row == column:
+            raise ValueError("contingency row and column must name two distinct columns")
+        if frame[row].nunique(dropna=False) > 100 or frame[column].nunique(dropna=False) > 100:
+            raise ValueError("contingency dimensions exceed 100 categories")
+        table = pd.crosstab(frame[row].fillna("<MISSING>"), frame[column].fillna("<MISSING>"), dropna=False)
+        csv_path = output_dir / "contingency_table.csv"
+        table.to_csv(csv_path)
+        payload = {
+            "row": row, "column": column,
+            "row_labels": list(map(str, table.index)), "column_labels": list(map(str, table.columns)),
+            "counts": table.to_numpy(dtype=int).tolist(), "n": int(table.to_numpy().sum()),
+        }
+        json_path = self._write_json(output_dir / "contingency_table.json", payload)
+        return payload, [json_path, csv_path], ["Computed categorical contingency counts without inferential claims."]
+
+    def _time_series_summary(self, request, paths, output_dir):
+        frame = self._load_dataset(paths["dataset_path"])
+        time_column = str(request.parameters.get("time_column") or "")
+        value_columns = request.parameters.get("value_columns")
+        if time_column not in frame.columns:
+            raise ValueError("time_series_summary time_column does not exist")
+        if not isinstance(value_columns, list) or not value_columns:
+            value_columns = list(frame.select_dtypes(include="number").columns)[:10]
+        parsed_time = pd.to_datetime(frame[time_column], errors="coerce", utc=True)
+        if parsed_time.notna().sum() < 3:
+            raise ValueError("time column has fewer than three parseable values")
+        result: list[dict[str, Any]] = []
+        for column in map(str, value_columns):
+            if column not in frame.columns:
+                raise ValueError("time-series value column does not exist")
+            clean = pd.DataFrame({"time": parsed_time, "value": pd.to_numeric(frame[column], errors="coerce")}).dropna().sort_values("time")
+            if len(clean) < 3:
+                continue
+            elapsed_days = (clean["time"] - clean["time"].iloc[0]).dt.total_seconds().to_numpy() / 86400
+            slope = float(np.polyfit(elapsed_days, clean["value"].to_numpy(), 1)[0]) if np.ptp(elapsed_days) else 0.0
+            result.append({
+                "column": column, "n": int(len(clean)), "start": clean["time"].iloc[0].isoformat(),
+                "end": clean["time"].iloc[-1].isoformat(), "mean": float(clean["value"].mean()),
+                "trend_per_day": slope, "lag1_autocorrelation": float(clean["value"].autocorr(lag=1)),
+            })
+        path = self._write_json(output_dir / "time_series_summary.json", result)
+        return {"time_column": time_column, "series": result}, [path], ["Computed deterministic time-series summaries."]
+
+    def _text_summary(self, request, paths, output_dir):
+        frame = self._load_dataset(paths["dataset_path"])
+        columns = request.parameters.get("columns")
+        if not isinstance(columns, list) or not columns:
+            columns = list(frame.select_dtypes(include=["object", "string"]).columns)[:5]
+        stopwords = {"the", "and", "for", "with", "that", "this", "from", "are", "was", "were", "的", "了", "和", "是", "在"}
+        result: dict[str, Any] = {}
+        for column in map(str, columns):
+            if column not in frame.columns:
+                raise ValueError("text_summary column does not exist")
+            values = frame[column].dropna().astype(str)
+            tokens = [token.lower() for value in values for token in re.findall(r"[\w\u4e00-\u9fff]+", value) if token.lower() not in stopwords]
+            result[column] = {
+                "documents": int(len(values)), "characters": int(sum(map(len, values))),
+                "tokens": len(tokens), "unique_tokens": len(set(tokens)),
+                "top_tokens": [{"token": token, "count": count} for token, count in Counter(tokens).most_common(50)],
+            }
+        path = self._write_json(output_dir / "text_summary.json", result)
+        return {"columns": list(result), "summaries": result}, [path], ["Computed bounded lexical summaries; no semantic interpretation was inferred."]
+
+    def _permutation_group_comparison(self, request, paths, output_dir):
+        frame = self._load_dataset(paths["dataset_path"])
+        value = str(request.parameters.get("value") or "")
+        group = str(request.parameters.get("group") or "")
+        iterations = self._bounded_int(request.parameters, "iterations", 100, 20_000)
+        if value not in frame.columns or group not in frame.columns:
+            raise ValueError("comparison value and group columns must exist")
+        clean = pd.DataFrame({"value": pd.to_numeric(frame[value], errors="coerce"), "group": frame[group]}).dropna()
+        labels = list(clean["group"].unique())
+        if len(labels) != 2:
+            raise ValueError("permutation comparison requires exactly two groups")
+        first = clean.loc[clean["group"] == labels[0], "value"].to_numpy()
+        second = clean.loc[clean["group"] == labels[1], "value"].to_numpy()
+        observed = float(first.mean() - second.mean())
+        pooled = clean["value"].to_numpy().copy()
+        rng = np.random.default_rng(request.seed)
+        exceedances = 0
+        for _ in range(iterations):
+            rng.shuffle(pooled)
+            difference = float(pooled[: len(first)].mean() - pooled[len(first) :].mean())
+            exceedances += abs(difference) >= abs(observed)
+        pooled_sd = float(clean["value"].std(ddof=1))
+        payload = {
+            "value": value, "group": group, "groups": list(map(str, labels)),
+            "n": [int(len(first)), int(len(second))], "means": [float(first.mean()), float(second.mean())],
+            "observed_mean_difference": observed,
+            "standardized_mean_difference": observed / pooled_sd if pooled_sd else 0.0,
+            "iterations": iterations, "two_sided_permutation_p": float((exceedances + 1) / (iterations + 1)),
+        }
+        path = self._write_json(output_dir / "permutation_group_comparison.json", payload)
+        return payload, [path], [f"Ran a seeded two-sided permutation test with {iterations} iterations."]
 
     def _plot_histogram(self, request, paths, output_dir):
         frame = self._load_dataset(paths["dataset_path"])

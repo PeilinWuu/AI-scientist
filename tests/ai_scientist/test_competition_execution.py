@@ -53,6 +53,66 @@ def test_executor_runs_regression_and_two_plot_types(tmp_path: Path) -> None:
     assert scatter["artifacts"][0]["media_type"] == "image/png"
 
 
+def test_default_tool_bundle_executes_cross_domain_tabular_operations(tmp_path: Path) -> None:
+    rows = 60
+    pd.DataFrame(
+        {
+            "date": pd.date_range("2026-01-01", periods=rows, freq="D").astype(str),
+            "group": ["control", "treatment"] * (rows // 2),
+            "outcome_class": ["low", "high", "high"] * (rows // 3),
+            "measurement": list(range(rows)),
+            "secondary_measurement": [value * 1.5 + 2 for value in range(rows)],
+            "response_text": [f"Participant response number {index} contains a distinct bounded note." for index in range(rows)],
+        }
+    ).to_csv(tmp_path / "mixed.csv", index=False)
+    adapter = ExecutionAdapter(tmp_path)
+
+    requests = adapter.default_dataset_requests(
+        "mixed.csv",
+        "results/bundle",
+        seed=42,
+        preferred_terms="measurement group time response",
+    )
+    results = [adapter.execute(request) for request in requests]
+    operations = {item["operation"] for item in results}
+
+    assert all(item["status"] == "success" for item in results)
+    assert {
+        "grouped_summary",
+        "frequency_table",
+        "contingency_table",
+        "time_series_summary",
+        "text_summary",
+        "permutation_group_comparison",
+    } <= operations
+    permutation = next(item for item in results if item["operation"] == "permutation_group_comparison")
+    assert 0 <= permutation["metrics"]["two_sided_permutation_p"] <= 1
+    assert permutation["seed"] == 42
+
+
+def test_grouped_correlation_reports_confidence_intervals_and_slopes(tmp_path: Path) -> None:
+    pd.DataFrame(
+        {
+            "species": ["a"] * 5 + ["b"] * 5,
+            "x": list(range(1, 6)) + list(range(1, 6)),
+            "y": [2, 4, 6, 8, 10] + [5, 4, 3, 2, 1],
+        }
+    ).to_csv(tmp_path / "grouped.csv", index=False)
+    result = ExecutionAdapter(tmp_path).execute(
+        {
+            "operation": "correlation",
+            "inputs": {"dataset_path": "grouped.csv"},
+            "parameters": {"columns": ["x", "y"], "group_by": "species", "method": "pearson"},
+            "output_directory": "results/correlation",
+        }
+    )
+
+    assert result["status"] == "success"
+    assert {item["group"] for item in result["metrics"]["pairs"]} == {"overall", "a", "b"}
+    assert all("slope" in item for item in result["metrics"]["pairs"])
+    assert all("ci95_fisher_z" in item for item in result["metrics"]["pairs"] if abs(item["coefficient"]) < 1)
+
+
 def test_executor_rejects_unknown_operation_missing_file_and_path_escape(tmp_path: Path) -> None:
     adapter = ExecutionAdapter(tmp_path)
     unknown = adapter.execute({"operation": "python_exec", "parameters": {"code": "2 + 2"}})

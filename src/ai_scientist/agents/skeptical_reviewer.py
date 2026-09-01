@@ -24,6 +24,7 @@ class SkepticalReviewerAgent(BaseResearchAgent[ReviewResult]):
                 "planning_only",
                 "execution_requirements",
                 "accepted_limitations",
+                "internal_execution_summary",
                 "approved_revision_plans",
                 "revision_verifications",
             ],

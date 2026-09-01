@@ -19,7 +19,9 @@ def now_utc() -> datetime:
 
 ExecutionOperation = Literal[
     "inspect_dataset", "describe_dataset", "missingness", "correlation",
-    "linear_regression", "plot_histogram", "plot_scatter", "run_simulation",
+    "linear_regression", "grouped_summary", "frequency_table", "contingency_table",
+    "time_series_summary", "text_summary", "permutation_group_comparison",
+    "plot_histogram", "plot_scatter", "run_simulation",
 ]
 
 

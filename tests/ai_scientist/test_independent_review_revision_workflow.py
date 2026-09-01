@@ -539,6 +539,74 @@ def test_model_output_does_not_complete_action_when_verification_fails(tmp_path:
     assert project.approved_revision_plans[-1].status == "needs_attention"
 
 
+def test_evidence_revision_returns_to_auditable_research_instead_of_dead_end(tmp_path: Path) -> None:
+    orchestrator = ResearchOrchestrator(tmp_path)
+    project = orchestrator.create_project("Verify a public dataset")
+    project.phase = ResearchPhase.HUMAN_REVISION_REVIEW
+    project.revision_issues = [
+        RevisionIssue(
+            classification="plan_blocking",
+            target="evidence",
+            problem="The dataset source and parsed fields must be verified.",
+            completion_criteria=["A primary dataset source and field mapping are recorded."],
+        )
+    ]
+    orchestrator.store.save(project)
+    orchestrator.submit_revision_review(
+        project.project_id,
+        [RevisionIssueDecision(issue_id=project.revision_issues[0].issue_id, disposition="provide_content", instruction="Use the uploaded public dataset.")],
+    )
+
+    result = orchestrator.run_next_step(project.project_id, job_id="job_evidence")
+    recovered = orchestrator.get_project(project.project_id)
+
+    assert result["current_phase"] == ResearchPhase.BACKGROUND_RESEARCH.value
+    assert recovered.phase == ResearchPhase.BACKGROUND_RESEARCH
+    assert recovered.active_revision_plan_id is None
+    assert recovered.current_revision_action is None
+    assert "证据不能由自动修订器生成" in recovered.revision_recovery_messages[-1]
+
+
+def test_failed_evidence_revision_can_be_resumed_without_spending_another_iteration(
+    tmp_path: Path,
+) -> None:
+    orchestrator = ResearchOrchestrator(tmp_path)
+    project = orchestrator.create_project("Verify a public dataset")
+    project.phase = ResearchPhase.HUMAN_REVISION_REVIEW
+    project.revision_issues = [
+        RevisionIssue(
+            classification="plan_blocking",
+            target="evidence",
+            problem="The dataset source must be verified.",
+            completion_criteria=["A primary dataset is recorded."],
+        )
+    ]
+    orchestrator.store.save(project)
+    submitted = orchestrator.submit_revision_review(
+        project.project_id,
+        [
+            RevisionIssueDecision(
+                issue_id=project.revision_issues[0].issue_id,
+                disposition="provide_content",
+                instruction="Use the uploaded dataset.",
+            )
+        ],
+    )
+    active_plan = submitted.approved_revision_plans[-1]
+    active_plan.status = "needs_attention"
+    active_plan.target_batches[0].status = "needs_attention"
+    submitted.phase = ResearchPhase.HUMAN_REVISION_REVIEW
+    submitted.iteration = submitted.max_iterations
+    orchestrator.store.save(submitted)
+
+    recovered = orchestrator.resume_evidence_research(project.project_id)
+
+    assert recovered.phase == ResearchPhase.BACKGROUND_RESEARCH
+    assert recovered.active_revision_plan_id is None
+    assert recovered.iteration == recovered.max_iterations
+    assert "证据不能由自动修订器生成" in recovered.revision_recovery_messages[-1]
+
+
 def test_failed_verification_triggers_targeted_auto_repair_before_human_review(tmp_path: Path) -> None:
     orchestrator, project_id = _revision_ready_project(tmp_path)
     model_calls: list[RevisionVerificationResult | None] = []

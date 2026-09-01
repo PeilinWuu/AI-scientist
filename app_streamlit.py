@@ -842,7 +842,7 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
     )
     phase_label = PHASE_LABELS.get(phase, phase)
     if phase == "EXECUTION_WAITING" and execution_capability == "INTERNAL_EXECUTABLE":
-        phase_label = "可以开始数值实验"
+        phase_label = "可以开始项目内执行"
     elif phase == "EXECUTION_WAITING" and execution_capability == "EXTERNAL_EXECUTION_REQUIRED":
         phase_label = "等待外部实验结果"
     elif phase == "HUMAN_INTERVENTION_REQUIRED":
@@ -861,7 +861,11 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
         f"可复现随机种子：{seed_label if seed_label is not None else '自动'}"
     )
     capability_view = execution_capability_view(execution_capability)
-    st.info(f"执行方式：{capability_view['label']}。{capability_view['description']}")
+    completed_execution = (project.get("internal_execution_summary") or {}).get("status") == "complete"
+    if execution_capability == "INTERNAL_EXECUTABLE" and completed_execution:
+        st.success("执行方式：项目内确定性执行已完成；真实结果及审计信息已进入复审与最终综合。")
+    else:
+        st.info(f"执行方式：{capability_view['label']}。{capability_view['description']}")
     if phase == "EXECUTION_WAITING" and execution_capability == "INTERNAL_EXECUTABLE":
         st.success(capability_view["action"])
     elif phase == "EXECUTION_WAITING" and execution_capability == "EXTERNAL_EXECUTION_REQUIRED":
@@ -886,19 +890,63 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
     execution_summary = project.get("internal_execution_summary") or {}
     if execution_summary:
         st.subheader("确定性执行闭环")
-        comparison = execution_summary.get("comparison") or {}
-        iteration_comparison = comparison.get("iteration") or {}
-        result_columns = st.columns(4)
-        result_columns[0].metric("第一轮 RMSE", f"{iteration_comparison.get('round_1_rmse', 0):.6f}")
-        result_columns[1].metric("第二轮 RMSE", f"{iteration_comparison.get('round_2_rmse', 0):.6f}")
-        result_columns[2].metric(
-            "迭代改善", f"{iteration_comparison.get('relative_rmse_gain_percent', 0):.2f}%"
-        )
-        result_columns[3].metric("执行状态", status_label(execution_summary.get("status", "unknown")))
-        st.caption(
-            "第二轮计划由第一轮真实执行结果、质量反馈和计划调整生成；"
-            "所有数值来自白名单确定性执行器。"
-        )
+        if execution_summary.get("executor_binding") == "deterministic_data_analysis_v1":
+            result_columns = st.columns(4)
+            result_columns[0].metric("执行状态", status_label(execution_summary.get("status", "unknown")))
+            result_columns[1].metric("数据文件", execution_summary.get("dataset_filename") or "未知")
+            result_columns[2].metric("白名单操作", execution_summary.get("operation_count", 0))
+            result_columns[3].metric("任意代码执行", "禁止")
+            st.caption(
+                f"输入 SHA-256：{execution_summary.get('dataset_content_sha256') or '未记录'}。"
+                "每项操作均保存参数、软件版本、运行时长和输出校验和。"
+            )
+            operation_rows = [
+                {
+                    "操作": item.get("operation"),
+                    "状态": status_label(item.get("status")),
+                    "耗时（毫秒）": item.get("duration_ms"),
+                    "产物数": len(item.get("artifacts") or []),
+                }
+                for item in execution_summary.get("operations") or []
+            ]
+            if operation_rows:
+                st.dataframe(operation_rows, use_container_width=True, hide_index=True)
+        else:
+            comparison = execution_summary.get("comparison") or {}
+            iteration_comparison = comparison.get("iteration") or {}
+            result_columns = st.columns(4)
+            result_columns[0].metric("第一轮 RMSE", f"{iteration_comparison.get('round_1_rmse', 0):.6f}")
+            result_columns[1].metric("第二轮 RMSE", f"{iteration_comparison.get('round_2_rmse', 0):.6f}")
+            result_columns[2].metric(
+                "迭代改善", f"{iteration_comparison.get('relative_rmse_gain_percent', 0):.2f}%"
+            )
+            result_columns[3].metric("执行状态", status_label(execution_summary.get("status", "unknown")))
+            st.caption(
+                "第二轮计划由第一轮真实执行结果、质量反馈和计划调整生成；"
+                "所有数值来自白名单确定性执行器。"
+            )
+
+    data_assets = [
+        item for item in project.get("research_assets") or []
+        if item.get("purpose") == "data" and item.get("parsing_status") == "parsed"
+    ]
+    if (
+        data_assets
+        and not project.get("planning_only", True)
+        and project.get("research_mode") in {"data_analysis", "observational", "mixed_methods"}
+        and phase in {"EXECUTION_WAITING", "DATA_ANALYSIS", "COMPLETED"}
+    ):
+        if st.button("使用项目内白名单工具复现数据分析", key=f"run_dataset_tools_{project.get('project_id')}"):
+            try:
+                _research_action(
+                    backend_url,
+                    f"/api/research/{project['project_id']}/run-dataset-tools",
+                    {},
+                )
+            except BackendAPIError as exc:
+                st.error(f"项目内分析失败：{exc.detail}")
+
+    if execution_summary and execution_summary.get("executor_binding") != "deterministic_data_analysis_v1":
         _render_execution_round("第一轮执行结果", execution_summary.get("round_1") or {})
         feedback_signals = execution_summary.get("feedback_signals") or []
         if feedback_signals:
@@ -913,6 +961,8 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
             st.markdown("### 第二轮计划调整")
             st.dataframe(plan_adjustment_rows(adjustments[-1]), use_container_width=True, hide_index=True)
         _render_execution_round("第二轮执行结果", execution_summary.get("round_2") or {})
+
+    if execution_summary:
         with st.expander("查看原始结构化数据（开发者）", expanded=False):
             st.json(execution_summary)
 
@@ -1095,6 +1145,11 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
         "file_search": "上传资料检索",
         "dataset_inspector": "数据结构与质量检查",
         "statistical_analyzer": "白名单确定性统计分析",
+        "categorical_analyzer": "分类频数、分组与列联分析",
+        "time_series_analyzer": "时间序列趋势与滞后摘要",
+        "text_analyzer": "文本语料词频与长度摘要",
+        "data_visualizer": "确定性直方图与散点图",
+        "deterministic_data_analysis_v1": "项目内确定性数据分析执行器",
         "artifact_store": "研究产物持久化",
         "python_executor": "任意 Python 执行",
         "code_runner": "任意代码运行器",
@@ -1330,6 +1385,40 @@ def _render_revision_review_gate(
     scores[2].metric("证据质量", review.get("evidence_quality_score", 0))
     _render_named_list("非阻断问题", review.get("non_blocking_issues") or [])
     _render_named_list("总体建议", review.get("recommendations") or [])
+
+    active_plan_id = project.get("active_revision_plan_id")
+    active_plan = next(
+        (
+            item
+            for item in project.get("approved_revision_plans") or []
+            if item.get("revision_plan_id") == active_plan_id
+        ),
+        None,
+    )
+    evidence_recovery_available = bool(
+        active_plan
+        and any(
+            batch.get("target") == "evidence" and batch.get("status") == "needs_attention"
+            for batch in active_plan.get("target_batches") or []
+        )
+    )
+    if evidence_recovery_available:
+        st.warning(
+            "上一轮证据修订无法由自动修订器安全完成。请返回证据检索；"
+            "您已上传的资料会保留并进入新的检索上下文。"
+        )
+        if st.button(
+            "返回证据检索并保留已上传资料",
+            type="primary",
+            disabled=job_running,
+            key=f"resume_evidence_research_{project_id}",
+        ):
+            _research_action(
+                backend_url,
+                f"/api/research/{project_id}/revision-review/resume-evidence-research",
+                {},
+            )
+        return
 
     verifications = project.get("revision_verifications") or []
     latest_verification = verifications[-1] if verifications else None
