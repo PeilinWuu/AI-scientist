@@ -157,12 +157,18 @@ def enrich_candidates(project: ResearchProject, candidates: list[SourceCandidate
 def parse_human_source(entry: str, rank: int) -> SourceCandidate:
     value = entry.strip()
     doi_match = re.search(r"10\.\d{4,9}/[-._;()/:A-Z0-9]+", value, flags=re.IGNORECASE)
-    pmid_match = re.search(r"(?:PMID\s*:\s*)?(\d{4,12})$", value, flags=re.IGNORECASE)
-    arxiv_match = re.search(r"(?:arXiv\s*:\s*)?(\d{4}\.\d{4,5})", value, flags=re.IGNORECASE)
+    arxiv_match = re.search(
+        r"(?:arxiv\s*:\s*|arxiv\.org/(?:abs|pdf)/)?((?:[a-z-]+(?:\.[A-Z]{2})?/)?\d{4}\.\d{4,5}|[a-z-]+/\d{7})(?:v\d+)?",
+        value,
+        flags=re.IGNORECASE,
+    )
+    explicit_pmid_match = re.search(r"PMID\s*:\s*(\d{4,12})", value, flags=re.IGNORECASE)
+    bare_pmid_match = re.fullmatch(r"\d{4,12}", value)
     is_url = value.startswith(("http://", "https://"))
     doi = doi_match.group(0).rstrip(".,;").lower() if doi_match else None
-    pmid = pmid_match.group(1) if pmid_match and not doi else None
-    arxiv_id = arxiv_match.group(1) if arxiv_match else None
+    arxiv_id = arxiv_match.group(1) if arxiv_match and not doi else None
+    pmid_match = explicit_pmid_match or bare_pmid_match
+    pmid = pmid_match.group(1) if pmid_match and not doi and not arxiv_id else None
     if doi:
         url = f"https://doi.org/{doi}"
         title = f"DOI: {doi}"

@@ -150,6 +150,26 @@ def test_reviewer_revision_exhaustion_is_explicit(tmp_path: Path) -> None:
     assert project.phase == ResearchPhase.HUMAN_INTERVENTION_REQUIRED
 
 
+def test_provided_data_resumes_human_intervention_at_independent_re_review(tmp_path: Path) -> None:
+    orchestrator = ResearchOrchestrator(tmp_path)
+    project = orchestrator.create_project("Resume after data", planning_only=True)
+    project.phase = ResearchPhase.HUMAN_INTERVENTION_REQUIRED
+    project.iteration = 2
+    orchestrator.store.save(project)
+
+    updated = orchestrator.provide_data(
+        project.project_id,
+        ["assets/observations.csv"],
+        "Seeded damped-oscillator observations",
+        "text/csv",
+    )
+
+    assert updated.phase == ResearchPhase.CRITICAL_REVIEW
+    assert updated.iteration == 2
+    assert updated.artifacts[-1].artifact_type == "provided_data_manifest"
+    assert any("重新进行独立复审" in message for message in updated.stage_messages)
+
+
 def test_planning_only_missing_execution_tools_does_not_fail_review(tmp_path: Path) -> None:
     result, project = run_review(tmp_path, "approve")
 

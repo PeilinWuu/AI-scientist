@@ -1,13 +1,13 @@
 {
-  "execution_id": "execution_fb44e65d6cf44777b0a85c2738ac36a3",
-  "request_id": "request_1caaade4bb8b4936992d9e3df2b38403",
+  "execution_id": "execution_d31bf2c8aff544859d836bab55e73f3d",
+  "request_id": "request_a762298fa8014836a08da28a06745ce3",
   "operation": "run_simulation",
   "status": "success",
-  "started_at": "2026-08-31T05:42:42.749814Z",
-  "finished_at": "2026-08-31T05:42:42.814368Z",
-  "duration_ms": 65,
+  "started_at": "2026-08-31T12:46:56.595627Z",
+  "finished_at": "2026-08-31T12:46:56.684065Z",
+  "duration_ms": 88,
   "seed": 20260831,
-  "input_fingerprint": "eefe81529215fecda2b9e0c398e95e53387ef847673e8b855d83d9cee9f02bf1",
+  "input_fingerprint": "36e2d7e20bf919e5b78850ae07fd75a32e46511aec52225100026b42e3196222",
   "input_checksums": {},
   "actual_parameters": {
     "mode": "generate_damped_oscillator",
@@ -31,7 +31,7 @@
   },
   "artifacts": [
     {
-      "artifact_id": "artifact_133431f36b3c4597837e35504ce56e8c",
+      "artifact_id": "artifact_e926b3775d4f4a50812254c1fd73665c",
       "artifact_type": "observations",
       "relative_path": "input/observations.csv",
       "media_type": "text/csv",
@@ -39,7 +39,7 @@
       "size_bytes": 21468
     },
     {
-      "artifact_id": "artifact_1790e36584414bb3af6dfac3267d2508",
+      "artifact_id": "artifact_42e98bf63aca4326b6ea2426031920be",
       "artifact_type": "ground_truth",
       "relative_path": "input/ground_truth.json",
       "media_type": "application/json",
@@ -47,7 +47,7 @@
       "size_bytes": 102
     },
     {
-      "artifact_id": "artifact_565a1e09756e4496afeadfa6c8548085",
+      "artifact_id": "artifact_d316bad287a048429a20d622810a7b96",
       "artifact_type": "observations",
       "relative_path": "input/observations.png",
       "media_type": "image/png",

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 from pathlib import Path
 from statistics import mean, pstdev
 from typing import Any
@@ -30,7 +31,12 @@ class CompetitionRuntime:
         self.root.mkdir(parents=True, exist_ok=True)
         self.executor = ExecutionAdapter(self.root)
 
-    def run_flagship(self, seed: int = 20260831) -> CompetitionRunState:
+    def run_flagship(
+        self,
+        seed: int = 20260831,
+        observations_path: str | Path | None = None,
+        ground_truth: dict[str, float] | None = None,
+    ) -> CompetitionRunState:
         self._ensure_layout()
         run_id = competition_id("flagship")
         state = CompetitionRunState(
@@ -39,26 +45,46 @@ class CompetitionRuntime:
             seed=seed,
             root_directory=str(self.root),
         )
+        supplied_observations = Path(observations_path).resolve() if observations_path else None
         self._write_json("audit/provenance.json", {
             "run_id": run_id,
             "case": state.case_name,
             "seed": seed,
-            "numeric_source": "controlled_local_deterministic",
+            "numeric_source": (
+                "project_observation_asset" if supplied_observations else "controlled_local_deterministic"
+            ),
             "llm_generated_metrics": False,
             "created_at": now_utc().isoformat(),
         })
-        generation = self._execute(ExecutionRequest(
-            operation="run_simulation",
-            parameters={
-                "mode": "generate_damped_oscillator", "damping": 0.173,
-                "omega": 2.37, "amplitude": 1.0, "phase": 0.2,
-                "noise_std": 0.03, "duration": 12.0, "samples": 360,
-            },
-            expected_outputs=["observations.csv", "ground_truth.json", "observations.png"],
-            provenance={"case": state.case_name, "role": "synthetic_observation_generation"},
-            seed=seed,
-            output_directory="input",
-        ))
+        if supplied_observations:
+            if not supplied_observations.is_file():
+                raise FileNotFoundError(f"Observation file not found: {supplied_observations}")
+            target = self.root / "input" / "observations.csv"
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(supplied_observations, target)
+            generation = self._execute(ExecutionRequest(
+                operation="inspect_dataset",
+                inputs={"dataset_path": "input/observations.csv"},
+                expected_outputs=["dataset_profile.json"],
+                provenance={"case": state.case_name, "role": "project_observation_asset"},
+                seed=seed,
+                output_directory="input/inspection",
+            ))
+            truth = ground_truth
+        else:
+            generation = self._execute(ExecutionRequest(
+                operation="run_simulation",
+                parameters={
+                    "mode": "generate_damped_oscillator", "damping": 0.173,
+                    "omega": 2.37, "amplitude": 1.0, "phase": 0.2,
+                    "noise_std": 0.03, "duration": 12.0, "samples": 360,
+                },
+                expected_outputs=["observations.csv", "ground_truth.json", "observations.png"],
+                provenance={"case": state.case_name, "role": "synthetic_observation_generation"},
+                seed=seed,
+                output_directory="input",
+            ))
+            truth = {"damping": 0.173, "omega": 2.37}
         if generation.status != "success":
             return self._fail_state(state, generation.failure_reason or "input generation failed")
         self._event("input_generated", generation.model_dump(mode="json"))
@@ -128,7 +154,7 @@ class CompetitionRuntime:
         if baseline.status != "success":
             return self._fail_state(state, baseline.failure_reason or "baseline failed")
         state.baseline_execution = baseline
-        comparison = self._comparison(plan_1, plan_2, result_1, result_2, baseline, generation)
+        comparison = self._comparison(plan_1, plan_2, result_1, result_2, baseline, generation, truth)
         state.comparison = comparison
         state.status = "complete"
         state.updated_at = now_utc()
@@ -262,9 +288,13 @@ class CompetitionRuntime:
         }
 
     @staticmethod
-    def _comparison(plan_1, plan_2, result_1, result_2, baseline, generation):
-        truth = {"damping": 0.173, "omega": 2.37}
-        error = lambda result: abs(result.metrics["best_damping"] - truth["damping"]) + abs(result.metrics["best_omega"] - truth["omega"])
+    def _comparison(plan_1, plan_2, result_1, result_2, baseline, generation, truth=None):
+        error = lambda result: (
+            abs(result.metrics["best_damping"] - truth["damping"])
+            + abs(result.metrics["best_omega"] - truth["omega"])
+            if truth
+            else None
+        )
         rmse_gain = result_1.metrics["rmse"] - result_2.metrics["rmse"]
         baseline_gain = baseline.metrics["rmse"] - result_2.metrics["rmse"]
         return {

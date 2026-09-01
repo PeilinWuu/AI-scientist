@@ -1,5 +1,5 @@
 {
-  "run_id": "flagship_a0ea5f236f9e49edbac68732a6d78c36",
+  "run_id": "flagship_554920dbbf28499cbe056c1f92255d8b",
   "case_name": "damped_oscillator_parameter_identification",
   "status": "complete",
   "seed": 20260831,
@@ -30,21 +30,21 @@
       "omega_points": 11,
       "success_rmse": 0.04,
       "resource_budget_evaluations": 121,
-      "derived_from_execution_id": "execution_4cfb67f4352f4d3bb0a2e444c62e75ce",
+      "derived_from_execution_id": "execution_8d339f38d03e41e48c9db0cb3a0db597",
       "rationale": "Deterministic feedback refinement around the Round 1 observed optimum."
     }
   ],
   "executions": [
     {
-      "execution_id": "execution_fb44e65d6cf44777b0a85c2738ac36a3",
-      "request_id": "request_1caaade4bb8b4936992d9e3df2b38403",
+      "execution_id": "execution_d31bf2c8aff544859d836bab55e73f3d",
+      "request_id": "request_a762298fa8014836a08da28a06745ce3",
       "operation": "run_simulation",
       "status": "success",
-      "started_at": "2026-08-31T05:42:42.749814Z",
-      "finished_at": "2026-08-31T05:42:42.814368Z",
-      "duration_ms": 65,
+      "started_at": "2026-08-31T12:46:56.595627Z",
+      "finished_at": "2026-08-31T12:46:56.684065Z",
+      "duration_ms": 88,
       "seed": 20260831,
-      "input_fingerprint": "eefe81529215fecda2b9e0c398e95e53387ef847673e8b855d83d9cee9f02bf1",
+      "input_fingerprint": "36e2d7e20bf919e5b78850ae07fd75a32e46511aec52225100026b42e3196222",
       "input_checksums": {},
       "actual_parameters": {
         "mode": "generate_damped_oscillator",
@@ -68,7 +68,7 @@
       },
       "artifacts": [
         {
-          "artifact_id": "artifact_133431f36b3c4597837e35504ce56e8c",
+          "artifact_id": "artifact_e926b3775d4f4a50812254c1fd73665c",
           "artifact_type": "observations",
           "relative_path": "input/observations.csv",
           "media_type": "text/csv",
@@ -76,7 +76,7 @@
           "size_bytes": 21468
         },
         {
-          "artifact_id": "artifact_1790e36584414bb3af6dfac3267d2508",
+          "artifact_id": "artifact_42e98bf63aca4326b6ea2426031920be",
           "artifact_type": "ground_truth",
           "relative_path": "input/ground_truth.json",
           "media_type": "application/json",
@@ -84,7 +84,7 @@
           "size_bytes": 102
         },
         {
-          "artifact_id": "artifact_565a1e09756e4496afeadfa6c8548085",
+          "artifact_id": "artifact_d316bad287a048429a20d622810a7b96",
           "artifact_type": "observations",
           "relative_path": "input/observations.png",
           "media_type": "image/png",
@@ -98,15 +98,15 @@
       "failure_reason": null
     },
     {
-      "execution_id": "execution_4cfb67f4352f4d3bb0a2e444c62e75ce",
-      "request_id": "request_190ff4bd1f0c4d749c1d29a802d79049",
+      "execution_id": "execution_8d339f38d03e41e48c9db0cb3a0db597",
+      "request_id": "request_c756c9e4a81349d58e54cf6bc7a35b5d",
       "operation": "run_simulation",
       "status": "success",
-      "started_at": "2026-08-31T05:42:42.820948Z",
-      "finished_at": "2026-08-31T05:42:42.861442Z",
-      "duration_ms": 40,
+      "started_at": "2026-08-31T12:46:56.688065Z",
+      "finished_at": "2026-08-31T12:46:56.717474Z",
+      "duration_ms": 29,
       "seed": 20260831,
-      "input_fingerprint": "578cd379a67817e4e65f4e9e916677a28d10c82fc917bb96a4c69c06a34ccb83",
+      "input_fingerprint": "9437f60b635b67cb76e466513b14a5607b6c21bb256252c60ccd10f913ff3426",
       "input_checksums": {
         "observations_path": "eeda48d77cfc67cd728fa2964098f712db5cdbd1d2320d6532cdf616e66ea95c"
       },
@@ -138,7 +138,7 @@
       },
       "artifacts": [
         {
-          "artifact_id": "artifact_a7a17f73aba5426b9c5c80e21ab52714",
+          "artifact_id": "artifact_5a34fecfbfc44c8683699cc329da0f5b",
           "artifact_type": "fit_result",
           "relative_path": "round_1/execution/fit_result.json",
           "media_type": "application/json",
@@ -146,7 +146,7 @@
           "size_bytes": 196
         },
         {
-          "artifact_id": "artifact_365e769dcf454991a4afcd28d81fc9ca",
+          "artifact_id": "artifact_3c628d29829c459ea6fa62f4cd41f240",
           "artifact_type": "fit_grid",
           "relative_path": "round_1/execution/fit_grid.csv",
           "media_type": "text/csv",
@@ -154,7 +154,7 @@
           "size_bytes": 2068
         },
         {
-          "artifact_id": "artifact_d3a97bdbd99e433aba594997c761f16f",
+          "artifact_id": "artifact_c640243e2eea40b9af84f7a1765685a6",
           "artifact_type": "fit",
           "relative_path": "round_1/execution/fit.png",
           "media_type": "image/png",
@@ -168,15 +168,15 @@
       "failure_reason": null
     },
     {
-      "execution_id": "execution_2aa595a4b0114f1e9c97b4ef7b46fb08",
-      "request_id": "request_94d612e54baa4940a1243d6f31f360e3",
+      "execution_id": "execution_65e0f647f7d042e0aa5f75a4cb11b1a1",
+      "request_id": "request_eed2f1aa597840c9a8525dbef8c5a737",
       "operation": "run_simulation",
       "status": "success",
-      "started_at": "2026-08-31T05:42:42.876752Z",
-      "finished_at": "2026-08-31T05:42:42.919823Z",
-      "duration_ms": 43,
+      "started_at": "2026-08-31T12:46:56.725326Z",
+      "finished_at": "2026-08-31T12:46:56.763399Z",
+      "duration_ms": 38,
       "seed": 20260831,
-      "input_fingerprint": "54b6fcf88aa017cf17e5c58a053f8a7ff60df7d775946b58cc64dfbb5de99853",
+      "input_fingerprint": "5e3f144cb1e70fb6e4ccbada2d042b6019bf1a6601e11372ee4437016f70d809",
       "input_checksums": {
         "observations_path": "eeda48d77cfc67cd728fa2964098f712db5cdbd1d2320d6532cdf616e66ea95c"
       },
@@ -208,7 +208,7 @@
       },
       "artifacts": [
         {
-          "artifact_id": "artifact_c89e16478f364cae88fb20ad2c4cc6e7",
+          "artifact_id": "artifact_e604f104d529452f8fa5279a04f7028f",
           "artifact_type": "fit_result",
           "relative_path": "round_2/execution/fit_result.json",
           "media_type": "application/json",
@@ -216,7 +216,7 @@
           "size_bytes": 216
         },
         {
-          "artifact_id": "artifact_f582f39b39a848c2a337a01187b85555",
+          "artifact_id": "artifact_2f9fcc3e518c4209bfc58be5bad6260b",
           "artifact_type": "fit_grid",
           "relative_path": "round_2/execution/fit_grid.csv",
           "media_type": "text/csv",
@@ -224,7 +224,7 @@
           "size_bytes": 4547
         },
         {
-          "artifact_id": "artifact_ee3fe966960f4b0f999487c0e2238954",
+          "artifact_id": "artifact_a6b119089a2c44ef86e40b3b4947ac2b",
           "artifact_type": "fit",
           "relative_path": "round_2/execution/fit.png",
           "media_type": "image/png",
@@ -243,20 +243,20 @@
       "iteration": 1,
       "plan_version": "round_1_v1",
       "execution_ids": [
-        "execution_4cfb67f4352f4d3bb0a2e444c62e75ce"
+        "execution_8d339f38d03e41e48c9db0cb3a0db597"
       ],
       "analysis_artifact_ids": [
-        "artifact_a7a17f73aba5426b9c5c80e21ab52714",
-        "artifact_365e769dcf454991a4afcd28d81fc9ca",
-        "artifact_d3a97bdbd99e433aba594997c761f16f"
+        "artifact_5a34fecfbfc44c8683699cc329da0f5b",
+        "artifact_3c628d29829c459ea6fa62f4cd41f240",
+        "artifact_c640243e2eea40b9af84f7a1765685a6"
       ],
       "feedback_signals": [
         {
-          "signal_id": "feedback_c67676c5601f4988a1f3051d888c5ab6",
+          "signal_id": "feedback_3aa82b440bbb4d1f9bec0b6e7c81ad39",
           "source_artifact_ids": [
-            "artifact_a7a17f73aba5426b9c5c80e21ab52714",
-            "artifact_365e769dcf454991a4afcd28d81fc9ca",
-            "artifact_d3a97bdbd99e433aba594997c761f16f"
+            "artifact_5a34fecfbfc44c8683699cc329da0f5b",
+            "artifact_3c628d29829c459ea6fa62f4cd41f240",
+            "artifact_c640243e2eea40b9af84f7a1765685a6"
           ],
           "observed_result": {
             "rmse": 0.05768367179165266,
@@ -276,7 +276,7 @@
       ],
       "adjustments": [
         {
-          "adjustment_id": "adjustment_635ddc3f604147f3a995640122b27dff",
+          "adjustment_id": "adjustment_e84436abb0664765a084cfbe04882d03",
           "target_task_id": "fit_damped_oscillator",
           "field": "search_bounds_and_resolution",
           "old_value": {
@@ -309,45 +309,45 @@
           },
           "reason": "Round 1 located an interior optimum; refine one coarse step around the observed best fit.",
           "evidence_refs": [
-            "artifact_a7a17f73aba5426b9c5c80e21ab52714",
-            "artifact_365e769dcf454991a4afcd28d81fc9ca",
-            "artifact_d3a97bdbd99e433aba594997c761f16f"
+            "artifact_5a34fecfbfc44c8683699cc329da0f5b",
+            "artifact_3c628d29829c459ea6fa62f4cd41f240",
+            "artifact_c640243e2eea40b9af84f7a1765685a6"
           ],
           "decision": "modify"
         }
       ],
       "next_plan_version": "round_2_v1",
       "decision": "continue",
-      "created_at": "2026-08-31T05:42:42.873752Z"
+      "created_at": "2026-08-31T12:46:56.723325Z"
     },
     {
       "iteration": 2,
       "plan_version": "round_2_v1",
       "execution_ids": [
-        "execution_2aa595a4b0114f1e9c97b4ef7b46fb08"
+        "execution_65e0f647f7d042e0aa5f75a4cb11b1a1"
       ],
       "analysis_artifact_ids": [
-        "artifact_c89e16478f364cae88fb20ad2c4cc6e7",
-        "artifact_f582f39b39a848c2a337a01187b85555",
-        "artifact_ee3fe966960f4b0f999487c0e2238954"
+        "artifact_e604f104d529452f8fa5279a04f7028f",
+        "artifact_2f9fcc3e518c4209bfc58be5bad6260b",
+        "artifact_a6b119089a2c44ef86e40b3b4947ac2b"
       ],
       "feedback_signals": [],
       "adjustments": [],
       "next_plan_version": null,
       "decision": "stop",
-      "created_at": "2026-08-31T05:42:42.927868Z"
+      "created_at": "2026-08-31T12:46:56.766401Z"
     }
   ],
   "baseline_execution": {
-    "execution_id": "execution_22e5caa8e20444d9bf4fb9dd83231e8c",
-    "request_id": "request_19e6413eb37c4a93a86ef00e6d8f2546",
+    "execution_id": "execution_119b1279c413408baea37a1be688cb40",
+    "request_id": "request_7b8ea27df4c04e129fd3e1b7aa699fc8",
     "operation": "run_simulation",
     "status": "success",
-    "started_at": "2026-08-31T05:42:42.930166Z",
-    "finished_at": "2026-08-31T05:42:42.968426Z",
-    "duration_ms": 38,
+    "started_at": "2026-08-31T12:46:56.767400Z",
+    "finished_at": "2026-08-31T12:46:56.807391Z",
+    "duration_ms": 40,
     "seed": 20260831,
-    "input_fingerprint": "647b3a0572bc2091fdc6280ab09d9237f6667f57f7f6ddf4b5125bb492283ff4",
+    "input_fingerprint": "2d8a8991da8679028d9f254a141051eeeb4f893b44feda2841a971e8300e48c2",
     "input_checksums": {
       "observations_path": "eeda48d77cfc67cd728fa2964098f712db5cdbd1d2320d6532cdf616e66ea95c"
     },
@@ -379,7 +379,7 @@
     },
     "artifacts": [
       {
-        "artifact_id": "artifact_5a7e60622d174b3cbcef07dad462182f",
+        "artifact_id": "artifact_3a0147aaeca245f4b7ed116e4bcdd006",
         "artifact_type": "fit_result",
         "relative_path": "comparison/baseline_execution/fit_result.json",
         "media_type": "application/json",
@@ -387,7 +387,7 @@
         "size_bytes": 228
       },
       {
-        "artifact_id": "artifact_b53d8e1580b943ddb544f5416094110e",
+        "artifact_id": "artifact_8d027b246e934528802c0cbe0582bdc2",
         "artifact_type": "fit_grid",
         "relative_path": "comparison/baseline_execution/fit_grid.csv",
         "media_type": "text/csv",
@@ -395,7 +395,7 @@
         "size_bytes": 9560
       },
       {
-        "artifact_id": "artifact_39eeb85ab7614cae8dc300911cbf34d2",
+        "artifact_id": "artifact_64f830303b00472d805a25545e178162",
         "artifact_type": "fit",
         "relative_path": "comparison/baseline_execution/fit.png",
         "media_type": "image/png",
@@ -431,12 +431,12 @@
       "constraint_satisfied": true
     },
     "provenance": {
-      "observation_execution_id": "execution_fb44e65d6cf44777b0a85c2738ac36a3",
-      "round_1_execution_id": "execution_4cfb67f4352f4d3bb0a2e444c62e75ce",
-      "round_2_execution_id": "execution_2aa595a4b0114f1e9c97b4ef7b46fb08",
-      "baseline_execution_id": "execution_22e5caa8e20444d9bf4fb9dd83231e8c"
+      "observation_execution_id": "execution_d31bf2c8aff544859d836bab55e73f3d",
+      "round_1_execution_id": "execution_8d339f38d03e41e48c9db0cb3a0db597",
+      "round_2_execution_id": "execution_65e0f647f7d042e0aa5f75a4cb11b1a1",
+      "baseline_execution_id": "execution_119b1279c413408baea37a1be688cb40"
     }
   },
-  "created_at": "2026-08-31T05:42:42.747809Z",
-  "updated_at": "2026-08-31T05:42:42.977137Z"
+  "created_at": "2026-08-31T12:46:56.594631Z",
+  "updated_at": "2026-08-31T12:46:56.814905Z"
 }

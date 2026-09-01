@@ -26,6 +26,7 @@ from src.ai_scientist.agents import (
 from src.ai_scientist.agents.base_agent import AgentRun
 from src.ai_scientist.artifact_store import ArtifactStore
 from src.ai_scientist.claim_graph import ClaimGraph
+from src.ai_scientist.competition_runtime import CompetitionRuntime
 from src.ai_scientist.domain_resolution import resolve_domain
 from src.ai_scientist.domain_router import DomainRouter
 from src.ai_scientist.document_parsers import parse_research_asset as parse_local_research_asset
@@ -150,6 +151,10 @@ RESEARCH_ASSET_UPLOAD_CONTEXTS = {
 
 _CURRENT_JOB_ID: ContextVar[str | None] = ContextVar("current_research_job_id", default=None)
 
+INTERNAL_EXECUTOR_BINDINGS = {
+    "competition_1b_damped_oscillator": "damped_oscillator_v1",
+}
+
 
 class ResearchOrchestrator:
     """Advance exactly one explicit research phase per call."""
@@ -183,21 +188,38 @@ class ResearchOrchestrator:
         if not objective:
             raise ValueError("Research question is required.")
         max_calls = int(os.getenv("AI_SCIENTIST_MAX_MODEL_CALLS", "50"))
+        resolved_constraints = {
+            **(constraints or {}),
+            **({"constraints_text": constraints_text} if constraints_text else {}),
+        }
+        executor_binding = INTERNAL_EXECUTOR_BINDINGS.get(str(resolved_constraints.get("example_case") or ""))
+        if executor_binding:
+            execution_capability = "INTERNAL_EXECUTABLE"
+            planning_only = False
+        elif planning_only:
+            execution_capability = "PLANNING_ONLY"
+        else:
+            execution_capability = "EXTERNAL_EXECUTION_REQUIRED"
+        available_tools = self.tools.available_names()
+        if executor_binding:
+            available_tools = [*available_tools, executor_binding]
         project = ResearchProject(
             title=objective[:100],
             objective=objective,
             domain_hint=domain_hint,
-            constraints={**(constraints or {}), **({"constraints_text": constraints_text} if constraints_text else {})},
+            constraints=resolved_constraints,
             model_overrides=normalize_model_overrides(model_overrides),
             max_iterations=max_iterations,
             planning_only=planning_only,
+            execution_capability=execution_capability,
+            executor_binding=executor_binding,
             evidence_review_mode=evidence_review_mode,
             reproducibility_seed=reproducibility_seed,
             budget={
                 "max_model_calls": max_calls,
                 "max_iterations": max_iterations,
             },
-            available_tools=self.tools.available_names(),
+            available_tools=available_tools,
             missing_capabilities=self.tools.unavailable_names(),
         )
         self.store.save(project)
@@ -211,6 +233,27 @@ class ResearchOrchestrator:
             display_markdown="研究项目已创建，可以开始逐阶段形成科研方案。",
         )
         self._append_event(project, event)
+        if executor_binding == "damped_oscillator_v1":
+            observations = (
+                Path(__file__).resolve().parents[2]
+                / "competition"
+                / "1b"
+                / "cases"
+                / "flagship"
+                / "input"
+                / "observations.csv"
+            )
+            if observations.is_file():
+                project = self.register_research_asset(
+                    project.project_id,
+                    observations.name,
+                    "text/csv",
+                    observations.read_bytes(),
+                    purpose="data",
+                    description="Competition 1B damped-oscillator example observations (seed 20260831).",
+                    upload_context="project_creation",
+                    source="bundled_example",
+                )
         return project
 
     def run_next_step(self, project_id: str, job_id: str | None = None) -> dict[str, Any]:
@@ -358,18 +401,30 @@ class ResearchOrchestrator:
                 stage_status = revision_status
                 revision_required = project.phase == ResearchPhase.HUMAN_REVISION_REVIEW
             elif project.phase == ResearchPhase.EXECUTION_WAITING:
-                if project.planning_only:
+                if project.execution_capability == "INTERNAL_EXECUTABLE" and project.executor_binding:
+                    self._transition_event(project, "execution_tool_available")
+                elif project.planning_only:
                     self._transition_event(project, "planning_only")
                 else:
                     stage_status = "waiting_for_execution_or_data"
                     project.human_actions_required.append(
                         "Provide data or connect an approved execution backend; no results were generated."
                     )
+            elif project.phase == ResearchPhase.EXECUTION:
+                if project.execution_capability != "INTERNAL_EXECUTABLE" or not project.executor_binding:
+                    raise InvalidTransitionError("No approved internal executor is bound to this project.")
+                produced_artifacts += self._run_bound_internal_executor(project)
+                self.state_machine.transition(project, "success")
             elif project.phase == ResearchPhase.DATA_ANALYSIS:
-                stage_status = "waiting_for_analysis_backend"
-                project.human_actions_required.append(
-                    "A dataset is registered, but no analysis backend is connected; no results were generated."
-                )
+                analysis_artifacts = self._record_execution_analysis(project)
+                if analysis_artifacts:
+                    produced_artifacts += analysis_artifacts
+                    self.state_machine.transition(project, "next")
+                else:
+                    stage_status = "waiting_for_analysis_backend"
+                    project.human_actions_required.append(
+                        "A dataset is registered, but no verifiable execution result is available; no results were generated."
+                    )
             elif project.phase == ResearchPhase.CRITICAL_REVIEW:
                 review = self._run_agent(project, SkepticalReviewerAgent)
                 self._refresh_quality_metrics(project)
@@ -886,6 +941,13 @@ class ResearchOrchestrator:
         )
         project.approval_valid_for_versions = dict(package.artifact_versions)
         project.approval_status = "valid"
+        approval_next_step = (
+            "项目将进入内部确定性执行阶段。"
+            if project.execution_capability == "INTERNAL_EXECUTABLE"
+            else "项目将等待外部实验结果。"
+            if project.execution_capability == "EXTERNAL_EXECUTION_REQUIRED"
+            else "项目将进入科学综合阶段。"
+        )
         self._append_event(
             project,
             completed_event(
@@ -895,7 +957,7 @@ class ResearchOrchestrator:
                 status="approved",
                 visibility="user",
                 display_key="human_approval_granted",
-                display_markdown="人工审查已确认当前版本的研究方案，项目将进入科学综合阶段。",
+                display_markdown=f"人工审查已确认当前版本的研究方案，{approval_next_step}",
             ),
         )
         self._transition_event(project, "approve")
@@ -1048,8 +1110,171 @@ class ResearchOrchestrator:
         project.artifacts.append(record)
         if project.phase == ResearchPhase.EXECUTION_WAITING:
             self._transition_event(project, "data_provided")
+        elif project.phase == ResearchPhase.HUMAN_INTERVENTION_REQUIRED:
+            project.phase = ResearchPhase.CRITICAL_REVIEW
+            project.revision_issues = []
+            project.current_revision_action = None
+            project.pending_revision_actions = []
+            project.stage_messages.append(
+                "人工已补充数据清单；项目将保留既有修订历史并重新进行独立复审。"
+            )
+            self._append_event(
+                project,
+                completed_event(
+                    project.project_id,
+                    ResearchPhase.HUMAN_INTERVENTION_REQUIRED,
+                    "human_researcher",
+                    status="data_provided_for_re_review",
+                    visibility="user",
+                    display_key=f"data_provided_for_re_review_{record.artifact_id}",
+                    output_artifact_ids=[record.artifact_id],
+                    display_markdown="已登记补充数据，下一阶段将重新进行独立复审。",
+                ),
+            )
         self.store.save(project)
         return project
+
+    def _run_bound_internal_executor(self, project: ResearchProject) -> list[str]:
+        """Run only the explicit, allowlisted executor bound at project creation."""
+
+        if project.executor_binding != "damped_oscillator_v1":
+            raise InvalidTransitionError(f"Unsupported executor binding: {project.executor_binding}")
+        compatible_assets = [
+            item
+            for item in project.research_assets
+            if item.purpose == "data" and Path(item.filename).suffix.lower() == ".csv"
+        ]
+        if not compatible_assets:
+            raise InvalidTransitionError(
+                "The damped-oscillator executor requires a project observation CSV."
+            )
+        observation_asset = compatible_assets[-1]
+        _, observation_path = self.get_research_asset(project.project_id, observation_asset.asset_id)
+        known_truth = (
+            {"damping": 0.173, "omega": 2.37}
+            if observation_asset.source == "bundled_example"
+            else None
+        )
+        execution_root = self.store.project_dir(project.project_id) / "internal_execution" / "damped_oscillator"
+        state = CompetitionRuntime(execution_root).run_flagship(
+            project.reproducibility_seed or 20260831,
+            observations_path=observation_path,
+            ground_truth=known_truth,
+        )
+        if state.status != "complete" or len(state.executions) < 3 or not state.iterations:
+            raise AIScientistError(f"Internal deterministic execution failed with status {state.status}.")
+        round_1 = state.executions[1]
+        round_2 = state.executions[2]
+        feedback_signals = [
+            item.model_dump(mode="json")
+            for iteration in state.iterations
+            for item in iteration.feedback_signals
+        ]
+        adjustments = [
+            item.model_dump(mode="json")
+            for iteration in state.iterations
+            for item in iteration.adjustments
+        ]
+        project.internal_execution_summary = {
+            "executor_binding": project.executor_binding,
+            "run_id": state.run_id,
+            "status": state.status,
+            "seed": state.seed,
+            "observation_asset_id": observation_asset.asset_id,
+            "root_directory": str(execution_root.relative_to(self.store.project_dir(project.project_id))),
+            "round_1": round_1.model_dump(mode="json"),
+            "feedback_signals": feedback_signals,
+            "plan_adjustments": adjustments,
+            "round_2": round_2.model_dump(mode="json"),
+            "comparison": state.comparison,
+            "iteration_records": [item.model_dump(mode="json") for item in state.iterations],
+        }
+        record = self.artifacts.save_json(
+            project.project_id,
+            "internal_execution_run",
+            state.model_dump(mode="json"),
+            project.executor_binding,
+        )
+        project.artifacts.append(record)
+        if project.executor_binding not in observation_asset.used_by_agents:
+            observation_asset.used_by_agents.append(project.executor_binding)
+        self._append_event(
+            project,
+            completed_event(
+                project.project_id,
+                ResearchPhase.EXECUTION,
+                project.executor_binding,
+                status="internal_execution_completed",
+                visibility="user",
+                display_key=f"internal_execution_{state.run_id}",
+                output_artifact_ids=[record.artifact_id],
+                display_markdown=(
+                    "内部确定性执行器已完成 Round 1、FeedbackSignal、PlanAdjustment、"
+                    "Round 2 与 comparison。"
+                ),
+            ),
+        )
+        return [record.artifact_id]
+
+    def _record_execution_analysis(self, project: ResearchProject) -> list[str]:
+        """Persist analysis provenance without inventing results for external projects."""
+
+        if project.internal_execution_summary:
+            payload = {
+                "analysis_source": "internal_deterministic_executor",
+                "executor_binding": project.executor_binding,
+                "comparison": project.internal_execution_summary.get("comparison", {}),
+                "feedback_signals": project.internal_execution_summary.get("feedback_signals", []),
+                "plan_adjustments": project.internal_execution_summary.get("plan_adjustments", []),
+            }
+            status = "internal_execution_analyzed"
+            markdown = "已从真实内部执行结果形成可审计分析，并将进入独立复审。"
+        else:
+            manifests = [item for item in project.artifacts if item.artifact_type == "provided_data_manifest"]
+            experimental_assets = [
+                item for item in project.research_assets if item.asset_role == "experimental_result"
+            ]
+            if not manifests and not experimental_assets:
+                return []
+            payload = {
+                "analysis_source": "researcher_provided_external_result",
+                "provided_manifest_artifact_ids": [item.artifact_id for item in manifests],
+                "experimental_assets": [
+                    {
+                        "asset_id": item.asset_id,
+                        "filename": item.filename,
+                        "research_round": item.research_round,
+                        "source": item.source,
+                        "parsed_artifact_id": item.parsed_artifact_id,
+                    }
+                    for item in experimental_assets
+                ],
+                "generated_metrics": {},
+                "handling_rule": "No execution metrics were generated or inferred by the system.",
+            }
+            status = "external_result_registered_for_review"
+            markdown = "已登记研究者提供的真实外部结果；系统未生成实验数值，下一阶段将独立复审。"
+        record = self.artifacts.save_json(
+            project.project_id,
+            "execution_analysis",
+            payload,
+            "orchestrator",
+        )
+        project.artifacts.append(record)
+        self._append_event(
+            project,
+            completed_event(
+                project.project_id,
+                ResearchPhase.DATA_ANALYSIS,
+                "orchestrator",
+                status=status,
+                visibility="user",
+                display_key=f"{status}_{record.artifact_id}",
+                output_artifact_ids=[record.artifact_id],
+                display_markdown=markdown,
+            ),
+        )
+        return [record.artifact_id]
 
     def mark_execution_complete(self, project_id: str, result_artifact_ids: list[str]) -> ResearchProject:
         project = self.get_project(project_id)

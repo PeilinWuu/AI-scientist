@@ -33,5 +33,9 @@ python -m venv .venv
 `QWEN_EVIDENCE_CHECKLIST.md`。
 
 Streamlit 只有一个 AI Scientist 产品入口。首页可输入任意科学问题并上传资料；“加载示例：
-阻尼振子参数辨识”只填入可编辑的问题、约束和 seed 20260831，不会自动执行 benchmark。
-Qwen 结构化推理与受控联网证据检索均由工作流内部调用，不作为独立聊天产品暴露。
+阻尼振子参数辨识”只准备可编辑的问题、约束、observation data、显式 executor binding 和 seed
+20260831，不会自动创建项目或执行。用户点击 Start Research 并批准研究方案后，同一项目进入
+EXECUTABLE，再由用户逐阶段触发确定性 Round 1、FeedbackSignal、PlanAdjustment、Round 2 和
+comparison。无内部 executor 的普通问题显示 EXTERNAL_EXECUTION_REQUIRED，等待研究者上传真实
+结果；系统不会生成替代数值。Qwen 结构化推理与受控联网证据检索均由工作流内部调用，不作为
+独立聊天产品暴露。

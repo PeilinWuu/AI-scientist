@@ -165,7 +165,7 @@ def test_streamlit_exposes_only_scientist_product_views_and_role_model_inputs() 
     assert "PRODUCT_VIEWS" not in source
     assert "render_competition_demo" not in source
     assert 'render_research_workspace(backend_url, show_debug)' in source
-    assert "科学问题 / Research Question" in source
+    assert '"科学问题"' in source
     assert "加载示例：阻尼振子参数辨识" in source
     assert "pure_qwen_model_input" not in source
     assert "qwen_search_model_input" not in source

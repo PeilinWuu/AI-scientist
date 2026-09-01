@@ -40,6 +40,8 @@
 ## 删除后的入口
 
 - Streamlit 只有一个 `AI Scientist` 产品入口，首屏从用户科学问题和可选附件开始。
-- Competition 1B 阻尼振子只作为可编辑的“加载示例”存在；加载不会创建项目或执行 benchmark。
+- Competition 1B 阻尼振子只作为可编辑的“加载示例”存在；加载不会创建项目或执行。用户点击
+  Start Research 后，显式 example metadata 将项目绑定到现有白名单确定性 executor；Round 1/2、
+  FeedbackSignal、PlanAdjustment 和 comparison 均保存在同一 AI Scientist 项目中。
 - OpenAPI 只保留 Competition 1B、AI Scientist、内部模型诊断和 health/readiness；不再暴露独立聊天 endpoints。
 - Qwen 推理和联网检索仍作为 AI Scientist 内部能力存在，不作为独立产品呈现。

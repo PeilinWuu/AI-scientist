@@ -8,7 +8,12 @@ from typing import Any
 from urllib.parse import urlparse
 
 from src.ai_scientist.schemas import SearchCandidate, utc_now
-from src.search_qwen_client import SearchQwenClient, extract_final_text, extract_request_id
+from src.search_qwen_client import (
+    SearchQwenClient,
+    extract_final_text,
+    extract_request_id,
+    extract_sources as extract_response_sources,
+)
 
 
 class QwenEvidenceSearchTool:
@@ -107,26 +112,38 @@ class QwenEvidenceSearchTool:
 def _search_candidates(response: Any, query: str) -> list[SearchCandidate]:
     candidates: list[SearchCandidate] = []
     seen: set[str] = set()
+
+    def append_source(source: Any) -> None:
+        url = _text(source, ["url", "source_url", "link"])
+        if not url or url in seen:
+            return
+        seen.add(url)
+        candidates.append(
+            SearchCandidate(
+                title=_text(source, ["title", "name"]),
+                url=url,
+                query=query,
+                rank=len(candidates) + 1,
+                source_domain=(
+                    _text(source, ["site_name", "site", "domain"])
+                    or urlparse(url).netloc.lower()
+                ),
+                snippet=_text(source, ["snippet", "summary", "text"]),
+                discovered_at=utc_now(),
+            )
+        )
+
     for item in _items(_value(response, "output")):
         if _value(item, "type") != "web_search_call":
             continue
         action = _value(item, "action")
         for source in _items(_value(action, "sources")):
-            url = _text(source, ["url", "source_url", "link"])
-            if not url or url in seen:
-                continue
-            seen.add(url)
-            candidates.append(
-                SearchCandidate(
-                    title=_text(source, ["title", "name"]),
-                    url=url,
-                    query=query,
-                    rank=len(candidates) + 1,
-                    source_domain=urlparse(url).netloc.lower(),
-                    snippet=_text(source, ["snippet", "summary", "text"]),
-                    discovered_at=utc_now(),
-                )
-            )
+            append_source(source)
+    # Bailian Responses may expose citations on assistant output annotations
+    # instead of web_search_call.action.sources. Both are provider-owned,
+    # explicit source metadata and are safe to normalize as candidates.
+    for source in extract_response_sources(response):
+        append_source(source)
     return candidates
 
 

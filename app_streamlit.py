@@ -16,8 +16,16 @@ from dotenv import load_dotenv
 from src.ai_scientist.presentation import (
     PHASE_LABELS,
     dedupe_user_events,
+    domain_label,
+    execution_capability_view,
+    execution_result_view,
+    feedback_signal_view,
+    plan_adjustment_rows,
+    research_mode_label,
     render_event_dict,
     render_project_overview,
+    status_label,
+    user_error_message,
 )
 from src.ui_time import format_local_datetime, format_utc_datetime
 from src.model_utils import normalize_model_name
@@ -123,7 +131,7 @@ def render_artifact_image(image_url: str, caption: str = "") -> None:
         st.image(response.content, caption=caption or None, use_column_width=True)
     except Exception as exc:  # noqa: BLE001 - preview failure must not break the product page
         LOGGER.warning("Artifact preview unavailable for %s: %s", image_url, exc)
-        st.warning("Artifact preview unavailable")
+        st.warning("暂时无法预览该产物，可下载文件后查看。")
 
 
 def _save_research_assets(
@@ -210,8 +218,8 @@ def _render_research_asset_uploader(
                 "添加类型",
                 options=["research_material", "experimental_result"],
                 format_func=lambda value: {
-                    "research_material": "Add Research Material",
-                    "experimental_result": "Add Experimental Result",
+                    "research_material": "添加研究资料",
+                    "experimental_result": "添加实验结果",
                 }[value],
                 horizontal=True,
                 key=f"{key_prefix}_role_{project_id}",
@@ -321,9 +329,25 @@ def _render_research_asset_uploader(
                     st.caption(str(item.get("description")))
                 parsed = item.get("parsed_content") or {}
                 if parsed:
-                    st.caption(
-                        f"解析器：{parsed.get('parser_name')} · {parsed.get('summary')}"
-                    )
+                    structured = parsed.get("structured_summary") or {}
+                    columns = structured.get("column_names") or []
+                    rows = structured.get("scanned_data_rows")
+                    if columns or rows is not None:
+                        missing = structured.get("missing_values_in_scanned_rows") or {}
+                        missing_total = sum(value for value in missing.values() if isinstance(value, int))
+                        st.caption(
+                            f"解析完成：读取 {rows if rows is not None else '未知'} 行、{len(columns)} 列"
+                            f"（{ '、'.join(columns) or '未识别列名' }），扫描范围内缺失值 {missing_total} 个。"
+                        )
+                    elif structured.get("root_type"):
+                        keys = structured.get("top_level_keys") or []
+                        st.caption(
+                            f"解析完成：JSON 顶层类型为 {structured.get('root_type')}，"
+                            f"包含 {structured.get('top_level_key_count', len(keys))} 个顶层字段"
+                            f"（{'、'.join(keys[:8]) or '未识别字段'}{'…' if len(keys) > 8 else ''}）。"
+                        )
+                    else:
+                        st.caption(f"解析器：{parsed.get('parser_name')} · {parsed.get('summary')}")
                     warnings = parsed.get("warnings") or []
                     if warnings:
                         st.caption("解析提示：" + "；".join(str(value) for value in warnings))
@@ -349,7 +373,7 @@ def _render_research_asset_uploader(
                             refresh_research_project(backend_url)
                             st.rerun()
                         except BackendAPIError as exc:
-                            st.error(exc.detail)
+                            st.error(user_error_message(exc))
                 delete_key = f"{key_prefix}_delete_confirm_{project_id}_{item.get('asset_id')}"
                 if not item.get("used_by_agents"):
                     allow_delete = st.checkbox("允许删除此误上传文件", key=delete_key)
@@ -366,7 +390,7 @@ def _render_research_asset_uploader(
                             refresh_research_project(backend_url)
                             st.rerun()
                         except BackendAPIError as exc:
-                            st.error(exc.detail)
+                            st.error(user_error_message(exc))
 
 
 def get_model_config(backend_url: str) -> dict:
@@ -462,6 +486,63 @@ def _short_debug_value(value: object) -> str:
     return "" if value is None else str(value)
 
 
+def _render_execution_round(title: str, result: dict) -> None:
+    view = execution_result_view(result)
+    st.markdown(f"### {title}")
+    columns = st.columns(5)
+    columns[0].metric("状态", view["status"] or "未知")
+    columns[1].metric("RMSE", f"{view['rmse']:.6f}" if isinstance(view["rmse"], (int, float)) else "—")
+    columns[2].metric("参数组合数", view["evaluations"] if view["evaluations"] is not None else "—")
+    columns[3].metric("随机种子", view["seed"] if view["seed"] is not None else "自动")
+    columns[4].metric("运行耗时", f"{view['duration_ms']} ms" if view["duration_ms"] is not None else "—")
+    metrics = result.get("metrics") or {}
+    if metrics:
+        st.markdown(
+            f"**最佳参数：** 阻尼系数 {metrics.get('best_damping', '—')}；"
+            f"角频率 {metrics.get('best_omega', '—')}"
+        )
+    st.caption(f"执行器：{view['executor']}")
+    if view["artifacts"]:
+        st.markdown("**生成产物：** " + "；".join(view["artifacts"]))
+
+
+def _render_final_synthesis(conclusion: dict) -> None:
+    statement = conclusion.get("planning_status_statement")
+    if statement:
+        st.info(statement)
+    section_specs = [
+        ("有证据支持的发现", "supported_findings"),
+        ("暂定推论", "tentative_inferences"),
+        ("证据不足的主张", "unsupported_claims"),
+        ("阴性结果", "negative_results"),
+        ("不确定性", "uncertainties"),
+        ("适用范围", "scope_of_validity"),
+        ("研究局限", "limitations"),
+        ("后续问题", "next_questions"),
+    ]
+    for title, key in section_specs:
+        items = conclusion.get(key) or []
+        st.markdown(f"### {title}")
+        if not items:
+            st.caption("暂无内容。")
+            continue
+        for item in items:
+            if isinstance(item, dict):
+                statement = item.get("statement") or item.get("finding") or "未命名条目"
+                st.markdown(f"- {statement}")
+                refs = item.get("supporting_evidence_ids") or item.get("evidence_refs") or []
+                if refs:
+                    st.caption("  证据引用：" + "、".join(refs))
+                if item.get("confidence") is not None:
+                    st.caption(f"  置信度：{item.get('confidence')}")
+                if item.get("limitations"):
+                    st.caption("  局限：" + "；".join(item.get("limitations") or []))
+            else:
+                st.markdown(f"- {item}")
+    if conclusion.get("human_verification_required"):
+        st.warning("该研究方案仍需人工核验后才能用于真实决策或实验执行。")
+
+
 def refresh_research_project(backend_url: str) -> dict | None:
     project_id = st.session_state.research_project_id
     if not project_id:
@@ -530,6 +611,7 @@ def _load_damped_oscillator_example() -> None:
     st.session_state.research_constraints_text = DAMPED_OSCILLATOR_EXAMPLE["constraints_text"]
     st.session_state.research_seed_mode = "Custom"
     st.session_state.research_custom_seed = DAMPED_OSCILLATOR_EXAMPLE["seed"]
+    st.session_state.research_planning_only = False
     st.session_state.research_example_case = DAMPED_OSCILLATOR_EXAMPLE["case_id"]
     st.session_state.research_example_notice = "loaded"
 
@@ -542,14 +624,13 @@ def _clear_example_marker() -> None:
 
 
 def _on_research_question_change() -> None:
-    """Detach the example marker when the researcher turns it into a custom question."""
+    """Keep an explicitly loaded executor binding while allowing question edits."""
 
     if (
         st.session_state.get("research_example_case")
         and st.session_state.get("research_objective") != DAMPED_OSCILLATOR_EXAMPLE["objective"]
     ):
-        st.session_state.research_example_case = ""
-        st.session_state.research_example_notice = "detached"
+        st.session_state.research_example_notice = "edited"
 
 
 def build_research_start_payload(
@@ -606,7 +687,10 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
         if st.session_state.research_example_notice == "preserved_user_input":
             st.warning("未加载示例：已保留你输入的科学问题。请先清空问题，再主动加载示例。")
         elif st.session_state.research_example_case:
-            st.info("示例问题、参数约束和推荐 seed 已填入；所有内容仍可编辑，尚未创建或运行项目。")
+            st.info(
+                "示例问题、参数约束、观测数据和推荐 seed 已准备；所有内容仍可编辑，"
+                "内部数值模拟尚未运行。"
+            )
             st.button("移除示例标记（保留文本）", on_click=_clear_example_marker)
         elif st.session_state.research_example_notice == "detached":
             st.info("已保留编辑后的内容，并解除 Competition 示例标记；不会自动运行 benchmark。")
@@ -624,9 +708,9 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
                 refresh_research_project(backend_url)
                 st.rerun()
             except BackendAPIError as exc:
-                st.error(exc.detail)
+                st.error(user_error_message(exc))
         objective = st.text_area(
-            "科学问题 / Research Question",
+            "科学问题",
             key="research_objective",
             height=180,
             placeholder="请描述你希望研究的科学问题、目标、已有条件和限制。",
@@ -639,16 +723,24 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
             key="research_constraints_text",
             placeholder="例如：目标人群、可用数据、时间范围、约束条件，以及是否允许因果推断。",
         )
-        with st.expander("Advanced Settings / 高级设置", expanded=False):
+        advanced_settings_container = (
+            st.expander("高级设置", expanded=False)
+            if not st.session_state.research_project_id
+            else st.container(border=True)
+        )
+        with advanced_settings_container:
+            if st.session_state.research_project_id:
+                st.caption("高级设置")
             seed_mode = st.radio(
-                "Reproducibility seed",
+                "可复现随机种子",
                 options=["Auto", "Custom"],
+                format_func=lambda value: {"Auto": "自动", "Custom": "自定义"}[value],
                 horizontal=True,
                 key="research_seed_mode",
                 help="seed 只控制可复现随机性，不会选择问题、加载案例或启动执行。",
             )
             custom_seed = st.number_input(
-                "Custom seed",
+                "自定义随机种子",
                 min_value=0,
                 max_value=2_147_483_647,
                 step=1,
@@ -656,12 +748,13 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
                 disabled=seed_mode != "Custom",
             )
             if st.session_state.research_example_case:
-                st.caption("Competition reproducibility seed：20260831（可修改）")
+                st.caption("比赛示例可复现随机种子：20260831（可修改）")
             max_iterations = st.number_input("最大修订次数", min_value=0, max_value=10, value=2)
             planning_only = st.checkbox(
-                "仅规划模式",
-                value=True,
-                help="关闭后，如无真实执行器，项目会明确等待外部执行或用户上传结果。",
+                "仅生成研究方案（不等待实验结果）",
+                value=False,
+                key="research_planning_only",
+                help="未选中时，如无内部执行器，项目会等待研究者完成外部实验并上传真实结果。",
             )
             evidence_review_mode = st.selectbox(
                 "证据审查模式",
@@ -697,7 +790,7 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
             placeholder="例如：已有文献、实验记录或待分析数据。",
         )
         st.caption("上传文件会随项目保存并在本地解析；解析摘要会进入后续研究角色的结构化输入。")
-        if st.button("Start Research / 创建研究项目", type="primary", disabled=not objective.strip()):
+        if st.button("创建研究项目", type="primary", disabled=not objective.strip()):
             try:
                 payload = build_research_start_payload(
                     objective=objective,
@@ -732,7 +825,7 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
                 for upload_error in upload_errors:
                     st.error(upload_error)
             except (ValueError, BackendAPIError) as exc:
-                st.error(exc.detail if isinstance(exc, BackendAPIError) else str(exc))
+                st.error(user_error_message(exc))
 
     render_scientist_model_config(backend_url)
 
@@ -744,14 +837,19 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
     st.subheader("项目状态")
     columns = st.columns(5)
     phase = project.get("phase", "")
+    execution_capability = project.get("execution_capability") or (
+        "PLANNING_ONLY" if project.get("planning_only", True) else "EXTERNAL_EXECUTION_REQUIRED"
+    )
     phase_label = PHASE_LABELS.get(phase, phase)
-    if phase == "EXECUTION_WAITING" and not project.get("planning_only", True):
-        phase_label = "EXTERNAL_EXECUTION_REQUIRED"
+    if phase == "EXECUTION_WAITING" and execution_capability == "INTERNAL_EXECUTABLE":
+        phase_label = "可以开始数值实验"
+    elif phase == "EXECUTION_WAITING" and execution_capability == "EXTERNAL_EXECUTION_REQUIRED":
+        phase_label = "等待外部实验结果"
     elif phase == "HUMAN_INTERVENTION_REQUIRED":
-        phase_label = "HUMAN_ACTION_REQUIRED"
+        phase_label = "需要人工处理"
     columns[0].metric("当前阶段", phase_label)
-    columns[1].metric("研究模式", project.get("research_mode") or "待选择")
-    columns[2].metric("研究领域", project.get("domain") or "通用")
+    columns[1].metric("研究模式", research_mode_label(project.get("research_mode")))
+    columns[2].metric("研究领域", domain_label(project.get("domain")))
     pending_cycle = 1 if project.get("phase") == "HUMAN_REVISION_REVIEW" and project.get("revision_issues") else 0
     columns[3].metric("修订轮次", project.get("iteration", 0) + pending_cycle)
     budget = project.get("budget") or {}
@@ -759,11 +857,15 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
     st.caption(f"项目 ID：{project.get('project_id')}")
     seed_label = project.get("reproducibility_seed")
     st.caption(
-        f"Workflow：{project.get('workflow_version') or 'general_research_v1'} · "
-        f"Reproducibility seed：{seed_label if seed_label is not None else 'Auto'}"
+        f"工作流版本：{project.get('workflow_version') or 'general_research_v1'} · "
+        f"可复现随机种子：{seed_label if seed_label is not None else '自动'}"
     )
-    if phase == "EXECUTION_WAITING" and not project.get("planning_only", True):
-        st.warning("EXTERNAL_EXECUTION_REQUIRED：当前问题没有已批准的自动执行器。请完成外部实验并上传实验结果。")
+    capability_view = execution_capability_view(execution_capability)
+    st.info(f"执行方式：{capability_view['label']}。{capability_view['description']}")
+    if phase == "EXECUTION_WAITING" and execution_capability == "INTERNAL_EXECUTABLE":
+        st.success(capability_view["action"])
+    elif phase == "EXECUTION_WAITING" and execution_capability == "EXTERNAL_EXECUTION_REQUIRED":
+        st.warning(capability_view["action"])
     elif phase == "DATA_ANALYSIS":
         st.info("实验结果已登记。系统只会在已接入真实分析能力时继续，不会伪造分析结果。")
     if project.get("model_overrides"):
@@ -780,6 +882,39 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
         expanded=bool(project.get("research_assets")),
         allow_experimental_results=True,
     )
+
+    execution_summary = project.get("internal_execution_summary") or {}
+    if execution_summary:
+        st.subheader("确定性执行闭环")
+        comparison = execution_summary.get("comparison") or {}
+        iteration_comparison = comparison.get("iteration") or {}
+        result_columns = st.columns(4)
+        result_columns[0].metric("第一轮 RMSE", f"{iteration_comparison.get('round_1_rmse', 0):.6f}")
+        result_columns[1].metric("第二轮 RMSE", f"{iteration_comparison.get('round_2_rmse', 0):.6f}")
+        result_columns[2].metric(
+            "迭代改善", f"{iteration_comparison.get('relative_rmse_gain_percent', 0):.2f}%"
+        )
+        result_columns[3].metric("执行状态", status_label(execution_summary.get("status", "unknown")))
+        st.caption(
+            "第二轮计划由第一轮真实执行结果、质量反馈和计划调整生成；"
+            "所有数值来自白名单确定性执行器。"
+        )
+        _render_execution_round("第一轮执行结果", execution_summary.get("round_1") or {})
+        feedback_signals = execution_summary.get("feedback_signals") or []
+        if feedback_signals:
+            feedback = feedback_signal_view(feedback_signals[-1])
+            st.markdown("### 第一轮反馈")
+            st.markdown(f"**触发原因：** {feedback['trigger']}")
+            st.markdown("**质量判断：** " + ("；".join(feedback["flags"]) or "未发现质量警告"))
+            if feedback["evidence_refs"]:
+                st.caption("证据引用：" + "、".join(feedback["evidence_refs"]))
+        adjustments = execution_summary.get("plan_adjustments") or []
+        if adjustments:
+            st.markdown("### 第二轮计划调整")
+            st.dataframe(plan_adjustment_rows(adjustments[-1]), use_container_width=True, hide_index=True)
+        _render_execution_round("第二轮执行结果", execution_summary.get("round_2") or {})
+        with st.expander("查看原始结构化数据（开发者）", expanded=False):
+            st.json(execution_summary)
 
     metrics = project.get("quality_metrics") or {}
     st.subheader("研究质量")
@@ -935,7 +1070,7 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
                     endpoint = f"/api/research/{project['project_id']}/hypotheses/{selected_hypothesis}"
                 _research_patch(backend_url, endpoint or "", {"patch": patch, "reason": edit_reason})
             except BackendAPIError as exc:
-                st.error(exc.detail if isinstance(exc, BackendAPIError) else str(exc))
+                st.error(user_error_message(exc))
 
     with st.expander("提供数据"):
         paths = st.text_area("产物路径（每行一个）", key="data_paths")
@@ -965,13 +1100,11 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
         "code_runner": "任意代码运行器",
         "citation_manager": "外部引用管理器",
     }
-    capability_columns[0].write([
-        capability_labels.get(name, name) for name in project.get("available_tools") or []
-    ])
+    available_labels = [capability_labels.get(name, name) for name in project.get("available_tools") or []]
+    capability_columns[0].markdown("\n".join(f"- {item}" for item in available_labels) or "- 暂无")
     capability_columns[1].write("**尚未接入的能力**")
-    capability_columns[1].write([
-        capability_labels.get(name, name) for name in project.get("missing_capabilities") or []
-    ])
+    missing_labels = [capability_labels.get(name, name) for name in project.get("missing_capabilities") or []]
+    capability_columns[1].markdown("\n".join(f"- {item}" for item in missing_labels) or "- 暂无")
     if show_debug:
         st.write("**原始能力 ID**")
         render_debug_object({"available_tools": project.get("available_tools") or [], "missing_capabilities": project.get("missing_capabilities") or []})
@@ -1021,14 +1154,14 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
                 if url:
                     st.markdown(f"[查看原始来源]({url})")
         if not evidence:
-            st.caption("尚未形成经过验证的正式 Evidence。")
+            st.caption("尚未形成经过验证的正式证据。")
     with tabs[2]:
         claims = project.get("claims") or []
         if not claims:
             st.info("尚未形成主张与证据映射。")
         for claim in claims:
             st.markdown(f"**{claim.get('statement', '未命名主张')}**")
-            st.caption(f"状态：{claim.get('status', 'unknown')}；支持证据：{', '.join(claim.get('supporting_evidence_ids') or []) or '无'}；反驳证据：{', '.join(claim.get('contradicting_evidence_ids') or []) or '无'}")
+            st.caption(f"状态：{status_label(claim.get('status', 'unknown'))}；支持证据：{', '.join(claim.get('supporting_evidence_ids') or []) or '无'}；反驳证据：{', '.join(claim.get('contradicting_evidence_ids') or []) or '无'}")
     with tabs[3]:
         hypotheses = project.get("hypotheses") or []
         if not hypotheses:
@@ -1040,7 +1173,7 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
                 _render_named_list("可证伪条件", hypothesis.get("falsification_conditions") or [])
                 _render_named_list("竞争性解释", hypothesis.get("alternative_explanations") or [])
     with tabs[4]:
-        st.markdown(f"**研究模式：** {project.get('research_mode') or '尚未选择'}")
+        st.markdown(f"**研究模式：** {research_mode_label(project.get('research_mode'))}")
         st.markdown(f"**方法选择依据：** {project.get('method_rationale') or '尚未生成'}")
         _render_named_list("有效性威胁", project.get("validity_threats") or [])
         _render_named_list("必要控制", project.get("required_controls") or [])
@@ -1099,7 +1232,7 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
                         + " → ".join(f"v{version}" for version in all_versions)
                     )
         for plan in plans:
-            st.markdown(f"### Independent Review v{plan.get('review_version')} → 修订轮次 {plan.get('revision_cycle')}")
+            st.markdown(f"### 独立审查 v{plan.get('review_version')} → 修订轮次 {plan.get('revision_cycle')}")
             summary = st.columns(4)
             summary[0].metric("人工接受", len(plan.get("approved_issues") or []))
             summary[1].metric("延期执行", len(plan.get("deferred_issues") or []))
@@ -1125,10 +1258,7 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
     with tabs[10]:
         conclusion = project.get("conclusion")
         if conclusion:
-            _render_mapping_sections(conclusion, {
-                "supported_findings": "有证据支持的发现", "unsupported_or_inconclusive": "尚无定论",
-                "uncertainties": "不确定性", "limitations": "局限", "next_questions": "后续问题",
-            })
+            _render_final_synthesis(conclusion)
         else:
             st.info("最终研究计划尚未生成。")
         render_research_downloads(backend_url, project)
@@ -1163,6 +1293,17 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
             artifact_rows = [{"type": item.get("artifact_type"), "file": item.get("filename"), "version": item.get("version")} for item in normalize_records(artifacts)]
             if artifact_rows:
                 st.dataframe(artifact_rows, use_container_width=True, hide_index=True)
+
+    with st.expander("查看原始结构化数据（开发者）", expanded=False):
+        raw_sections = {
+            "项目概览": project,
+            "证据与来源": {"evidence": project.get("evidence"), "source_selection_snapshots": project.get("source_selection_snapshots")},
+            "独立审查": project.get("reviews") or [],
+            "修订历史": {"revision_issues": project.get("revision_issues"), "approved_revision_plans": project.get("approved_revision_plans")},
+            "最终综合": project.get("conclusion") or {},
+        }
+        raw_section = st.selectbox("数据范围", list(raw_sections), key=f"raw_section_{project.get('project_id')}")
+        st.json(raw_sections[raw_section])
 
 
 def _render_revision_review_gate(
@@ -1228,7 +1369,7 @@ def _render_revision_review_gate(
             st.markdown(f"**问题：** {issue.get('problem') or '未说明的问题'}")
             st.markdown(f"**严重性：** {_revision_classification_label(classification)}")
             st.markdown(f"**影响：** {issue.get('impact') or '尚未说明'}")
-            _render_named_list("Reviewer 建议", issue.get("reviewer_recommendations") or [])
+            _render_named_list("审查员建议", issue.get("reviewer_recommendations") or [])
             _render_named_list("验收标准", issue.get("completion_criteria") or [])
             st.markdown(f"**目标：** {_revision_target_label(issue.get('target'))}")
             default = "defer_execution" if classification == "execution_prerequisite" else (
@@ -1244,7 +1385,7 @@ def _render_revision_review_gate(
                     "provide_content": "我自己提供补充信息",
                     "accept_limitation": "接受为研究局限性",
                     "defer_execution": "延期到执行阶段",
-                    "reject": "不同意 Reviewer 此项建议",
+                    "reject": "不同意审查员此项建议",
                 }[value],
                 key=f"revision_disposition_{project_id}_{issue_id}",
             )
@@ -1426,10 +1567,28 @@ def _render_evidence_curation_gate(
         summary[1].metric("AI 初步推荐", len(recommended))
         summary[2].metric("正式证据", len(project.get("evidence") or []))
         st.info("AI 负责发现和说明资料，最终是否采用由你决定。只有保留的来源才会进入正式提取和验证。")
+        if not candidates:
+            records = checkpoint.get("query_records") or []
+            completed_without_sources = len(
+                [item for item in records if item.get("status") == "completed"]
+            )
+            timed_out = len([item for item in records if item.get("status") == "timeout"])
+            failed = len([item for item in records if item.get("status") == "failed"])
+            planned = len((checkpoint.get("search_plan") or {}).get("queries") or [])
+            not_attempted = max(0, planned - len(records))
+            st.warning(
+                "本轮没有取得带 URL、DOI 或其他可核验标识的候选来源，系统不会把无来源的模型文本当作证据。"
+                "你可以重新生成检索方案，或在下方登记 DOI、URL、论文标题并继续。"
+            )
+            st.caption(
+                f"诊断：{completed_without_sources} 条查询完成但无来源元数据；"
+                f"{timed_out} 条超时；{failed} 条失败；{not_attempted} 条未执行。"
+            )
         for item in [*recommended, *[x for x in candidates if x not in recommended and x not in excluded]]:
             _render_source_candidate_card(project_id, item, initially_expanded=item in recommended)
         if excluded:
-            with st.expander(f"AI 建议排除（{len(excluded)}）"):
+            with st.container(border=True):
+                st.markdown(f"**AI 建议排除（{len(excluded)}）**")
                 for item in excluded:
                     _render_source_candidate_card(project_id, item, initially_expanded=False)
 
@@ -1484,7 +1643,7 @@ def _render_evidence_curation_gate(
                 {"decisions": decisions, "selection_note": note},
             )
         if action_columns[1].button(
-            "重新检索", disabled=job_running, key=f"research_sources_again_{project_id}"
+            "重新生成检索方案", disabled=job_running, key=f"research_sources_again_{project_id}"
         ):
             _research_action(backend_url, f"/api/research/{project_id}/search-plan/regenerate", {})
         if action_columns[2].button(
@@ -1713,7 +1872,7 @@ def _start_research_step_job(backend_url: str, project_id: str) -> None:
             if isinstance(detail, dict):
                 render_debug_object(detail)
             else:
-                st.write(detail)
+                st.caption(user_error_message(detail))
 
 
 def _research_action(backend_url: str, path: str, payload: dict | None = None) -> None:
@@ -1724,7 +1883,7 @@ def _research_action(backend_url: str, path: str, payload: dict | None = None) -
         refresh_research_project(backend_url)
         st.rerun()
     except BackendAPIError as exc:
-        st.error(exc.detail)
+        st.error(user_error_message(exc))
 
 
 def _research_patch(backend_url: str, path: str, payload: dict) -> None:
@@ -1750,6 +1909,7 @@ STATE_DEFAULTS = {
     "research_constraints_text": "",
     "research_seed_mode": "Auto",
     "research_custom_seed": 20260831,
+    "research_planning_only": False,
     "research_example_case": "",
     "research_example_notice": "",
 }

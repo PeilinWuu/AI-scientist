@@ -190,7 +190,7 @@ class StructuredQwenClient:
         if not api_key:
             raise RuntimeError("DASHSCOPE_API_KEY is missing. Please set it in .env.")
         self.http_client = httpx.Client(
-            timeout=float(os.getenv("AI_SCIENTIST_MODEL_TIMEOUT", "300")),
+            timeout=float(os.getenv("AI_SCIENTIST_MODEL_TIMEOUT", "600")),
             trust_env=False,
         )
         self.client = OpenAI(

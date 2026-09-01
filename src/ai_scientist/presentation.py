@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from src.ai_scientist.quality import source_level_distribution
@@ -42,7 +43,175 @@ PHASE_LABELS = {
     "HUMAN_APPROVAL": "等待人工批准",
     "SYNTHESIS": "形成研究方案",
     "COMPLETED": "研究方案完成",
+    "EXECUTION_WAITING": "等待实验执行",
+    "EXECUTION": "正在执行实验",
+    "DATA_ANALYSIS": "分析实验结果",
+    "HUMAN_INTERVENTION_REQUIRED": "需要人工处理",
+    "FAILED": "执行失败",
+    "CANCELLED": "项目已取消",
 }
+
+STATUS_LABELS = {
+    "success": "执行成功",
+    "complete": "已完成",
+    "completed": "已完成",
+    "failed": "执行失败",
+    "rejected": "已拒绝",
+    "pending": "等待处理",
+    "running": "正在运行",
+    "queued": "等待运行",
+    "approve": "通过",
+    "revise": "需要修订",
+    "reject": "不通过",
+    "supported": "有证据支持",
+    "partially_supported": "部分支持",
+    "unsupported": "证据不足",
+    "contradicted": "存在反证",
+    "unknown": "尚未判断",
+}
+
+EXECUTION_CAPABILITY_VIEWS = {
+    "INTERNAL_EXECUTABLE": {
+        "label": "系统可直接执行数值实验",
+        "description": "当前研究已绑定经过批准的确定性执行器；只有点击“运行下一阶段”后才会开始执行。",
+        "action": "运行下一阶段，系统将保存真实执行结果和反馈记录。",
+    },
+    "EXTERNAL_EXECUTION_REQUIRED": {
+        "label": "需要研究者完成外部实验",
+        "description": "当前问题没有可安全自动运行的执行器，系统不会伪造实验、仪器或分析结果。",
+        "action": "请在外部完成实验后上传 CSV、Excel、JSON、文本或 PDF 结果，再运行下一阶段。",
+    },
+    "PLANNING_ONLY": {
+        "label": "仅生成研究方案",
+        "description": "本项目只生成经过审查的研究方案，不执行实验或数据分析。",
+        "action": "完成方案审查后，可下载研究包供后续人工执行。",
+    },
+}
+
+
+def status_label(value: Any) -> str:
+    """Translate known machine statuses while preserving unknown values."""
+
+    text = "" if value is None else str(value)
+    return STATUS_LABELS.get(text, PHASE_LABELS.get(text, text))
+
+
+def execution_capability_view(value: Any) -> dict[str, str]:
+    key = "" if value is None else str(value)
+    return dict(
+        EXECUTION_CAPABILITY_VIEWS.get(
+            key,
+            {"label": key or "尚未判断", "description": "执行能力尚未确定。", "action": "请继续完成研究规划。"},
+        )
+    )
+
+
+def determine_output_language(text: str, explicit: str | None = None) -> str:
+    """Choose a response language without changing any research schema."""
+
+    normalized = (explicit or "auto").strip().lower()
+    if normalized in {"en", "english", "en-us", "en-gb"}:
+        return "en"
+    if normalized in {"zh", "zh-cn", "chinese", "中文"}:
+        return "zh-CN"
+    content = text or ""
+    if re.search(r"\b(?:respond|answer|write|output|reply)\s+in\s+english\b", content, re.I) or "请用英文" in content:
+        return "en"
+    if re.search(r"[\u4e00-\u9fff]", content):
+        return "zh-CN"
+    return "auto"
+
+
+def language_instruction(language: str) -> str:
+    if language == "zh-CN":
+        return "所有面向用户的自然语言字段使用简体中文；字段名和引用 ID 保持结构化 schema 要求。"
+    if language == "en":
+        return "Write all user-facing natural-language fields in English; preserve schema field names and reference IDs."
+    return "Use the language of the user's research question for user-facing natural-language fields."
+
+
+def research_mode_label(value: Any) -> str:
+    return _mode_label(value) if value else "尚未选择"
+
+
+def domain_label(value: Any) -> str:
+    return _domain_label(str(value)) if value else "通用研究"
+
+
+def feedback_signal_view(signal: dict[str, Any]) -> dict[str, Any]:
+    observed = signal.get("observed_result") or signal.get("observed_metrics") or signal.get("metrics") or {}
+    flags = signal.get("quality_flags") or signal.get("flags") or signal.get("diagnostic_flags") or []
+    flag_labels = {
+        "boundary_optimum": "最优值位于搜索边界",
+        "coarse_resolution": "搜索分辨率偏粗",
+        "insufficient_improvement": "改善幅度不足",
+        "high_error": "拟合误差仍较高",
+        "rmse_above_success_threshold": "RMSE 尚未达到成功阈值",
+    }
+    trigger_labels = {
+        "round_1_deterministic_fit_evaluation": "第一轮确定性拟合未达到预设成功阈值",
+    }
+    raw_trigger = signal.get("trigger") or signal.get("reason")
+    return {
+        "status": status_label(signal.get("status")),
+        "round": signal.get("round") or signal.get("research_round"),
+        "rmse": observed.get("rmse", signal.get("rmse")),
+        "flags": [flag_labels.get(str(item), str(item)) for item in flags],
+        "trigger": trigger_labels.get(str(raw_trigger), str(raw_trigger)) if raw_trigger else "根据本轮真实执行结果生成反馈。",
+        "evidence_refs": list(signal.get("evidence_refs") or signal.get("source_artifact_ids") or []),
+    }
+
+
+def plan_adjustment_rows(adjustment: dict[str, Any]) -> list[dict[str, Any]]:
+    old_value = adjustment.get("old_value") or {}
+    new_value = adjustment.get("new_value") or {}
+    fields = list(dict.fromkeys([*old_value.keys(), *new_value.keys()]))
+    return [
+        {
+            "调整项": field,
+            "调整前": old_value.get(field),
+            "调整后": new_value.get(field),
+            "原因": adjustment.get("reason") or "根据本轮反馈调整",
+            "证据引用": "、".join(adjustment.get("evidence_refs") or []),
+        }
+        for field in fields
+    ]
+
+
+def execution_result_view(result: dict[str, Any]) -> dict[str, Any]:
+    metrics = result.get("metrics") or result.get("evaluation") or {}
+    parameters = result.get("best_parameters") or result.get("parameters") or {}
+    artifacts = result.get("artifacts") or result.get("artifact_refs") or []
+    return {
+        "status": status_label(result.get("status")),
+        "executor": result.get("executor_name") or result.get("executor_id") or "确定性白名单执行器",
+        "seed": result.get("reproducibility_seed", result.get("seed")),
+        "evaluations": result.get("evaluation_count", metrics.get("evaluations")),
+        "rmse": metrics.get("rmse", result.get("rmse")),
+        "best_parameters": parameters,
+        "duration_ms": result.get("duration_ms", result.get("latency_ms")),
+        "artifacts": [
+            (item.get("filename") or item.get("relative_path") or item.get("artifact_type"))
+            if isinstance(item, dict)
+            else str(item)
+            for item in artifacts
+        ],
+    }
+
+
+def user_error_message(error: Any) -> str:
+    """Return a safe, concise user-facing message; diagnostics stay in developer details."""
+
+    detail = getattr(error, "detail", error)
+    if isinstance(detail, list):
+        messages = [str(item.get("msg") or "输入内容不符合要求") for item in detail if isinstance(item, dict)]
+        return "提交内容有误：" + "；".join(messages[:3])
+    if isinstance(detail, dict):
+        detail = detail.get("error_message") or detail.get("message") or detail.get("detail")
+    text = str(detail or "操作未完成，请稍后重试。")
+    if "Traceback" in text:
+        return "操作未完成。技术详情已隐藏，可在开发者调试模式中查看。"
+    return text[:500]
 
 
 def render_research_question(question: ResearchQuestion | None) -> str:

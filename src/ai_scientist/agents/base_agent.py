@@ -9,6 +9,7 @@ from typing import Any, Generic, TypeVar
 from pydantic import BaseModel
 
 from src.ai_scientist.schemas import ResearchProject
+from src.ai_scientist.presentation import determine_output_language, language_instruction
 from src.ai_scientist.skill_loader import SkillLoader
 from src.ai_scientist.structured_client import StructuredCallMetadata, StructuredQwenClient
 
@@ -44,6 +45,9 @@ class BaseResearchAgent(Generic[OutputT]):
             domain_skill,
         )
         payload = self.build_payload(project)
+        output_language = determine_output_language(project.objective)
+        payload["output_language"] = output_language
+        payload["language_rule"] = language_instruction(output_language)
         asset_context = parsed_asset_context(project)
         if asset_context["assets"]:
             payload["uploaded_asset_context"] = asset_context

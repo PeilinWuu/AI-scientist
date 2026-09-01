@@ -1,13 +1,13 @@
 {
-  "execution_id": "execution_22e5caa8e20444d9bf4fb9dd83231e8c",
-  "request_id": "request_19e6413eb37c4a93a86ef00e6d8f2546",
+  "execution_id": "execution_119b1279c413408baea37a1be688cb40",
+  "request_id": "request_7b8ea27df4c04e129fd3e1b7aa699fc8",
   "operation": "run_simulation",
   "status": "success",
-  "started_at": "2026-08-31T05:42:42.930166Z",
-  "finished_at": "2026-08-31T05:42:42.968426Z",
-  "duration_ms": 38,
+  "started_at": "2026-08-31T12:46:56.767400Z",
+  "finished_at": "2026-08-31T12:46:56.807391Z",
+  "duration_ms": 40,
   "seed": 20260831,
-  "input_fingerprint": "647b3a0572bc2091fdc6280ab09d9237f6667f57f7f6ddf4b5125bb492283ff4",
+  "input_fingerprint": "2d8a8991da8679028d9f254a141051eeeb4f893b44feda2841a971e8300e48c2",
   "input_checksums": {
     "observations_path": "eeda48d77cfc67cd728fa2964098f712db5cdbd1d2320d6532cdf616e66ea95c"
   },
@@ -39,7 +39,7 @@
   },
   "artifacts": [
     {
-      "artifact_id": "artifact_5a7e60622d174b3cbcef07dad462182f",
+      "artifact_id": "artifact_3a0147aaeca245f4b7ed116e4bcdd006",
       "artifact_type": "fit_result",
       "relative_path": "comparison/baseline_execution/fit_result.json",
       "media_type": "application/json",
@@ -47,7 +47,7 @@
       "size_bytes": 228
     },
     {
-      "artifact_id": "artifact_b53d8e1580b943ddb544f5416094110e",
+      "artifact_id": "artifact_8d027b246e934528802c0cbe0582bdc2",
       "artifact_type": "fit_grid",
       "relative_path": "comparison/baseline_execution/fit_grid.csv",
       "media_type": "text/csv",
@@ -55,7 +55,7 @@
       "size_bytes": 9560
     },
     {
-      "artifact_id": "artifact_39eeb85ab7614cae8dc300911cbf34d2",
+      "artifact_id": "artifact_64f830303b00472d805a25545e178162",
       "artifact_type": "fit",
       "relative_path": "comparison/baseline_execution/fit.png",
       "media_type": "image/png",

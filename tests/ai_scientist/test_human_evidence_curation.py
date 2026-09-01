@@ -9,6 +9,7 @@ from src.ai_scientist.evidence_curation import (
     bind_search_plan,
     compute_question_hash,
     deterministic_plan_relevance,
+    parse_human_source,
     validate_checkpoint_binding,
     validate_search_plan_binding,
 )
@@ -274,6 +275,14 @@ def test_human_sources_accept_doi_pmid_url_and_assets_are_locally_parsed(
     updated = orchestrator.register_research_asset(item.project_id, "paper.txt", "text/plain", b"text")
     assert updated.research_assets[-1].parsing_status == "parsed"
     assert updated.research_assets[-1].parsed_artifact_id
+
+
+def test_human_source_arxiv_url_is_not_misclassified_as_pmid() -> None:
+    source = parse_human_source("https://arxiv.org/abs/physics/0412102", 1)
+
+    assert source.arxiv_id == "physics/0412102"
+    assert source.pmid is None
+    assert source.url == "https://arxiv.org/abs/physics/0412102"
 
 
 def test_research_assets_support_reference_and_data_upload_contexts(tmp_path: Path) -> None:

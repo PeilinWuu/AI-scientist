@@ -1,9 +1,9 @@
 {
-  "signal_id": "feedback_c67676c5601f4988a1f3051d888c5ab6",
+  "signal_id": "feedback_3aa82b440bbb4d1f9bec0b6e7c81ad39",
   "source_artifact_ids": [
-    "artifact_a7a17f73aba5426b9c5c80e21ab52714",
-    "artifact_365e769dcf454991a4afcd28d81fc9ca",
-    "artifact_d3a97bdbd99e433aba594997c761f16f"
+    "artifact_5a34fecfbfc44c8683699cc329da0f5b",
+    "artifact_3c628d29829c459ea6fa62f4cd41f240",
+    "artifact_c640243e2eea40b9af84f7a1765685a6"
   ],
   "observed_result": {
     "rmse": 0.05768367179165266,

@@ -8,6 +8,7 @@ from types import SimpleNamespace
 import pytest
 
 from src.pure_qwen_client import PureQwenClient
+from src.ai_scientist.tools.search_tools import _search_candidates
 from src.search_qwen_client import (
     SEARCH_TOOLS,
     SearchQwenClient,
@@ -134,6 +135,33 @@ def test_sources_and_tool_usage_are_separate_from_reply() -> None:
     assert extract_final_text(response) == "Answer [1]"
 
 
+def test_evidence_candidates_accept_bailian_output_annotations() -> None:
+    annotation = SimpleNamespace(
+        type="url_citation",
+        url="https://example.com/paper",
+        title="Cited paper",
+        site_name="example.com",
+        snippet="A provider-owned citation.",
+    )
+    response = SimpleNamespace(
+        output=[
+            SimpleNamespace(type="web_search_call", action=SimpleNamespace(sources=[])),
+            SimpleNamespace(
+                type="message",
+                role="assistant",
+                content=[SimpleNamespace(type="output_text", text="Answer [1]", annotations=[annotation])],
+            ),
+        ]
+    )
+
+    candidates = _search_candidates(response, "bounded oscillator search")
+
+    assert len(candidates) == 1
+    assert candidates[0].url == "https://example.com/paper"
+    assert candidates[0].title == "Cited paper"
+    assert candidates[0].source_domain == "example.com"
+
+
 def test_search_production_source_has_no_manual_prompt_fragments() -> None:
     production_files = [Path("app_streamlit.py"), *Path("src").rglob("*.py")]
     source = "\n".join(path.read_text(encoding="utf-8") for path in production_files)
@@ -163,4 +191,3 @@ def test_search_client_uses_responses_tools_without_messages() -> None:
     assert '"type": "web_extractor"' in source
     assert '"role": "system"' not in source
     assert "chat.completions.create" not in source
-

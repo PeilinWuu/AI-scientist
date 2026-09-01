@@ -1189,6 +1189,11 @@ class ResearchProject(StrictModel):
     )
     stage_messages: list[str] = Field(default_factory=list)
     planning_only: bool = True
+    execution_capability: Literal[
+        "INTERNAL_EXECUTABLE", "EXTERNAL_EXECUTION_REQUIRED", "PLANNING_ONLY"
+    ] = "PLANNING_ONLY"
+    executor_binding: str | None = None
+    internal_execution_summary: dict[str, Any] = Field(default_factory=dict)
     domain_hint: str | None = None
     method_rationale: str = ""
     validity_threats: list[str] = Field(default_factory=list)
