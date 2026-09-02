@@ -1,0 +1,57 @@
+{
+  "project_id": "project_f9374def244c4829b4b8d8c52f4d56d2",
+  "question_hash": "c238de55d8067641f8211466d15868f719a70cfd8952555859107291de589148",
+  "search_plan_id": "sp_f9374def244c4829b4b8d8c52f4d56d2_v1",
+  "search_artifact_id": null,
+  "search_completed": false,
+  "normalization_completed": false,
+  "search_payload": null,
+  "search_plan": {
+    "search_plan_id": "sp_f9374def244c4829b4b8d8c52f4d56d2_v1",
+    "project_id": "project_f9374def244c4829b4b8d8c52f4d56d2",
+    "research_question_version": 1,
+    "question_hash": "c238de55d8067641f8211466d15868f719a70cfd8952555859107291de589148",
+    "version": 2,
+    "generated_at": "2026-06-22T00:00:00Z",
+    "planner_model": "qwen3.8-max",
+    "queries": [
+      "UCI Machine Learning Repository Iris dataset 150 instances sepal length petal length species schema",
+      "\"Iris\" dataset \"sepal length\" \"petal length\" Pearson correlation overall setosa versicolor virginica",
+      "Fisher 1936 Iris measurements correlation sepal length petal length species differences",
+      "Iris dataset species-specific correlation sepal length petal length confidence interval"
+    ],
+    "target_source_types": [
+      "dataset repository documentation",
+      "dataset citation or provenance record",
+      "peer-reviewed or statistical reference source",
+      "secondary descriptive analysis of the Iris dataset"
+    ],
+    "preferred_databases": [
+      "UCI Machine Learning Repository",
+      "Google Scholar",
+      "Crossref",
+      "Wikipedia"
+    ],
+    "date_constraints": [
+      "Prefer original dataset documentation or sources from 1936 onward; include modern repository documentation if it confirms schema or sample counts."
+    ],
+    "maximum_queries": 4,
+    "rationale": "The uploaded file is treated only as untrusted research material indicating a possible 150-row Iris dataset with sepal_length_cm, petal_length_cm, and species columns; it does not verify external sources. Queries aim to confirm the canonical dataset source, schema/sample counts, and any published or documented correlations between sepal length and petal length overall and by species. The queries discriminate between dataset documentation, original citation/provenance, and species-specific correlation evidence without performing analysis or making conclusions.",
+    "relevance_status": "relevant",
+    "relevance_note": "检索式覆盖核心概念：iris, setosa, versicolor, virginica。 这些查询直接围绕公开 Iris 数据集、萼片长度与花瓣长度、三个物种分组、Pearson 相关或相关系数及置信区间展开，与研究问题的描述性与关联性分析目标高度一致。",
+    "approved_at": null,
+    "approved_by": null
+  },
+  "query_records": [],
+  "candidates": [],
+  "selected_candidates": [],
+  "source_selection_completed": false,
+  "awaiting_search_plan_review": true,
+  "search_plan_approved": false,
+  "awaiting_source_review": false,
+  "source_selection_id": null,
+  "extraction_completed": false,
+  "started_at": "2026-09-01T07:04:54.602984Z",
+  "last_activity_at": null,
+  "elapsed_seconds": 0.0
+}

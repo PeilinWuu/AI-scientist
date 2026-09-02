@@ -1,0 +1,33 @@
+{
+  "evidence_quality_score": 8.7,
+  "methodological_validity_score": 9.0,
+  "feasibility_score": 8.5,
+  "reproducibility_score": 8.8,
+  "claim_support_score": 8.8,
+  "uncertainty_handling_score": 9.2,
+  "blocking_issues": [],
+  "non_blocking_issues": [
+    "EVD-002 的 duplicate_of 字段写为 'EV-001'，而当前证据编号为 EVD-001，存在标识不一致，但不影响证据内容判断。",
+    "EVD-003 中 verification_status 为 'verified' 但 verified 为 false、status 为 'unverified'，字段状态不一致；应明确其仅为用户上传材料的解析预览，不作为独立验证结论。",
+    "iris_analysis_results.json（asset_5f69e292ef0f4314b611f8f8bc6a4015）为外部确定性分析结果，尚未被当前 evidence 或 claims 显式登记为结果型证据；其内容不能仅因解析而视为已复现。",
+    "样本 35 和 38 的 UCI 已知行级修正在上传文件中的具体状态仍未直接确认，但可作为已知局限保留。",
+    "重复记录数量为 3 来自结果文件描述，尚未在当前 evidence 的 extracted_claims 中作为数据质量观察单独登记。"
+  ],
+  "recommendations": [
+    "将 EVD-002 的 duplicate_of 统一为 EVD-001，或改为 null 并说明其与 EVD-001 的重复关系。",
+    "修正 EVD-003 的状态字段，使其一致表达为：上传材料、已解析预览、未独立验证、不作为统计执行结果。",
+    "为 iris_analysis_results.json 增加一条结果型证据记录，明确其 asset_id、content_sha256、来源为外部确定性分析、仅作为待审查结果材料而非本项目已执行计算。",
+    "在最终分析报告中保留说明：总体相关可能主要受物种间均值差异驱动；setosa 组内相关置信区间包含接近零，应描述为组内线性关联弱或不确定性高。",
+    "在最终报告中继续明确区分：UCI 文档证据、上传文件解析摘要、外部分析结果文件、以及需要由审计工具确认的计算结果。"
+  ],
+  "decision": "approve",
+  "failed_quality_gates": [],
+  "required_revision_target": "none",
+  "revision_plan": [],
+  "approval_conditions": [
+    "本批准限于当前修订闭环：已批准的两个 blocking issues 已通过人工提供的上传数据资产和权威来源说明得到处理。",
+    "后续分析执行不得将解析摘要或外部结果文件的出现本身视为本项目已完成统计计算。",
+    "最终结论必须继续限定为描述性与关联性分析，不推断因果关系、生物学机制或超出该上传数据集的普遍规律。",
+    "如果后续执行阶段发现实际读取行数、缺失值、物种标签、重复数或相关统计结果与上传解析摘要或外部结果文件不一致，应暂停并记录差异。"
+  ]
+}

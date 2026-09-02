@@ -1,0 +1,2275 @@
+{
+  "project_id": "project_f9374def244c4829b4b8d8c52f4d56d2",
+  "title": "Iris 数据中萼片长度与花瓣长度线性关联的描述与物种间比较",
+  "status": "COMPLETED",
+  "workflow_version": "general_research_v1@1.0",
+  "reproducibility_seed": null,
+  "statement": "This report is a research plan produced through AI Scientist multi-role planning and review. No real experiment, simulation, or data analysis has been executed, so it must not be treated as an experimental conclusion.",
+  "uploaded_assets": [
+    {
+      "asset_id": "asset_f8860d8760ed4f01ba7389310e938d03",
+      "filename": "iris_uci.csv",
+      "purpose": "data",
+      "asset_role": "research_material",
+      "research_round": null,
+      "source": "UCI Machine Learning Repository",
+      "description": "UCI Iris Dataset, id=53, DOI 10.24432/C56C76; 150 samples, four measurements in cm and three species. Downloaded from the official UCI archive for this end-to-end test.",
+      "parsing_status": "parsed",
+      "parser_name": "local_delimited_v1",
+      "summary": "Tabular data with 5 columns and 150 scanned data rows.",
+      "content_sha256": "24d7757511c6c8d4850aa86a6fad04b9426b319c635af26e6d413d94fe5bd73e",
+      "warnings": [],
+      "used_by_agents": [
+        "evidence_researcher",
+        "hypothesis_scientist",
+        "methodologist",
+        "study_designer",
+        "analyst",
+        "reproducibility_engineer",
+        "skeptical_reviewer",
+        "scientific_synthesizer",
+        "controlled_python_sandbox_v1"
+      ]
+    },
+    {
+      "asset_id": "asset_d189e2602b104466a6ba39e11b853331",
+      "filename": "iris_uci.csv",
+      "purpose": "data",
+      "asset_role": "experimental_result",
+      "research_round": 1,
+      "source": "UCI Machine Learning Repository / external deterministic analysis",
+      "description": "UCI Iris raw data used for the approved observational analysis.",
+      "parsing_status": "parsed",
+      "parser_name": "local_delimited_v1",
+      "summary": "Tabular data with 5 columns and 150 scanned data rows.",
+      "content_sha256": "24d7757511c6c8d4850aa86a6fad04b9426b319c635af26e6d413d94fe5bd73e",
+      "warnings": [],
+      "used_by_agents": [
+        "skeptical_reviewer",
+        "scientific_synthesizer",
+        "deterministic_data_analysis_v1"
+      ]
+    },
+    {
+      "asset_id": "asset_5f69e292ef0f4314b611f8f8bc6a4015",
+      "filename": "iris_analysis_results.json",
+      "purpose": "other",
+      "asset_role": "experimental_result",
+      "research_round": 1,
+      "source": "UCI Machine Learning Repository / external deterministic analysis",
+      "description": "Deterministic external analysis results: descriptive statistics, overall and species-specific Pearson correlations, Fisher-z 95% confidence intervals, slopes and R-squared.",
+      "parsing_status": "parsed",
+      "parser_name": "local_json_v1",
+      "summary": "JSON document with root type dict.",
+      "content_sha256": "c9694aa9975dd7ef7d0a49290ff0cb90323a1e24c4acf68891dbfd9ca7438eb6",
+      "warnings": [],
+      "used_by_agents": [
+        "skeptical_reviewer",
+        "scientific_synthesizer"
+      ]
+    }
+  ],
+  "research_question": {
+    "original_question": "鸢尾花数据中，萼片长度与花瓣长度是否存在稳定的线性关联？这种关联在三个物种之间是否不同？",
+    "normalized_question": "在公开 Iris 数据集中，萼片长度与花瓣长度之间是否存在稳定的线性关联？该线性关联的强度和方向在 setosa、versicolor、virginica 三个物种之间是否存在差异？",
+    "question_type": "描述性与关联性数据分析",
+    "objective": "通过描述性统计与相关分析评估 Iris 数据中萼片长度与花瓣长度的线性关联，并比较该关联在三个物种间的差异。",
+    "scope": "使用公开 Iris 数据集的全部样本或明确说明的可用样本；变量限定为萼片长度与花瓣长度；分析限定为描述性统计、总体相关、分物种相关和必要的可视化/简单线性拟合描述；按三个物种分组比较。",
+    "operational_definitions": [
+      "稳定的线性关联：在总体和/或分物种样本中，萼片长度与花瓣长度的 Pearson 相关系数具有明确方向、较大绝对值且置信区间不接近零；若使用其他相关指标，应明确说明。",
+      "线性关联：以 Pearson 相关系数为主要度量，可辅以散点图和简单线性回归斜率描述，但不作因果解释。",
+      "三个物种之间的差异：比较 setosa、versicolor、virginica 各自的分物种相关系数及其置信区间，必要时说明相关系数差异的统计学不确定性。",
+      "样本量：用于相关分析的有效观测数，按总体和各物种分别报告。",
+      "研究局限：包括样本代表性、相关不等于因果、可能存在的异常值、线性假设是否充分等。"
+    ],
+    "measurable_success_criteria": [
+      "报告 Iris 数据集总样本量以及每个物种的样本量。",
+      "报告萼片长度和花瓣长度的基本描述统计量，如均值、标准差、最小值、最大值或四分位数。",
+      "报告总体萼片长度与花瓣长度的相关系数，并说明所用相关度量。",
+      "报告三个物种各自的萼片长度与花瓣长度相关系数。",
+      "若可行，提供相关系数置信区间或等价的不确定性描述。",
+      "明确回答是否存在稳定线性关联以及三个物种之间是否存在差异。",
+      "说明分析局限，包括不作因果推断。"
+    ],
+    "assumptions": [
+      "公开 Iris 数据集可获取，且包含萼片长度、花瓣长度和物种字段。",
+      "每个样本同时具有完整的萼片长度、花瓣长度和物种标签。",
+      "数据集中的数值字段单位一致且可直接用于相关分析。",
+      "Pearson 相关系数是衡量线性关联的合适主要指标，除非数据质量或分布特征要求补充说明。",
+      "用户只要求描述与关联分析，不要求建模预测或因果推断。"
+    ],
+    "knowns": [
+      "Iris 是常用的公开花卉形态数据集，通常包含三个物种。",
+      "常见 Iris 数据包含萼片长度、萼片宽度、花瓣长度、花瓣宽度和物种变量。",
+      "不同物种的花部形态可能存在明显差异，因此合并分析与分物种分析可能得到不同关联模式。",
+      "约束要求只做描述性统计与关联分析，不作因果推断。"
+    ],
+    "unknowns": [
+      "实际使用的 Iris 数据版本、来源和字段名。",
+      "数据是否存在缺失值、异常值或重复记录。",
+      "每个物种样本量是否均衡。",
+      "稳定性的判定阈值是否需要预先设定。",
+      "是否需要报告相关系数置信区间或仅报告点估计。"
+    ],
+    "exclusions": [
+      "不进行因果推断或因果语言表述。",
+      "不进行复杂建模、变量选择、预测任务或机器学习评估。",
+      "不引入 Iris 数据集以外的新数据。",
+      "不将相关系数解释为生物学机制或遗传关系的证明。",
+      "不对测量误差来源进行超出数据范围的推断。"
+    ],
+    "missing_information": [
+      "需要确认使用的公开 Iris 数据版本或来源。",
+      "需要确认数据字段中萼片长度、花瓣长度和物种的具体列名。",
+      "需要确认缺失值和异常值的处理规则。",
+      "需要确认相关系数是否必须使用 Pearson，以及是否需要置信区间。",
+      "需要确认‘稳定’是否要求统计显著性、置信区间或预定义阈值。"
+    ]
+  },
+  "scope": "使用公开 Iris 数据集的全部样本或明确说明的可用样本；变量限定为萼片长度与花瓣长度；分析限定为描述性统计、总体相关、分物种相关和必要的可视化/简单线性拟合描述；按三个物种分组比较。",
+  "operational_definitions": [
+    "稳定的线性关联：在总体和/或分物种样本中，萼片长度与花瓣长度的 Pearson 相关系数具有明确方向、较大绝对值且置信区间不接近零；若使用其他相关指标，应明确说明。",
+    "线性关联：以 Pearson 相关系数为主要度量，可辅以散点图和简单线性回归斜率描述，但不作因果解释。",
+    "三个物种之间的差异：比较 setosa、versicolor、virginica 各自的分物种相关系数及其置信区间，必要时说明相关系数差异的统计学不确定性。",
+    "样本量：用于相关分析的有效观测数，按总体和各物种分别报告。",
+    "研究局限：包括样本代表性、相关不等于因果、可能存在的异常值、线性假设是否充分等。"
+  ],
+  "success_criteria": [
+    "报告 Iris 数据集总样本量以及每个物种的样本量。",
+    "报告萼片长度和花瓣长度的基本描述统计量，如均值、标准差、最小值、最大值或四分位数。",
+    "报告总体萼片长度与花瓣长度的相关系数，并说明所用相关度量。",
+    "报告三个物种各自的萼片长度与花瓣长度相关系数。",
+    "若可行，提供相关系数置信区间或等价的不确定性描述。",
+    "明确回答是否存在稳定线性关联以及三个物种之间是否存在差异。",
+    "说明分析局限，包括不作因果推断。"
+  ],
+  "evidence": [
+    {
+      "evidence_id": "EVD-001",
+      "title": "UCI Machine Learning Repository: Iris dataset page (classic path)",
+      "source_type": "unknown",
+      "source_url": "https://archive.ics.uci.edu/ml/datasets/iris",
+      "source_asset_id": null,
+      "citation": "Fisher, R. (1936). Iris [Dataset]. UCI Machine Learning Repository. https://doi.org/10.24432/C56C76",
+      "authors": [
+        "R. A. Fisher"
+      ],
+      "doi": "10.24432/c56c76",
+      "pmid": null,
+      "arxiv_id": null,
+      "official_record_url": "https://archive.ics.uci.edu/ml/datasets/iris",
+      "journal_or_publisher": "UCI Machine Learning Repository",
+      "summary": "Repository page describing the Iris dataset: 150 instances, 4 continuous real-valued features measured in cm (sepal length, sepal width, petal length, petal width), and a categorical class/species target with Iris Setosa, Iris Versicolour, and Iris Virginica. The page reports no missing values and states that the three classes contain 50 instances each. It also notes known discrepancies with Fisher's original article, including corrections for samples 35 and 38. The page documents dataset structure but does not report descriptive statistics or correlation coefficients.",
+      "extracted_claims": [
+        "The UCI Iris dataset contains 150 instances.",
+        "The dataset contains 4 continuous feature variables measured in cm: sepal length, sepal width, petal length, and petal width.",
+        "The class/species variable has three categories: Iris Setosa, Iris Versicolour, and Iris Virginica.",
+        "The three classes contain 50 instances each.",
+        "The repository page states that the dataset has no missing values.",
+        "The page notes that the repository data differ from Fisher's original article and identifies corrections for samples 35 and 38."
+      ],
+      "reliability": "high",
+      "relevance": "high",
+      "limitations": [
+        "The page documents dataset metadata and known row-level corrections but does not provide variable-level statistics, correlation coefficients, or confidence intervals.",
+        "The page notes a discrepancy with Fisher's original article, so the exact numeric values used for analysis may depend on the downloaded file version.",
+        "Candidate verification was only partial; the page content was extracted and summarized but not independently re-verified beyond the provided extraction."
+      ],
+      "publication_date": null,
+      "publication_year": "1936",
+      "status": "partially_verified",
+      "source_level": "A",
+      "is_primary_source": true,
+      "verified": true,
+      "verification_status": "verified",
+      "verification_method": "doi",
+      "verification_note": "DOI is present and normalized; source can be independently checked.",
+      "duplicate_of": null,
+      "retrieval_date": "2026-09-01T07:20:35.102326Z",
+      "reliability_score": 1.0,
+      "relevance_score": 1.0,
+      "selection_provenance": {
+        "selected_by": "human",
+        "selection_id": "source_selection_260bbeebfa3f40ff88055e74f5c0aaf0",
+        "candidate_id": "candidate_b161cd1b77b94394a8c02d70ef772446",
+        "verification_method": "doi"
+      }
+    },
+    {
+      "evidence_id": "EVD-002",
+      "title": "UCI Machine Learning Repository: Iris dataset page (canonical dataset ID 53)",
+      "source_type": "unknown",
+      "source_url": "https://archive.ics.uci.edu/dataset/53/iris",
+      "source_asset_id": null,
+      "citation": "Fisher, R. (1936). Iris [Dataset]. UCI Machine Learning Repository. https://doi.org/10.24432/C56C76",
+      "authors": [
+        "R. A. Fisher"
+      ],
+      "doi": "10.24432/c56c76",
+      "pmid": null,
+      "arxiv_id": null,
+      "official_record_url": "https://archive.ics.uci.edu/dataset/53/iris",
+      "journal_or_publisher": "UCI Machine Learning Repository",
+      "summary": "Canonical UCI repository page for dataset ID 53 with substantially the same Iris dataset description as the classic path: 150 instances, 4 continuous cm-scale features, three species/class labels, no reported missing values, 50 instances per class, and notes about discrepancies with Fisher's original article. This page provides dataset documentation rather than analytical results.",
+      "extracted_claims": [
+        "The canonical UCI Iris dataset page corresponds to dataset ID 53.",
+        "The dataset is described as having 150 instances and 4 features.",
+        "The species/class labels are Iris Setosa, Iris Versicolour, and Iris Virginica.",
+        "The page reports no missing values.",
+        "The page reports known differences from Fisher's original article, including sample 35 and sample 38 corrections."
+      ],
+      "reliability": "high",
+      "relevance": "high",
+      "limitations": [
+        "This page largely duplicates EV-001; it does not add independent evidence for correlations.",
+        "No descriptive statistics or correlation results are provided on the page.",
+        "Verification remains partial because it relies on the provided extraction rather than independent retrieval."
+      ],
+      "publication_date": null,
+      "publication_year": "1936",
+      "status": "partially_verified",
+      "source_level": "A",
+      "is_primary_source": true,
+      "verified": true,
+      "verification_status": "verified",
+      "verification_method": "doi",
+      "verification_note": "DOI is present and normalized; source can be independently checked.",
+      "duplicate_of": "EV-001",
+      "retrieval_date": "2026-09-01T07:20:35.102326Z",
+      "reliability_score": 1.0,
+      "relevance_score": 1.0,
+      "selection_provenance": {
+        "selected_by": "human",
+        "selection_id": "source_selection_260bbeebfa3f40ff88055e74f5c0aaf0",
+        "candidate_id": "candidate_61d4693ecfb54d949cb049094898b79e",
+        "verification_method": "doi"
+      }
+    },
+    {
+      "evidence_id": "EVD-003",
+      "title": "Uploaded tabular research material: iris_uci.csv (UCI Iris dataset file, parsed preview only)",
+      "source_type": "uploaded_dataset",
+      "source_url": null,
+      "source_asset_id": "asset_f8860d8760ed4f01ba7389310e938d03",
+      "citation": null,
+      "authors": [],
+      "doi": "10.24432/c56c76",
+      "pmid": null,
+      "arxiv_id": null,
+      "official_record_url": null,
+      "journal_or_publisher": "UCI Machine Learning Repository (as described in user-provided asset metadata)",
+      "summary": "Parsed preview of an uploaded CSV described as UCI Iris dataset ID 53. The structured summary reports UTF-8-BOM encoding, comma delimiter, five columns (sepal_length_cm, sepal_width_cm, petal_length_cm, petal_width_cm, species), 150 scanned data rows, and zero missing values across the scanned columns. Ten sample rows show Iris-setosa observations with numeric sepal and petal lengths in cm. This is an observation of file structure and a bounded preview; it does not establish that statistical analysis was executed, and values remain unverified user-provided material.",
+      "extracted_claims": [
+        "The uploaded file contains column names sepal_length_cm, sepal_width_cm, petal_length_cm, petal_width_cm, and species.",
+        "The parsed preview scanned 150 data rows and reported the row count as not partial.",
+        "The parsed preview reported zero missing values in the scanned rows for all five columns.",
+        "The sample rows include observations labeled Iris-setosa with numeric sepal_length_cm and petal_length_cm values.",
+        "The asset metadata states the file corresponds to UCI dataset ID 53 with DOI 10.24432/C56C76."
+      ],
+      "reliability": "medium",
+      "relevance": "high",
+      "limitations": [
+        "Uploaded files are untrusted research material; the file's stated provenance is not independently verified.",
+        "Parsing or previewing does not verify that the file is the authoritative UCI version or that all values are error-free.",
+        "The preview does not provide computed means, standard deviations, ranges, correlations, or confidence intervals.",
+        "Content digest and asset_id preserve provenance, but analytical claims require a separate validated computation step."
+      ],
+      "publication_date": null,
+      "publication_year": null,
+      "status": "unverified",
+      "source_level": "C",
+      "is_primary_source": false,
+      "verified": false,
+      "verification_status": "verified",
+      "verification_method": "doi",
+      "verification_note": "DOI is present and normalized; source can be independently checked.",
+      "duplicate_of": "EV-001",
+      "retrieval_date": "2026-09-01T07:20:35.102326Z",
+      "reliability_score": 0.7,
+      "relevance_score": 1.0,
+      "selection_provenance": null
+    },
+    {
+      "evidence_id": "evidence_3d4ec94b74d844a69643794d4aadc0e5",
+      "title": "Project-internal deterministic analysis of iris_uci.csv",
+      "source_type": "dataset",
+      "source_url": null,
+      "source_asset_id": "asset_d189e2602b104466a6ba39e11b853331",
+      "citation": null,
+      "authors": [],
+      "doi": null,
+      "pmid": null,
+      "arxiv_id": null,
+      "official_record_url": null,
+      "journal_or_publisher": null,
+      "summary": "The allowlisted project executor completed 9 operations against input SHA-256 24d7757511c6c8d4850aa86a6fad04b9426b319c635af26e6d413d94fe5bd73e.",
+      "extracted_claims": [
+        "项目内工具读取了 150 行、5 列数据。",
+        "项目内确定性分析：overall 组的 sepal_length_cm 与 petal_length_cm pearson 相关系数为 0.8718（n=150）, 95% CI [0.8270, 0.9055]。",
+        "项目内确定性分析：overall 组的 sepal_length_cm 与 sepal_width_cm pearson 相关系数为 -0.1094（n=150）, 95% CI [-0.2650, 0.0518]。",
+        "项目内确定性分析：overall 组的 sepal_length_cm 与 petal_width_cm pearson 相关系数为 0.8180（n=150）, 95% CI [0.7569, 0.8648]。",
+        "项目内确定性分析：overall 组的 petal_length_cm 与 sepal_width_cm pearson 相关系数为 -0.4205（n=150）, 95% CI [-0.5441, -0.2791]。",
+        "项目内确定性分析：overall 组的 petal_length_cm 与 petal_width_cm pearson 相关系数为 0.9628（n=150）, 95% CI [0.9489, 0.9729]。",
+        "项目内确定性分析：overall 组的 sepal_width_cm 与 petal_width_cm pearson 相关系数为 -0.3565（n=150）, 95% CI [-0.4889, -0.2082]。",
+        "项目内确定性分析：Iris-setosa 组的 sepal_length_cm 与 petal_length_cm pearson 相关系数为 0.2639（n=50）, 95% CI [-0.0156, 0.5051]。",
+        "项目内确定性分析：Iris-setosa 组的 sepal_length_cm 与 sepal_width_cm pearson 相关系数为 0.7468（n=50）, 95% CI [0.5914, 0.8487]。",
+        "项目内确定性分析：Iris-setosa 组的 sepal_length_cm 与 petal_width_cm pearson 相关系数为 0.2791（n=50）, 95% CI [0.0008, 0.5173]。",
+        "项目内确定性分析：Iris-setosa 组的 petal_length_cm 与 sepal_width_cm pearson 相关系数为 0.1767（n=50）, 95% CI [-0.1069, 0.4337]。",
+        "项目内确定性分析：Iris-setosa 组的 petal_length_cm 与 petal_width_cm pearson 相关系数为 0.3063（n=50）, 95% CI [0.0306, 0.5387]。",
+        "项目内确定性分析：Iris-setosa 组的 sepal_width_cm 与 petal_width_cm pearson 相关系数为 0.2800（n=50）, 95% CI [0.0018, 0.5180]。",
+        "项目内确定性分析：Iris-versicolor 组的 sepal_length_cm 与 petal_length_cm pearson 相关系数为 0.7540（n=50）, 95% CI [0.6021, 0.8533]。",
+        "项目内确定性分析：Iris-versicolor 组的 sepal_length_cm 与 sepal_width_cm pearson 相关系数为 0.5259（n=50）, 95% CI [0.2900, 0.7016]。",
+        "项目内确定性分析：Iris-versicolor 组的 sepal_length_cm 与 petal_width_cm pearson 相关系数为 0.5465（n=50）, 95% CI [0.3162, 0.7159]。",
+        "项目内确定性分析：Iris-versicolor 组的 petal_length_cm 与 sepal_width_cm pearson 相关系数为 0.5605（n=50）, 95% CI [0.3343, 0.7257]。",
+        "项目内确定性分析：Iris-versicolor 组的 petal_length_cm 与 petal_width_cm pearson 相关系数为 0.7867（n=50）, 95% CI [0.6508, 0.8737]。",
+        "项目内确定性分析：Iris-versicolor 组的 sepal_width_cm 与 petal_width_cm pearson 相关系数为 0.6640（n=50）, 95% CI [0.4731, 0.7953]。",
+        "项目内确定性分析：Iris-virginica 组的 sepal_length_cm 与 petal_length_cm pearson 相关系数为 0.8642（n=50）, 95% CI [0.7715, 0.9210]。",
+        "项目内确定性分析：Iris-virginica 组的 sepal_length_cm 与 sepal_width_cm pearson 相关系数为 0.4572（n=50）, 95% CI [0.2050, 0.6525]。"
+      ],
+      "reliability": "project-internal deterministic execution",
+      "relevance": "direct analysis of the approved dataset",
+      "limitations": [
+        "Results apply only to the registered dataset and recorded parameters.",
+        "Descriptive associations do not establish causality."
+      ],
+      "publication_date": null,
+      "publication_year": null,
+      "status": "unverified",
+      "source_level": "A",
+      "is_primary_source": true,
+      "verified": false,
+      "verification_status": "verified",
+      "verification_method": "none",
+      "verification_note": "Verified by input checksum, fixed operation whitelist, saved parameters, and output checksums.",
+      "duplicate_of": null,
+      "retrieval_date": "2026-09-01T11:58:28.037078Z",
+      "reliability_score": 1.0,
+      "relevance_score": 1.0,
+      "selection_provenance": null
+    },
+    {
+      "evidence_id": "evidence_d81b9b2ba598462da51f5dade3750be8",
+      "title": "Controlled Python analysis of iris_uci.csv",
+      "source_type": "dataset",
+      "source_url": null,
+      "source_asset_id": "asset_f8860d8760ed4f01ba7389310e938d03",
+      "citation": null,
+      "authors": [],
+      "doi": null,
+      "pmid": null,
+      "arxiv_id": null,
+      "official_record_url": null,
+      "journal_or_publisher": null,
+      "summary": "Restricted child-process analysis completed with code SHA-256 e4c50e8f46904d80aeeb92d8e26f5906c28763c146f075800aeb380515a66782. Result preview: {\"overall_correlation\": 0.8717541573048718, \"by_species\": {\"Iris-setosa\": 0.2638740929186868, \"Iris-versicolor\": 0.754048958592016, \"Iris-virginica\": 0.8642247329355764}}",
+      "extracted_claims": [
+        "受控 Python 执行返回以下结构化结果：{\"overall_correlation\": 0.8717541573048718, \"by_species\": {\"Iris-setosa\": 0.2638740929186868, \"Iris-versicolor\": 0.754048958592016, \"Iris-virginica\": 0.8642247329355764}}"
+      ],
+      "reliability": "audited restricted Python execution",
+      "relevance": "explicit analysis of the registered project dataset",
+      "limitations": [
+        "Generated analysis code requires independent scientific review.",
+        "The restricted subprocess is defence in depth, not a container or VM security boundary.",
+        "Associations or model outputs do not establish causality."
+      ],
+      "publication_date": null,
+      "publication_year": null,
+      "status": "unverified",
+      "source_level": "A",
+      "is_primary_source": true,
+      "verified": false,
+      "verification_status": "verified",
+      "verification_method": "none",
+      "verification_note": "Input/code hashes, resource limits, stdout, result and output checksums were recorded.",
+      "duplicate_of": null,
+      "retrieval_date": "2026-09-01T14:00:03.936403Z",
+      "reliability_score": 0.9,
+      "relevance_score": 1.0,
+      "selection_provenance": null
+    }
+  ],
+  "evidence_curation": {
+    "review_mode": "ASSISTED",
+    "search_plan_versions": 2,
+    "candidate_count": 19,
+    "selection_snapshots": [
+      {
+        "selection_id": "source_selection_f584c116b4b54c2fa381ca74e477759f",
+        "project_id": "project_f9374def244c4829b4b8d8c52f4d56d2",
+        "iteration": 0,
+        "research_question_version": 1,
+        "search_plan_version": 1,
+        "kept_candidate_ids": [
+          "candidate_d44454b4e0114ba9a4039fadb4cc94f5"
+        ],
+        "rejected_candidate_ids": [
+          "candidate_6a2aeeafd73f4c9090667b8d7680102c"
+        ],
+        "deferred_candidate_ids": [
+          "candidate_ad4260904e8d44538316bb6fd5e6150c",
+          "candidate_f72258dbcb7248b083ca10fc14c1650a",
+          "candidate_a9ebab62626e4c2a95c3349abe6a137c",
+          "candidate_be550e0649a143e6a2f002bb4ced529c",
+          "candidate_8575fbd8f37c42dba528f6dc5ceeef6d",
+          "candidate_340b794db49a45daa7a2f8fd3c10b0d1",
+          "candidate_93819a7bb77046719f58308aa19c1943",
+          "candidate_4e6736af2de449e4a4e4e7476b99aadc",
+          "candidate_a5957f35f8944e6bbfea9dc1b5d1a9d4",
+          "candidate_96fc43cfc87f4380b713928d74328ec0",
+          "candidate_deeb070dd0444f09a10d874623af7d88",
+          "candidate_dfc29c7df570407e82b9358e6109c8d7",
+          "candidate_49b20ef2ae6f4369b87d8ab4bcf00a4e"
+        ],
+        "human_added_source_ids": [],
+        "decisions": [
+          {
+            "candidate_id": "candidate_6a2aeeafd73f4c9090667b8d7680102c",
+            "decision": "reject",
+            "decided_by": "human",
+            "human_note": "",
+            "rejection_reason": "主题无关",
+            "decided_at": "2026-09-01T06:12:49.976087Z"
+          },
+          {
+            "candidate_id": "candidate_ad4260904e8d44538316bb6fd5e6150c",
+            "decision": "defer",
+            "decided_by": "human",
+            "human_note": "",
+            "rejection_reason": "",
+            "decided_at": "2026-09-01T06:12:49.976087Z"
+          },
+          {
+            "candidate_id": "candidate_f72258dbcb7248b083ca10fc14c1650a",
+            "decision": "defer",
+            "decided_by": "human",
+            "human_note": "",
+            "rejection_reason": "",
+            "decided_at": "2026-09-01T06:12:49.976087Z"
+          },
+          {
+            "candidate_id": "candidate_a9ebab62626e4c2a95c3349abe6a137c",
+            "decision": "defer",
+            "decided_by": "human",
+            "human_note": "",
+            "rejection_reason": "",
+            "decided_at": "2026-09-01T06:12:49.976087Z"
+          },
+          {
+            "candidate_id": "candidate_be550e0649a143e6a2f002bb4ced529c",
+            "decision": "defer",
+            "decided_by": "human",
+            "human_note": "",
+            "rejection_reason": "",
+            "decided_at": "2026-09-01T06:12:49.976087Z"
+          },
+          {
+            "candidate_id": "candidate_8575fbd8f37c42dba528f6dc5ceeef6d",
+            "decision": "defer",
+            "decided_by": "human",
+            "human_note": "",
+            "rejection_reason": "",
+            "decided_at": "2026-09-01T06:12:49.976087Z"
+          },
+          {
+            "candidate_id": "candidate_d44454b4e0114ba9a4039fadb4cc94f5",
+            "decision": "keep",
+            "decided_by": "human",
+            "human_note": "",
+            "rejection_reason": "",
+            "decided_at": "2026-09-01T06:12:49.976087Z"
+          },
+          {
+            "candidate_id": "candidate_340b794db49a45daa7a2f8fd3c10b0d1",
+            "decision": "defer",
+            "decided_by": "human",
+            "human_note": "",
+            "rejection_reason": "",
+            "decided_at": "2026-09-01T06:12:49.976087Z"
+          },
+          {
+            "candidate_id": "candidate_93819a7bb77046719f58308aa19c1943",
+            "decision": "defer",
+            "decided_by": "human",
+            "human_note": "",
+            "rejection_reason": "",
+            "decided_at": "2026-09-01T06:12:49.976087Z"
+          },
+          {
+            "candidate_id": "candidate_4e6736af2de449e4a4e4e7476b99aadc",
+            "decision": "defer",
+            "decided_by": "human",
+            "human_note": "",
+            "rejection_reason": "",
+            "decided_at": "2026-09-01T06:12:49.976087Z"
+          },
+          {
+            "candidate_id": "candidate_a5957f35f8944e6bbfea9dc1b5d1a9d4",
+            "decision": "defer",
+            "decided_by": "human",
+            "human_note": "",
+            "rejection_reason": "",
+            "decided_at": "2026-09-01T06:12:49.976087Z"
+          },
+          {
+            "candidate_id": "candidate_96fc43cfc87f4380b713928d74328ec0",
+            "decision": "defer",
+            "decided_by": "human",
+            "human_note": "",
+            "rejection_reason": "",
+            "decided_at": "2026-09-01T06:12:49.976087Z"
+          },
+          {
+            "candidate_id": "candidate_deeb070dd0444f09a10d874623af7d88",
+            "decision": "defer",
+            "decided_by": "human",
+            "human_note": "",
+            "rejection_reason": "",
+            "decided_at": "2026-09-01T06:12:49.976087Z"
+          },
+          {
+            "candidate_id": "candidate_dfc29c7df570407e82b9358e6109c8d7",
+            "decision": "defer",
+            "decided_by": "human",
+            "human_note": "",
+            "rejection_reason": "",
+            "decided_at": "2026-09-01T06:12:49.976087Z"
+          },
+          {
+            "candidate_id": "candidate_49b20ef2ae6f4369b87d8ab4bcf00a4e",
+            "decision": "defer",
+            "decided_by": "human",
+            "human_note": "",
+            "rejection_reason": "",
+            "decided_at": "2026-09-01T06:12:49.976087Z"
+          }
+        ],
+        "created_at": "2026-09-01T06:12:49.976087Z",
+        "created_by": "human",
+        "selection_note": ""
+      },
+      {
+        "selection_id": "source_selection_260bbeebfa3f40ff88055e74f5c0aaf0",
+        "project_id": "project_f9374def244c4829b4b8d8c52f4d56d2",
+        "iteration": 2,
+        "research_question_version": 1,
+        "search_plan_version": 2,
+        "kept_candidate_ids": [
+          "candidate_b161cd1b77b94394a8c02d70ef772446",
+          "candidate_61d4693ecfb54d949cb049094898b79e"
+        ],
+        "rejected_candidate_ids": [
+          "candidate_1a48e2a9136b45e9887faa27bf3f5ec9"
+        ],
+        "deferred_candidate_ids": [
+          "candidate_00d6480998854274a1222b15b6aa8298",
+          "candidate_753ef52e03c94ff588c70fbfe17d3748",
+          "candidate_2730c39cea5446b59d6d62d0ad69546f",
+          "candidate_7e41a95a2b5b4a888c8f46cbd5dcf1a6",
+          "candidate_79178b46e652434f8ba830e9a0036244",
+          "candidate_281a7d47a045448e9c2924571fe7bb73",
+          "candidate_de96baa877054f8abedad6ca1a6da1a0",
+          "candidate_421371f61a7e4478b0ab9054cf9d08d0",
+          "candidate_d7eaa52bc63048e8ba4abf6d3813790a",
+          "candidate_115ff194b3034cd389457caa3283d37a",
+          "candidate_996cf665641d412ca2238179dc8b0d1d",
+          "candidate_67efd05150ed482e8b1369614aa7fde9",
+          "candidate_e4802c44e4ee4312bcd523ec9cb4ff84",
+          "candidate_39e8b4898c214396852b04233ba43537",
+          "candidate_fbebfc45bfdd4391a2220f31c620106a",
+          "candidate_8c3d7166799f4243b4cfbfe5dfac02db"
+        ],
+        "human_added_source_ids": [
+          "candidate_61d4693ecfb54d949cb049094898b79e"
+        ],
+        "decisions": [
+          {
+            "candidate_id": "candidate_00d6480998854274a1222b15b6aa8298",
+            "decision": "defer",
+            "decided_by": "human",
+            "human_note": "",
+            "rejection_reason": "",
+            "decided_at": "2026-09-01T07:21:29.361253Z"
+          },
+          {
+            "candidate_id": "candidate_753ef52e03c94ff588c70fbfe17d3748",
+            "decision": "defer",
+            "decided_by": "human",
+            "human_note": "",
+            "rejection_reason": "",
+            "decided_at": "2026-09-01T07:21:29.361253Z"
+          },
+          {
+            "candidate_id": "candidate_2730c39cea5446b59d6d62d0ad69546f",
+            "decision": "defer",
+            "decided_by": "human",
+            "human_note": "",
+            "rejection_reason": "",
+            "decided_at": "2026-09-01T07:21:29.361253Z"
+          },
+          {
+            "candidate_id": "candidate_7e41a95a2b5b4a888c8f46cbd5dcf1a6",
+            "decision": "defer",
+            "decided_by": "human",
+            "human_note": "",
+            "rejection_reason": "",
+            "decided_at": "2026-09-01T07:21:29.361253Z"
+          },
+          {
+            "candidate_id": "candidate_79178b46e652434f8ba830e9a0036244",
+            "decision": "defer",
+            "decided_by": "human",
+            "human_note": "",
+            "rejection_reason": "",
+            "decided_at": "2026-09-01T07:21:29.361253Z"
+          },
+          {
+            "candidate_id": "candidate_b161cd1b77b94394a8c02d70ef772446",
+            "decision": "keep",
+            "decided_by": "human",
+            "human_note": "",
+            "rejection_reason": "",
+            "decided_at": "2026-09-01T07:21:29.361253Z"
+          },
+          {
+            "candidate_id": "candidate_281a7d47a045448e9c2924571fe7bb73",
+            "decision": "defer",
+            "decided_by": "human",
+            "human_note": "",
+            "rejection_reason": "",
+            "decided_at": "2026-09-01T07:21:29.361253Z"
+          },
+          {
+            "candidate_id": "candidate_de96baa877054f8abedad6ca1a6da1a0",
+            "decision": "defer",
+            "decided_by": "human",
+            "human_note": "",
+            "rejection_reason": "",
+            "decided_at": "2026-09-01T07:21:29.361253Z"
+          },
+          {
+            "candidate_id": "candidate_421371f61a7e4478b0ab9054cf9d08d0",
+            "decision": "defer",
+            "decided_by": "human",
+            "human_note": "",
+            "rejection_reason": "",
+            "decided_at": "2026-09-01T07:21:29.361253Z"
+          },
+          {
+            "candidate_id": "candidate_d7eaa52bc63048e8ba4abf6d3813790a",
+            "decision": "defer",
+            "decided_by": "human",
+            "human_note": "",
+            "rejection_reason": "",
+            "decided_at": "2026-09-01T07:21:29.361253Z"
+          },
+          {
+            "candidate_id": "candidate_115ff194b3034cd389457caa3283d37a",
+            "decision": "defer",
+            "decided_by": "human",
+            "human_note": "",
+            "rejection_reason": "",
+            "decided_at": "2026-09-01T07:21:29.361253Z"
+          },
+          {
+            "candidate_id": "candidate_996cf665641d412ca2238179dc8b0d1d",
+            "decision": "defer",
+            "decided_by": "human",
+            "human_note": "",
+            "rejection_reason": "",
+            "decided_at": "2026-09-01T07:21:29.361253Z"
+          },
+          {
+            "candidate_id": "candidate_67efd05150ed482e8b1369614aa7fde9",
+            "decision": "defer",
+            "decided_by": "human",
+            "human_note": "",
+            "rejection_reason": "",
+            "decided_at": "2026-09-01T07:21:29.361253Z"
+          },
+          {
+            "candidate_id": "candidate_e4802c44e4ee4312bcd523ec9cb4ff84",
+            "decision": "defer",
+            "decided_by": "human",
+            "human_note": "",
+            "rejection_reason": "",
+            "decided_at": "2026-09-01T07:21:29.361253Z"
+          },
+          {
+            "candidate_id": "candidate_39e8b4898c214396852b04233ba43537",
+            "decision": "defer",
+            "decided_by": "human",
+            "human_note": "",
+            "rejection_reason": "",
+            "decided_at": "2026-09-01T07:21:29.361253Z"
+          },
+          {
+            "candidate_id": "candidate_fbebfc45bfdd4391a2220f31c620106a",
+            "decision": "defer",
+            "decided_by": "human",
+            "human_note": "",
+            "rejection_reason": "",
+            "decided_at": "2026-09-01T07:21:29.361253Z"
+          },
+          {
+            "candidate_id": "candidate_8c3d7166799f4243b4cfbfe5dfac02db",
+            "decision": "defer",
+            "decided_by": "human",
+            "human_note": "",
+            "rejection_reason": "",
+            "decided_at": "2026-09-01T07:21:29.361253Z"
+          },
+          {
+            "candidate_id": "candidate_61d4693ecfb54d949cb049094898b79e",
+            "decision": "keep",
+            "decided_by": "human",
+            "human_note": "",
+            "rejection_reason": "",
+            "decided_at": "2026-09-01T07:21:29.361253Z"
+          },
+          {
+            "candidate_id": "candidate_1a48e2a9136b45e9887faa27bf3f5ec9",
+            "decision": "reject",
+            "decided_by": "human",
+            "human_note": "",
+            "rejection_reason": "主题无关",
+            "decided_at": "2026-09-01T07:21:29.361253Z"
+          }
+        ],
+        "created_at": "2026-09-01T07:21:29.361253Z",
+        "created_by": "human",
+        "selection_note": "保留 UCI Machine Learning Repository 的官方 Iris 数据集记录及其旧版官方 URL；项目内 iris_uci.csv 来自该官方归档，DOI 10.24432/C56C76。其他博客、课程作业与二手页面不作为正式证据。"
+      }
+    ],
+    "feedback_summary": {
+      "rejection_reason_counts": {
+        "主题无关": 1
+      },
+      "concise_feedback": [
+        "主题无关: 1"
+      ]
+    }
+  },
+  "claims": [
+    {
+      "claim_id": "CLM-001",
+      "statement": "The UCI Iris dataset documentation reports 150 instances, grouped into three classes/species with 50 instances each: Iris Setosa, Iris Versicolour, and Iris Virginica.",
+      "claim_type": "reported_fact",
+      "supporting_evidence_ids": [
+        "EVD-001",
+        "EVD-002"
+      ],
+      "contradicting_evidence_ids": [],
+      "confidence": 0.0,
+      "assumptions": [
+        "The selected UCI repository pages accurately describe the version of the Iris dataset intended for analysis.",
+        "The species labels in the uploaded file correspond to the repository's three classes."
+      ],
+      "limitations": [
+        "The repository pages note discrepancies with Fisher's original article, so individual row values may vary across file versions.",
+        "This claim concerns dataset documentation, not computed analytical results."
+      ],
+      "status": "supported",
+      "dimension": "unspecified"
+    },
+    {
+      "claim_id": "CLM-002",
+      "statement": "The UCI Iris dataset documentation includes sepal length and petal length as continuous variables measured in cm, alongside sepal width and petal width.",
+      "claim_type": "reported_fact",
+      "supporting_evidence_ids": [
+        "EVD-001",
+        "EVD-002"
+      ],
+      "contradicting_evidence_ids": [],
+      "confidence": 0.0,
+      "assumptions": [
+        "The variable names in the analysis file can be mapped to the repository variables: sepal_length_cm to sepal length and petal_length_cm to petal length."
+      ],
+      "limitations": [
+        "Documentation alone does not verify the numeric accuracy of the uploaded file.",
+        "Units are reported by the repository page; independent metrological verification was not performed."
+      ],
+      "status": "supported",
+      "dimension": "unspecified"
+    },
+    {
+      "claim_id": "CLM-003",
+      "statement": "The UCI repository pages state that the Iris dataset has no missing values.",
+      "claim_type": "reported_fact",
+      "supporting_evidence_ids": [
+        "EVD-001",
+        "EVD-002"
+      ],
+      "contradicting_evidence_ids": [],
+      "confidence": 0.0,
+      "assumptions": [
+        "The repository missing-value statement applies to the specific file version used for analysis."
+      ],
+      "limitations": [
+        "The repository statement does not independently verify the uploaded CSV.",
+        "The uploaded CSV preview also reported zero missing values, but that is an unverified local observation."
+      ],
+      "status": "supported",
+      "dimension": "unspecified"
+    },
+    {
+      "claim_id": "CLM-004",
+      "statement": "The uploaded iris_uci.csv preview reports five columns, including sepal_length_cm, petal_length_cm, and species, with 150 scanned data rows and zero missing values in the scanned rows.",
+      "claim_type": "observation",
+      "supporting_evidence_ids": [
+        "EVD-003"
+      ],
+      "contradicting_evidence_ids": [],
+      "confidence": 0.0,
+      "assumptions": [
+        "The structured summary accurately reflects the uploaded file content.",
+        "The scanned rows represent the full file because row_count_is_partial was false."
+      ],
+      "limitations": [
+        "Uploaded material is untrusted and not independently verified.",
+        "A parsed preview is not an executed statistical analysis.",
+        "The preview does not establish that the file is identical to the official UCI version."
+      ],
+      "status": "partially_supported",
+      "dimension": "unspecified"
+    },
+    {
+      "claim_id": "CLM-005",
+      "statement": "The UCI Iris dataset pages report known discrepancies from Fisher's original article, including corrected values for sample 35 and sample 38.",
+      "claim_type": "reported_fact",
+      "supporting_evidence_ids": [
+        "EVD-001",
+        "EVD-002"
+      ],
+      "contradicting_evidence_ids": [],
+      "confidence": 0.0,
+      "assumptions": [
+        "The repository's correction notes are relevant to the version of the data used for analysis."
+      ],
+      "limitations": [
+        "The extraction does not show whether the uploaded file contains the corrected or uncorrected values for those samples.",
+        "These row-level issues may affect descriptive statistics and correlations if the affected variables are included."
+      ],
+      "status": "supported",
+      "dimension": "unspecified"
+    },
+    {
+      "claim_id": "CLM-006",
+      "statement": "The selected sources do not provide Pearson correlation coefficients, confidence intervals, descriptive statistics, or fitted slopes for sepal length versus petal length, either overall or by species.",
+      "claim_type": "observation",
+      "supporting_evidence_ids": [
+        "EVD-001",
+        "EVD-002",
+        "EVD-003"
+      ],
+      "contradicting_evidence_ids": [],
+      "confidence": 0.0,
+      "assumptions": [
+        "The provided extractions and previews are complete enough to identify whether such statistics were present."
+      ],
+      "limitations": [
+        "This is a gap observation based on the available selected sources; other sources were not searched or extracted."
+      ],
+      "status": "supported",
+      "dimension": "unspecified"
+    },
+    {
+      "claim_id": "CLM-007",
+      "statement": "Based on the available selected sources, it cannot be determined whether sepal length and petal length have a stable linear association overall or whether the association differs among setosa, versicolor, and virginica.",
+      "claim_type": "inference",
+      "supporting_evidence_ids": [
+        "EVD-001",
+        "EVD-002",
+        "EVD-003"
+      ],
+      "contradicting_evidence_ids": [],
+      "confidence": 0.0,
+      "assumptions": [
+        "The evidence set contains no computed correlations for the requested variables.",
+        "No additional datasets or external statistical results may be introduced."
+      ],
+      "limitations": [
+        "The uploaded file could support such an analysis if a validated computation step is performed, but parsing alone does not produce estimates.",
+        "The inference addresses current evidence availability, not the underlying statistical truth."
+      ],
+      "status": "supported",
+      "dimension": "unspecified"
+    },
+    {
+      "claim_id": "CLM-008",
+      "statement": "Any future correlation estimates from the uploaded file must be treated as conditional on the file being a valid representation of the intended UCI Iris dataset and on appropriate handling of the documented row-level corrections.",
+      "claim_type": "hypothesis",
+      "supporting_evidence_ids": [
+        "EVD-001",
+        "EVD-002",
+        "EVD-003"
+      ],
+      "contradicting_evidence_ids": [],
+      "confidence": 0.0,
+      "assumptions": [
+        "The analysis will use the uploaded CSV as the data source.",
+        "Pearson correlation will be the primary linear association measure unless diagnostics justify another measure."
+      ],
+      "limitations": [
+        "No analysis has been executed in this evidence step.",
+        "The effect of samples 35 and 38 on sepal length and petal length correlations is not known from the current extraction."
+      ],
+      "status": "partially_supported",
+      "dimension": "unspecified"
+    },
+    {
+      "claim_id": "claim_ab1d5f0719114fda895fea8a2aef24c5",
+      "statement": "项目内工具读取了 150 行、5 列数据。",
+      "claim_type": "observation",
+      "supporting_evidence_ids": [
+        "evidence_3d4ec94b74d844a69643794d4aadc0e5"
+      ],
+      "contradicting_evidence_ids": [],
+      "confidence": 1.0,
+      "assumptions": [],
+      "limitations": [
+        "Limited to the recorded input checksum."
+      ],
+      "status": "supported",
+      "dimension": "unspecified"
+    },
+    {
+      "claim_id": "claim_78efc6e4ae0744daaaec465f70aef702",
+      "statement": "项目内确定性分析：overall 组的 sepal_length_cm 与 petal_length_cm pearson 相关系数为 0.8718（n=150）, 95% CI [0.8270, 0.9055]。",
+      "claim_type": "observation",
+      "supporting_evidence_ids": [
+        "evidence_3d4ec94b74d844a69643794d4aadc0e5"
+      ],
+      "contradicting_evidence_ids": [],
+      "confidence": 0.99,
+      "assumptions": [
+        "Recorded columns were interpreted as numeric measurements."
+      ],
+      "limitations": [
+        "Association is not causation."
+      ],
+      "status": "supported",
+      "dimension": "unspecified"
+    },
+    {
+      "claim_id": "claim_8163237d702d4464ad1d30e66a1f8226",
+      "statement": "项目内确定性分析：overall 组的 sepal_length_cm 与 sepal_width_cm pearson 相关系数为 -0.1094（n=150）, 95% CI [-0.2650, 0.0518]。",
+      "claim_type": "observation",
+      "supporting_evidence_ids": [
+        "evidence_3d4ec94b74d844a69643794d4aadc0e5"
+      ],
+      "contradicting_evidence_ids": [],
+      "confidence": 0.99,
+      "assumptions": [
+        "Recorded columns were interpreted as numeric measurements."
+      ],
+      "limitations": [
+        "Association is not causation."
+      ],
+      "status": "supported",
+      "dimension": "unspecified"
+    },
+    {
+      "claim_id": "claim_d7290d63d41c4022a5b75c7c9626e56e",
+      "statement": "项目内确定性分析：overall 组的 sepal_length_cm 与 petal_width_cm pearson 相关系数为 0.8180（n=150）, 95% CI [0.7569, 0.8648]。",
+      "claim_type": "observation",
+      "supporting_evidence_ids": [
+        "evidence_3d4ec94b74d844a69643794d4aadc0e5"
+      ],
+      "contradicting_evidence_ids": [],
+      "confidence": 0.99,
+      "assumptions": [
+        "Recorded columns were interpreted as numeric measurements."
+      ],
+      "limitations": [
+        "Association is not causation."
+      ],
+      "status": "supported",
+      "dimension": "unspecified"
+    },
+    {
+      "claim_id": "claim_9344f416078c452d9b314dbfcd1197ac",
+      "statement": "项目内确定性分析：overall 组的 petal_length_cm 与 sepal_width_cm pearson 相关系数为 -0.4205（n=150）, 95% CI [-0.5441, -0.2791]。",
+      "claim_type": "observation",
+      "supporting_evidence_ids": [
+        "evidence_3d4ec94b74d844a69643794d4aadc0e5"
+      ],
+      "contradicting_evidence_ids": [],
+      "confidence": 0.99,
+      "assumptions": [
+        "Recorded columns were interpreted as numeric measurements."
+      ],
+      "limitations": [
+        "Association is not causation."
+      ],
+      "status": "supported",
+      "dimension": "unspecified"
+    },
+    {
+      "claim_id": "claim_09a568b4e3a0439bb2ecf2b115c1f70f",
+      "statement": "项目内确定性分析：overall 组的 petal_length_cm 与 petal_width_cm pearson 相关系数为 0.9628（n=150）, 95% CI [0.9489, 0.9729]。",
+      "claim_type": "observation",
+      "supporting_evidence_ids": [
+        "evidence_3d4ec94b74d844a69643794d4aadc0e5"
+      ],
+      "contradicting_evidence_ids": [],
+      "confidence": 0.99,
+      "assumptions": [
+        "Recorded columns were interpreted as numeric measurements."
+      ],
+      "limitations": [
+        "Association is not causation."
+      ],
+      "status": "supported",
+      "dimension": "unspecified"
+    },
+    {
+      "claim_id": "claim_007c00414e9d4288adf3ea1199e92738",
+      "statement": "项目内确定性分析：overall 组的 sepal_width_cm 与 petal_width_cm pearson 相关系数为 -0.3565（n=150）, 95% CI [-0.4889, -0.2082]。",
+      "claim_type": "observation",
+      "supporting_evidence_ids": [
+        "evidence_3d4ec94b74d844a69643794d4aadc0e5"
+      ],
+      "contradicting_evidence_ids": [],
+      "confidence": 0.99,
+      "assumptions": [
+        "Recorded columns were interpreted as numeric measurements."
+      ],
+      "limitations": [
+        "Association is not causation."
+      ],
+      "status": "supported",
+      "dimension": "unspecified"
+    },
+    {
+      "claim_id": "claim_f17e9490ed214ca29d26c9a0479e41f3",
+      "statement": "项目内确定性分析：Iris-setosa 组的 sepal_length_cm 与 petal_length_cm pearson 相关系数为 0.2639（n=50）, 95% CI [-0.0156, 0.5051]。",
+      "claim_type": "observation",
+      "supporting_evidence_ids": [
+        "evidence_3d4ec94b74d844a69643794d4aadc0e5"
+      ],
+      "contradicting_evidence_ids": [],
+      "confidence": 0.99,
+      "assumptions": [
+        "Recorded columns were interpreted as numeric measurements."
+      ],
+      "limitations": [
+        "Association is not causation."
+      ],
+      "status": "supported",
+      "dimension": "unspecified"
+    },
+    {
+      "claim_id": "claim_ed2434fc7fb94803a3d65454fac9e21e",
+      "statement": "项目内确定性分析：Iris-setosa 组的 sepal_length_cm 与 sepal_width_cm pearson 相关系数为 0.7468（n=50）, 95% CI [0.5914, 0.8487]。",
+      "claim_type": "observation",
+      "supporting_evidence_ids": [
+        "evidence_3d4ec94b74d844a69643794d4aadc0e5"
+      ],
+      "contradicting_evidence_ids": [],
+      "confidence": 0.99,
+      "assumptions": [
+        "Recorded columns were interpreted as numeric measurements."
+      ],
+      "limitations": [
+        "Association is not causation."
+      ],
+      "status": "supported",
+      "dimension": "unspecified"
+    },
+    {
+      "claim_id": "claim_57026fd4705144b58ab0fd30701ff39e",
+      "statement": "项目内确定性分析：Iris-setosa 组的 sepal_length_cm 与 petal_width_cm pearson 相关系数为 0.2791（n=50）, 95% CI [0.0008, 0.5173]。",
+      "claim_type": "observation",
+      "supporting_evidence_ids": [
+        "evidence_3d4ec94b74d844a69643794d4aadc0e5"
+      ],
+      "contradicting_evidence_ids": [],
+      "confidence": 0.99,
+      "assumptions": [
+        "Recorded columns were interpreted as numeric measurements."
+      ],
+      "limitations": [
+        "Association is not causation."
+      ],
+      "status": "supported",
+      "dimension": "unspecified"
+    },
+    {
+      "claim_id": "claim_fdc28ff9fc8d4b5d90485738d589560b",
+      "statement": "项目内确定性分析：Iris-setosa 组的 petal_length_cm 与 sepal_width_cm pearson 相关系数为 0.1767（n=50）, 95% CI [-0.1069, 0.4337]。",
+      "claim_type": "observation",
+      "supporting_evidence_ids": [
+        "evidence_3d4ec94b74d844a69643794d4aadc0e5"
+      ],
+      "contradicting_evidence_ids": [],
+      "confidence": 0.99,
+      "assumptions": [
+        "Recorded columns were interpreted as numeric measurements."
+      ],
+      "limitations": [
+        "Association is not causation."
+      ],
+      "status": "supported",
+      "dimension": "unspecified"
+    },
+    {
+      "claim_id": "claim_6fd9a83b89a24266b502edb60d3e055d",
+      "statement": "项目内确定性分析：Iris-setosa 组的 petal_length_cm 与 petal_width_cm pearson 相关系数为 0.3063（n=50）, 95% CI [0.0306, 0.5387]。",
+      "claim_type": "observation",
+      "supporting_evidence_ids": [
+        "evidence_3d4ec94b74d844a69643794d4aadc0e5"
+      ],
+      "contradicting_evidence_ids": [],
+      "confidence": 0.99,
+      "assumptions": [
+        "Recorded columns were interpreted as numeric measurements."
+      ],
+      "limitations": [
+        "Association is not causation."
+      ],
+      "status": "supported",
+      "dimension": "unspecified"
+    },
+    {
+      "claim_id": "claim_d327164d816c48c197ba25f50be69ac3",
+      "statement": "项目内确定性分析：Iris-setosa 组的 sepal_width_cm 与 petal_width_cm pearson 相关系数为 0.2800（n=50）, 95% CI [0.0018, 0.5180]。",
+      "claim_type": "observation",
+      "supporting_evidence_ids": [
+        "evidence_3d4ec94b74d844a69643794d4aadc0e5"
+      ],
+      "contradicting_evidence_ids": [],
+      "confidence": 0.99,
+      "assumptions": [
+        "Recorded columns were interpreted as numeric measurements."
+      ],
+      "limitations": [
+        "Association is not causation."
+      ],
+      "status": "supported",
+      "dimension": "unspecified"
+    },
+    {
+      "claim_id": "claim_d37f8b59ff3a4d35ad63e8042268f7ce",
+      "statement": "项目内确定性分析：Iris-versicolor 组的 sepal_length_cm 与 petal_length_cm pearson 相关系数为 0.7540（n=50）, 95% CI [0.6021, 0.8533]。",
+      "claim_type": "observation",
+      "supporting_evidence_ids": [
+        "evidence_3d4ec94b74d844a69643794d4aadc0e5"
+      ],
+      "contradicting_evidence_ids": [],
+      "confidence": 0.99,
+      "assumptions": [
+        "Recorded columns were interpreted as numeric measurements."
+      ],
+      "limitations": [
+        "Association is not causation."
+      ],
+      "status": "supported",
+      "dimension": "unspecified"
+    },
+    {
+      "claim_id": "claim_bde2d36ee51149c688ae34d830075565",
+      "statement": "项目内确定性分析：Iris-versicolor 组的 sepal_length_cm 与 sepal_width_cm pearson 相关系数为 0.5259（n=50）, 95% CI [0.2900, 0.7016]。",
+      "claim_type": "observation",
+      "supporting_evidence_ids": [
+        "evidence_3d4ec94b74d844a69643794d4aadc0e5"
+      ],
+      "contradicting_evidence_ids": [],
+      "confidence": 0.99,
+      "assumptions": [
+        "Recorded columns were interpreted as numeric measurements."
+      ],
+      "limitations": [
+        "Association is not causation."
+      ],
+      "status": "supported",
+      "dimension": "unspecified"
+    },
+    {
+      "claim_id": "claim_e3806c5c9bb24c14926cae007ca8a196",
+      "statement": "项目内确定性分析：Iris-versicolor 组的 sepal_length_cm 与 petal_width_cm pearson 相关系数为 0.5465（n=50）, 95% CI [0.3162, 0.7159]。",
+      "claim_type": "observation",
+      "supporting_evidence_ids": [
+        "evidence_3d4ec94b74d844a69643794d4aadc0e5"
+      ],
+      "contradicting_evidence_ids": [],
+      "confidence": 0.99,
+      "assumptions": [
+        "Recorded columns were interpreted as numeric measurements."
+      ],
+      "limitations": [
+        "Association is not causation."
+      ],
+      "status": "supported",
+      "dimension": "unspecified"
+    },
+    {
+      "claim_id": "claim_57e41e1218b94c7ea4df6099c026f12c",
+      "statement": "项目内确定性分析：Iris-versicolor 组的 petal_length_cm 与 sepal_width_cm pearson 相关系数为 0.5605（n=50）, 95% CI [0.3343, 0.7257]。",
+      "claim_type": "observation",
+      "supporting_evidence_ids": [
+        "evidence_3d4ec94b74d844a69643794d4aadc0e5"
+      ],
+      "contradicting_evidence_ids": [],
+      "confidence": 0.99,
+      "assumptions": [
+        "Recorded columns were interpreted as numeric measurements."
+      ],
+      "limitations": [
+        "Association is not causation."
+      ],
+      "status": "supported",
+      "dimension": "unspecified"
+    },
+    {
+      "claim_id": "claim_f0f11321cdab4657b7b0d6c1981f18fe",
+      "statement": "项目内确定性分析：Iris-versicolor 组的 petal_length_cm 与 petal_width_cm pearson 相关系数为 0.7867（n=50）, 95% CI [0.6508, 0.8737]。",
+      "claim_type": "observation",
+      "supporting_evidence_ids": [
+        "evidence_3d4ec94b74d844a69643794d4aadc0e5"
+      ],
+      "contradicting_evidence_ids": [],
+      "confidence": 0.99,
+      "assumptions": [
+        "Recorded columns were interpreted as numeric measurements."
+      ],
+      "limitations": [
+        "Association is not causation."
+      ],
+      "status": "supported",
+      "dimension": "unspecified"
+    },
+    {
+      "claim_id": "claim_4895948fd907433e829ee5ed55e9af6e",
+      "statement": "项目内确定性分析：Iris-versicolor 组的 sepal_width_cm 与 petal_width_cm pearson 相关系数为 0.6640（n=50）, 95% CI [0.4731, 0.7953]。",
+      "claim_type": "observation",
+      "supporting_evidence_ids": [
+        "evidence_3d4ec94b74d844a69643794d4aadc0e5"
+      ],
+      "contradicting_evidence_ids": [],
+      "confidence": 0.99,
+      "assumptions": [
+        "Recorded columns were interpreted as numeric measurements."
+      ],
+      "limitations": [
+        "Association is not causation."
+      ],
+      "status": "supported",
+      "dimension": "unspecified"
+    },
+    {
+      "claim_id": "claim_778cb63281c54dee8f029d608471fa78",
+      "statement": "项目内确定性分析：Iris-virginica 组的 sepal_length_cm 与 petal_length_cm pearson 相关系数为 0.8642（n=50）, 95% CI [0.7715, 0.9210]。",
+      "claim_type": "observation",
+      "supporting_evidence_ids": [
+        "evidence_3d4ec94b74d844a69643794d4aadc0e5"
+      ],
+      "contradicting_evidence_ids": [],
+      "confidence": 0.99,
+      "assumptions": [
+        "Recorded columns were interpreted as numeric measurements."
+      ],
+      "limitations": [
+        "Association is not causation."
+      ],
+      "status": "supported",
+      "dimension": "unspecified"
+    },
+    {
+      "claim_id": "claim_58e04ded1e52419ba1880e67ff00f225",
+      "statement": "项目内确定性分析：Iris-virginica 组的 sepal_length_cm 与 sepal_width_cm pearson 相关系数为 0.4572（n=50）, 95% CI [0.2050, 0.6525]。",
+      "claim_type": "observation",
+      "supporting_evidence_ids": [
+        "evidence_3d4ec94b74d844a69643794d4aadc0e5"
+      ],
+      "contradicting_evidence_ids": [],
+      "confidence": 0.99,
+      "assumptions": [
+        "Recorded columns were interpreted as numeric measurements."
+      ],
+      "limitations": [
+        "Association is not causation."
+      ],
+      "status": "supported",
+      "dimension": "unspecified"
+    },
+    {
+      "claim_id": "claim_f06a2d932527499e906fde28f8c7b5e9",
+      "statement": "受控 Python 执行返回以下结构化结果：{\"overall_correlation\": 0.8717541573048718, \"by_species\": {\"Iris-setosa\": 0.2638740929186868, \"Iris-versicolor\": 0.754048958592016, \"Iris-virginica\": 0.8642247329355764}}",
+      "claim_type": "observation",
+      "supporting_evidence_ids": [
+        "evidence_d81b9b2ba598462da51f5dade3750be8"
+      ],
+      "contradicting_evidence_ids": [],
+      "confidence": 0.9,
+      "assumptions": [
+        "用户提交的分析代码与登记数据字段语义相符。"
+      ],
+      "limitations": [
+        "该主张只记录程序输出，科学含义仍需独立复审。",
+        "受限子进程不是容器或虚拟机级隔离。"
+      ],
+      "status": "supported",
+      "dimension": "structural_existence"
+    }
+  ],
+  "quality_metrics": {
+    "total_evidence_count": 5,
+    "verified_evidence_count": 3,
+    "partially_verified_evidence_count": 0,
+    "unverified_evidence_count": 0,
+    "unique_evidence_count": 3,
+    "verified_primary_source_count": 3,
+    "evidence_verification_rate": 1.0,
+    "total_key_claims": 30,
+    "supported_key_claims": 30,
+    "disputed_key_claims": 0,
+    "unsupported_key_claims": 0,
+    "evidence_coverage": 1.0,
+    "primary_source_ratio": 1.0,
+    "total_hypotheses": 4,
+    "falsifiable_hypotheses": 4,
+    "hypothesis_completeness": 1.0,
+    "total_conclusions": 3,
+    "traceable_conclusions": 3,
+    "conclusion_traceability": 1.0,
+    "reviewer_min_score": 9.0,
+    "blocking_issue_count": 0,
+    "unverifiable_source_count": 0,
+    "revision_improvement_score": 0.0,
+    "stagnation_detected": false
+  },
+  "source_level_distribution": {
+    "A": 4,
+    "B": 0,
+    "C": 1,
+    "D": 0,
+    "E": 0
+  },
+  "hypotheses": [
+    {
+      "hypothesis_id": "HYP-001",
+      "statement": "在 UCI Iris 数据集中，萼片长度与花瓣长度存在稳定的正向线性关联，总体 Pearson 相关系数明显大于 0，且置信区间不接近零。",
+      "mechanism": "花部器官可能呈现协同形态变异：花瓣较长的样本在整体测量上也倾向于具有较长的萼片，从而在两变量间产生正向共变。该假设仅描述统计关联模式，不涉及因果机制。",
+      "predictions": [
+        "总体样本中萼片长度与花瓣长度的 Pearson 相关系数为正。",
+        "总体相关系数的置信区间下限明显大于 0。",
+        "以花瓣长度为自变量、萼片长度为因变量的简单线性拟合斜率为正。",
+        "散点图总体趋势表现为从左上到右上的正相关形态。"
+      ],
+      "falsification_conditions": [
+        "总体 Pearson 相关系数接近 0 或其置信区间包含接近零的值。",
+        "总体相关系数为负且置信区间排除零，则方向与假设相反。",
+        "散点图显示总体线性趋势缺失或明显非线性，即使点估计为正也削弱‘稳定线性’解释。"
+      ],
+      "alternative_explanations": [
+        "物种间的均值差异造成总体正相关，而每个物种内部可能较弱或不存在线性关联。",
+        "少数异常样本或行级数据差异驱动总体相关。",
+        "数据版本差异或测量记录方式导致共变模式不同于原始数据。"
+      ],
+      "required_evidence": [
+        "总体样本量与有效观测数。",
+        "萼片长度和花瓣长度的均值、标准差、最小值、最大值及四分位数。",
+        "总体 Pearson 相关系数及置信区间。",
+        "总体散点图或等价的线性趋势检查。",
+        "简单线性拟合斜率作为辅助描述。"
+      ],
+      "supporting_claim_ids": [
+        "CLM-001",
+        "CLM-002",
+        "CLM-004",
+        "CLM-007"
+      ],
+      "status": "proposed"
+    },
+    {
+      "hypothesis_id": "HYP-002",
+      "statement": "萼片长度与花瓣长度的线性关联强度在 setosa、versicolor、virginica 三个物种之间存在差异，至少有一个物种的分物种 Pearson 相关系数明显不同于另一个物种。",
+      "mechanism": "不同物种的花部形态结构可能不同，导致萼片长度与花瓣长度的共变模式在物种内部不一致；因此，总体相关可能混合了不同的物种内关联结构。",
+      "predictions": [
+        "三个物种的 Pearson 相关系数不全相同。",
+        "至少一个物种的相关系数置信区间与另一个物种的相关系数点估计或置信区间不重叠或重叠很小。",
+        "分物种散点图显示不同物种的线性趋势斜率或离散程度存在差异。"
+      ],
+      "falsification_conditions": [
+        "三个物种的相关系数点估计接近，且各自置信区间高度重叠。",
+        "分物种散点图显示三个物种的线性趋势方向和强度基本一致。",
+        "对物种间相关系数差异的不确定性评估显示差异不稳健。"
+      ],
+      "alternative_explanations": [
+        "观察到的物种间差异来自样本量有限导致的估计波动。",
+        "物种标签或数据版本差异造成表观差异。",
+        "总体与分物种差异仅由组间均值分离造成，而物种内关联结构相似。"
+      ],
+      "required_evidence": [
+        "每个物种的样本量。",
+        "setosa、versicolor、virginica 各自的萼片长度与花瓣长度描述统计。",
+        "三个物种各自的 Pearson 相关系数及置信区间。",
+        "分物种散点图或简单线性拟合描述。",
+        "物种间相关系数差异的不确定性说明。"
+      ],
+      "supporting_claim_ids": [
+        "CLM-001",
+        "CLM-002",
+        "CLM-004",
+        "CLM-007"
+      ],
+      "status": "proposed"
+    },
+    {
+      "hypothesis_id": "HYP-003",
+      "statement": "Iris 数据中的总体正相关主要由物种间差异驱动；在控制或分组到物种后，至少部分物种内部的萼片长度与花瓣长度线性关联较弱、不稳定或置信区间接近零。",
+      "mechanism": "三个物种在萼片长度和花瓣长度上的均值位置不同。若物种间均值差异很大，合并样本可产生强总体相关；但这不一定意味着每个物种内部都存在同等强度的线性关联。",
+      "predictions": [
+        "总体 Pearson 相关系数较大且为正。",
+        "至少一个物种内部的相关系数明显低于总体相关系数。",
+        "分物种散点图显示物种簇之间分离明显，而簇内线性趋势较弱或不一致。",
+        "若报告简单回归斜率，总体斜率与部分物种内斜率存在明显差异。"
+      ],
+      "falsification_conditions": [
+        "三个物种内部相关系数均较大且方向一致，与总体相关系数接近。",
+        "分物种置信区间均不接近零且相互重叠程度高。",
+        "分物种散点图显示各物种内部线性趋势与总体趋势一致。"
+      ],
+      "alternative_explanations": [
+        "物种内弱相关可能是样本量较小导致的估计不稳定，而非真实无线性关联。",
+        "异常值或数据版本中的行级差异削弱了物种内相关。",
+        "线性假设不充分，物种内可能存在非线性关联但 Pearson 未能捕捉。"
+      ],
+      "required_evidence": [
+        "总体与分物种相关系数对比。",
+        "总体与分物种相关系数置信区间。",
+        "分物种散点图或等价可视化。",
+        "分物种简单线性拟合斜率描述。",
+        "异常值或高影响样本检查结果。"
+      ],
+      "supporting_claim_ids": [
+        "CLM-001",
+        "CLM-002",
+        "CLM-004",
+        "CLM-006",
+        "CLM-007"
+      ],
+      "status": "proposed"
+    },
+    {
+      "hypothesis_id": "HYP-004",
+      "statement": "在 Iris 数据的实际观测中，萼片长度与花瓣长度之间不存在稳定的线性关联，因为关系明显非线性、相关系数置信区间接近零，或结果对数据版本、异常值和处理选择高度敏感。",
+      "mechanism": "两变量可能只在总体尺度上呈现由分组结构造成的表观趋势，或在物种内部呈非线性、异方差或弱相关形态；此外，样本 35 和 38 的行级差异、异常值或文件版本不确定性可能改变统计摘要。",
+      "predictions": [
+        "总体或分物种 Pearson 相关系数置信区间接近零，或不同分组结果不一致。",
+        "散点图显示曲线、簇状分离、异方差或明显非线性形态。",
+        "排除或检查异常样本后，相关系数发生实质性变化。",
+        "若使用 Spearman 或分物种结果作为敏感性检查，结论与 Pearson 不一致或方向不稳定。"
+      ],
+      "falsification_conditions": [
+        "总体和三个物种内相关系数均具有明确方向，置信区间不接近零。",
+        "散点图支持线性近似合理且无显著异常点驱动结果。",
+        "敏感性检查显示相关估计对合理处理选择稳健。"
+      ],
+      "alternative_explanations": [
+        "不稳定只是由于样本量有限，而非关系本身不存在。",
+        "线性模型不适合，但存在稳定的单调非线性关联。",
+        "数据版本差异导致结果不稳定，而官方版本中关联可能稳定。"
+      ],
+      "required_evidence": [
+        "总体与分物种相关系数及置信区间。",
+        "散点图、残差图或等价线性假设检查。",
+        "异常值、重复记录或高影响样本检查结果。",
+        "对样本 35 和 38 数据版本状态的确认或敏感性分析。",
+        "必要时补充 Spearman 相关或分物种比较作为稳健性检查。"
+      ],
+      "supporting_claim_ids": [
+        "CLM-005",
+        "CLM-006",
+        "CLM-007",
+        "CLM-008"
+      ],
+      "status": "proposed"
+    }
+  ],
+  "method_selection": {
+    "research_mode": "data_analysis",
+    "rationale": "该问题属于对公开 Iris 数据集的描述性与关联性分析：目标不是预测、因果推断或机制解释，而是评估萼片长度与花瓣长度之间是否存在线性关联，并比较 setosa、versicolor、virginica 三个物种内的关联模式。上传材料（asset_f8860d8760ed4f01ba7389310e938d03）显示数据为结构化表格，包含 sepal_length_cm、sepal_width_cm、petal_length_cm、petal_width_cm、species 五列，扫描行数 150，且各列在已扫描行中未显示缺失值；该材料应作为数据来源与来源线索使用，不将解析本身视为统计结果验证。方法上应以有效观测数为前提，先进行样本量、缺失值、重复记录、数值范围与物种标签一致性检查，再报告各变量描述统计。线性关联采用 Pearson 相关系数作为主指标，同时可辅以散点图和简单线性拟合描述（仅用于形态描述，不作因果解释）。若数据分布、异常值或离群点可能影响 Pearson 相关，可补充 Spearman 相关或稳健性说明，但不改变以 Pearson 为主指标的既定方案。分物种分析应分别计算 setosa、versicolor、virginica 的相关系数；如需不确定性评估，优先使用 Fisher z 变换近似置信区间或其他等价方法，并明确说明样本量限制。总体相关与分物种相关需同时报告，因为物种间形态差异可能导致合并样本相关与组内相关不一致（例如总体相关受物种间均值差异影响）。",
+    "validity_threats": [
+      "合并样本相关可能受物种组成影响，不能直接代表每个物种内部的线性关联。",
+      "相关系数仅描述线性关联，不能证明因果关系或生物学机制。",
+      "异常值、极端样本或数据录入错误可能放大或削弱相关系数。",
+      "若存在缺失值、重复记录或物种标签错误，有效样本量与分组结果可能偏差。",
+      "样本来源限于公开 Iris 数据集，结论外推到更广泛鸢尾花群体需谨慎。",
+      "相关系数置信区间在小样本或接近边界值时可能不稳定。",
+      "上传文件的解析摘要只能说明数据结构和可见样本，不能等同于完整统计计算。"
+    ],
+    "required_controls": [
+      "固定数据来源为上传的 iris_uci.csv（asset_f8860d8760ed4f01ba7389310e938d03）或明确说明的公开 UCI Iris 版本，不引入外部新数据。",
+      "仅使用 sepal_length_cm、petal_length_cm 和 species 三列进行本问题分析，避免无关变量干扰。",
+      "在计算相关前确认每行同时具有有效的萼片长度、花瓣长度和物种标签；记录被排除的观测及原因。",
+      "按原始物种标签分组，分别计算 setosa、versicolor、virginica 的相关系数，不重新聚类或重新标注物种。",
+      "若报告相关系数置信区间，应预先说明方法（例如 Fisher z 变换近似）并注明样本量。",
+      "所有结论限定为描述性和关联性分析，不使用因果语言。"
+    ]
+  },
+  "study_design": {
+    "research_mode": "data_analysis",
+    "objective": "基于上传的 iris_uci.csv（asset_f8860d8760ed4f01ba7389310e938d03；artifact_cd8f151c0d6c481d8b0798f95d928be5）对萼片长度（sepal_length_cm）与花瓣长度（petal_length_cm）进行描述性统计与 Pearson 相关分析：估计总体线性关联，分物种估计 setosa、versicolor、virginica 的线性关联，并通过置信区间、散点图、简单线性斜率和敏感性检查判断总体关联是否稳定以及物种间是否存在差异。",
+    "hypotheses_tested": [
+      "HYP-001",
+      "HYP-002",
+      "HYP-003",
+      "HYP-004"
+    ],
+    "population_or_system": "公开 UCI Iris 数据集（asset_f8860d8760ed4f01ba7389310e938d03，artifact_cd8f151c0d6c481d8b0798f95d928be5）中的 150 条鸢尾花样本，物种标签包括 Iris-setosa、Iris-versicolor、Iris-virginica；本设计仅覆盖该数据集中的观测，不外推到未测量鸢尾花群体。",
+    "variables": [
+      "分析变量 X：sepal_length_cm，连续型，单位 cm",
+      "分析变量 Y：petal_length_cm，连续型，单位 cm",
+      "分组变量：species，类别型，取值为 Iris-setosa、Iris-versicolor、Iris-virginica",
+      "主要统计量：总体与各物种内 sepal_length_cm 与 petal_length_cm 的 Pearson 相关系数 r",
+      "辅助统计量：均值、标准差、最小值、最大值、四分位数、样本量、简单线性拟合斜率、Fisher z 置信区间"
+    ],
+    "controls": [
+      "数据来源固定为上传文件 iris_uci.csv（asset_f8860d8760ed4f01ba7389310e938d03），不引入外部新数据；解析摘要仅作为数据结构证据，不等同完整统计计算。",
+      "仅使用 sepal_length_cm、petal_length_cm、species 三列，避免其他列影响本问题的相关估计。",
+      "相关分析使用原始行观测；仅排除同时缺失 sepal_length_cm、petal_length_cm 或 species 的行，并记录排除数与原因。",
+      "物种分组严格按原始 species 标签执行，不重新聚类、不重新标注、不合并物种。",
+      "主要线性关联度量预先指定为 Pearson 相关系数；若进行稳健性检查，Spearman 相关仅作为补充，不替代主要结论。",
+      "相关系数置信区间预先指定使用 Fisher z 变换近似，并报告样本量；所有结论限定为描述性与关联性，不使用因果语言。"
+    ],
+    "comparison_groups": [
+      "总体：全部有效观测合并组",
+      "Iris-setosa 组",
+      "Iris-versicolor 组",
+      "Iris-virginica 组"
+    ],
+    "sampling_plan": [
+      "使用 iris_uci.csv 中全部 150 条已扫描数据行，不进行抽样、不放回采样或训练/测试划分。",
+      "若某行缺失 sepal_length_cm、petal_length_cm 或 species，则从有效分析样本中排除并记录；当前解析摘要显示扫描行中这些字段缺失数为 0。",
+      "按 species 分组形成三个分物种子样本；报告每组有效样本量。"
+    ],
+    "data_collection_plan": [
+      "不收集新数据；仅使用已上传的 iris_uci.csv 作为研究材料。",
+      "记录数据来源、asset_id、parsed_artifact_id、文件名、编码、分隔符、列名、扫描行数和内容哈希，用于溯源。",
+      "如果后续工具读取的数据与解析摘要不一致，以实际工具读取结果为准，并记录差异。"
+    ],
+    "measurement_plan": [
+      "sepal_length_cm 与 petal_length_cm 按连续数值变量处理，单位为 cm；读取时将字符串转换为数值。",
+      "对数值转换失败、空白或非法值按缺失处理，并记录其行号与原因。",
+      "检查重复记录：完全重复行不自动删除，但需报告重复数量并作为敏感性检查结果说明。",
+      "检查异常值与高影响样本：通过散点图、四分位距规则或 Cook 距离/杠杆值等简单诊断识别，不自动删除；仅当必要时进行排除前后对比。",
+      "记录每个分组的有效观测数：总体、Iris-setosa、Iris-versicolor、Iris-virginica。"
+    ],
+    "analysis_plan": [
+      "第一步：数据校验。确认列名为 sepal_length_cm、petal_length_cm、species；确认行数、缺失值、数值范围、重复记录和物种标签类别。",
+      "第二步：描述统计。分别对总体和三个物种计算 sepal_length_cm 与 petal_length_cm 的样本量、均值、标准差、最小值、第一四分位数、中位数、第三四分位数和最大值。",
+      "第三步：总体相关。计算总体 Pearson r，并用 Fisher z 变换给出 95% 置信区间；同时给出简单线性回归 petal_length_cm ~ sepal_length_cm 的斜率作为辅助描述。",
+      "第四步：分物种相关。分别对 Iris-setosa、Iris-versicolor、Iris-virginica 计算 Pearson r、95% Fisher z 置信区间和简单线性斜率。",
+      "第五步：稳定性判定。若某组 r 具有明确方向、绝对值较大且 95% 置信区间下限远离 0，则判定该组存在较稳定线性关联；若置信区间接近或包含 0，则判定为不稳定或证据不足。",
+      "第六步：物种间差异判定。比较三个物种 r 的点估计与置信区间重叠情况；如需量化差异，可计算两组相关系数差异的近似检验或报告重叠程度，但需说明样本量有限。",
+      "第七步：可视化。绘制总体散点图、按物种着色散点图、分物种散点图，并叠加简单线性拟合线；若工具无法输出图像，则以数值趋势描述替代。",
+      "第八步：稳健性与敏感性。检查异常值、高影响样本、重复记录对 r 的影响；必要时报告排除高影响样本后的 r 变化；可补充 Spearman 相关作为非线性或异常值敏感性检查。",
+      "第九步：结论映射。将结果映射到 HYP-001 至 HYP-004：支持、削弱、证伪或证据不足，并保留负结果或不稳定结果。"
+    ],
+    "quality_controls": [
+      "分析前核对上传文件解析摘要：150 扫描行、5 列、目标字段缺失数为 0；若实际读取不一致，记录差异并重新评估有效样本。",
+      "只统计同时具有有效 sepal_length_cm、petal_length_cm 和 species 的观测；报告被排除观测数量和原因。",
+      "所有相关系数必须报告对应样本量；小样本组的结果需标明估计不确定性较高。",
+      "Pearson 相关与置信区间方法固定；不得在看到结果后更换主要相关度量以迎合预期。",
+      "异常值不得静默删除；任何排除必须预先定义规则并作为敏感性分析展示。",
+      "若无法执行统计计算，只报告已解析结构、样本行和可见字段信息，不声称已完成完整统计分析。"
+    ],
+    "stopping_rules": [
+      "如果数据文件无法读取、目标列缺失或行数显著异常，则停止统计分析并报告数据可用性问题。",
+      "如果有效样本量低于分析要求（例如某一物种少于 3 条观测），则不给出该组稳定相关结论，只报告描述统计和不确定性。",
+      "如果缺失、重复或异常记录比例异常高，则先报告数据质量问题，再决定是否继续相关分析。",
+      "如果计算工具不可用或无法生成置信区间，则报告点估计受限，并明确标注未完成的不确定性评估。"
+    ],
+    "feasibility": "feasible_with_tools",
+    "required_tools": [
+      "dataset_inspector",
+      "statistical_analyzer",
+      "artifact_store"
+    ],
+    "human_actions_required": [
+      "如需最终发布，人工确认是否接受 Fisher z 近似置信区间作为不确定性报告方法。",
+      "如需正式引用数据，人工核对上传文件与 UCI 官方版本的一致性；当前材料来自上传文件，不将解析本身视为外部来源验证。"
+    ],
+    "risks": [
+      "总体相关可能主要由物种间均值差异驱动，不能直接推断每个物种内部都存在同等强度的线性关联。",
+      "Pearson 相关仅捕捉线性关联；若存在非线性、簇状分离或异方差，可能误判稳定性。",
+      "样本量固定且每组约 50 条，相关系数置信区间可能较宽，尤其是接近边界或存在异常值时。",
+      "异常值、重复记录或录入错误可能影响相关系数和斜率。",
+      "上传文件解析摘要只证明结构和可见样本，不等同于完整统计计算；实际统计结果必须由工具执行后确认。",
+      "若数据版本、字段名或样本 35/38 等行级内容与常见公开版本不一致，结果可能与用户预期版本不同。"
+    ],
+    "ethical_considerations": [
+      "不涉及人类受试者、个人数据或敏感生物样本。",
+      "明确声明分析仅描述统计关联，不证明因果关系、遗传关系或生物学机制。",
+      "避免将公开数据结果外推为所有鸢尾花物种或野外群体的普遍规律。"
+    ],
+    "reproducibility_plan": [
+      "记录数据资产标识：asset_f8860d8760ed4f01ba7389310e938d03，parsed_artifact_id artifact_cd8f151c0d6c481d8b0798f95d928be5，文件名 iris_uci.csv，内容哈希 24d7757511c6c8d4850aa86a6fad04b9426b319c635af26e6d413d94fe5bd73e。",
+      "记录分析列：sepal_length_cm、petal_length_cm、species；记录排除规则和有效样本量。",
+      "固定统计方法：Pearson 相关、Fisher z 95% 置信区间、简单线性拟合斜率作为辅助描述。",
+      "若使用随机成分（本设计不需要抽样或随机化），记录种子；当前为全量数据，无随机抽样。",
+      "输出最终报告时同时给出总体与分物种结果、样本量、置信区间、可视化或等价趋势描述、局限性和假设检验状态。"
+    ]
+  },
+  "analysis_plan": {
+    "objectives": [
+      "基于上传的 iris_uci.csv 数据集，评估萼片长度（sepal_length_cm）与花瓣长度（petal_length_cm）之间的总体线性关联强度与方向。",
+      "分别估计 Iris-setosa、Iris-versicolor、Iris-virginica 三个物种内部萼片长度与花瓣长度的线性关联，并比较其差异。",
+      "通过描述统计、相关系数置信区间、散点图和简单线性拟合斜率，判断该线性关联是否在总体和分物种层面具有稳定性。",
+      "明确分析边界：仅进行描述性与关联性分析，不进行因果推断、预测建模或超出上传数据范围的生物学机制解释。"
+    ],
+    "input_data": [
+      "上传数据文件：iris_uci.csv，asset_id=asset_f8860d8760ed4f01ba7389310e938d03，parsed_artifact_id=artifact_cd8f151c0d6c481d8b0798f95d928be5，内容哈希=24d7757511c6c8d4850aa86a6fad04b9426b319c635af26e6d413d94fe5bd73e。",
+      "数据角色：用户上传的研究材料/数据集，不作为外部来源验证依据；解析摘要仅证明已观察到的结构与有限样本，不等同于完整统计计算。",
+      "解析摘要显示：UTF-8-SIG 编码，CSV 分隔，共 5 列、150 条扫描数据行，且扫描范围内目标字段缺失数为 0。",
+      "分析字段：sepal_length_cm（连续数值，单位 cm）、petal_length_cm（连续数值，单位 cm）、species（类别标签，样本值为 Iris-setosa、Iris-versicolor、Iris-virginica）。",
+      "样本范围：使用全部有效观测；若实际读取中出现缺失、非法值或标签异常，则按预定义规则排除并记录。"
+    ],
+    "preprocessing": [
+      "读取 iris_uci.csv 时保留原始行号，以便追踪异常行、重复行或缺失行。",
+      "仅选择 sepal_length_cm、petal_length_cm、species 三列进入分析；其他列不参与本问题的相关估计。",
+      "将 sepal_length_cm 与 petal_length_cm 转换为数值；空白、缺失或无法转换值记录为缺失。",
+      "有效观测定义：同一行同时具有非缺失的 sepal_length_cm、petal_length_cm 和 species；不满足者排除并报告数量与原因。",
+      "检查 species 实际类别；若出现预期三类之外的标签，不自动合并或重命名，单独记录并评估是否影响分析。",
+      "报告完全重复行数量；默认不自动删除，仅在敏感性分析中说明其可能影响。",
+      "检查数值范围是否异常，例如负值、极大值或明显超出厘米级花瓣/萼片合理范围的值；不自动删除，先标记为可疑观测。",
+      "如果实际读取结果与解析摘要不一致，以实际读取结果为准，并在结果中记录差异。"
+    ],
+    "metrics": [
+      "总体与各物种有效样本量。",
+      "sepal_length_cm 与 petal_length_cm 的均值、标准差、最小值、第一四分位数、中位数、第三四分位数、最大值。",
+      "总体 Pearson 相关系数 r，表示 sepal_length_cm 与 petal_length_cm 的线性关联方向与强度。",
+      "Iris-setosa、Iris-versicolor、Iris-virginica 各组内部的 Pearson 相关系数。",
+      "每个相关系数对应的样本量和 95% 置信区间。",
+      "简单线性回归斜率：petal_length_cm ~ sepal_length_cm，仅作为线性趋势辅助描述，不作为因果效应。",
+      "可选辅助指标：Spearman 秩相关系数，用于检查单调关联或对异常值的敏感性，不替代 Pearson 主要结论。"
+    ],
+    "statistical_assumptions": [
+      "观测行被视为数据集中的记录；不假设样本来自某个可外推的随机抽样总体，结论限定为对该上传数据集内部结构的描述。",
+      "Pearson 相关系数用于度量线性关联；其解释需结合散点图，避免在明显非线性或簇状结构下过度解释。",
+      "Fisher z 近似置信区间假设样本量足够且相关系数估计远离边界；对接近 ±1 或样本量很小的组需谨慎解释。",
+      "物种内相关分析假设组内观测来自同一标签类别；不假设物种标签无误或等同于生物学分类真值。",
+      "相关分析不要求变量服从正态分布，但极端异常值可能显著影响 Pearson 估计。",
+      "不假设萼片长度与花瓣长度之间存在因果关系或共同机制；所有解释限于统计关联。"
+    ],
+    "statistical_methods": [
+      "数据校验：确认列名、行数、字段类型、缺失值、重复行、物种标签类别和数值范围。",
+      "描述统计：对总体和三个物种分别计算 sepal_length_cm 与 petal_length_cm 的样本量、均值、标准差、最小值、四分位数和最大值。",
+      "总体相关：计算全体有效观测中 sepal_length_cm 与 petal_length_cm 的 Pearson 相关系数。",
+      "分物种相关：分别计算 Iris-setosa、Iris-versicolor、Iris-virginica 组内 Pearson 相关系数。",
+      "置信区间：对每个 Pearson r 使用 Fisher z 变换计算 95% 置信区间，并报告样本量。",
+      "线性趋势辅助描述：对总体和各物种分别拟合简单线性模型 petal_length_cm ~ sepal_length_cm，报告斜率；不解释为因果效应。",
+      "物种间差异比较：比较三个物种相关系数点估计与置信区间重叠；可补充近似两组相关差异检验或成对差异描述，但需说明样本量有限且该检验为辅助证据。",
+      "可视化：绘制总体散点图、按物种着色散点图和分物种散点图；若无法输出图像，用数值趋势、范围与拟合方向替代描述。",
+      "稳定性判定：若某组 r 方向明确、绝对值较大且 95% 置信区间不接近零，则描述为该组存在较稳定线性关联；若置信区间接近或包含零，则描述为证据不足或不稳定。",
+      "结论映射：将结果映射到 HYP-001 至 HYP-004，明确支持、削弱、证伪或证据不足，并保留负结果或不稳定结果。"
+    ],
+    "robustness_checks": [
+      "使用 Spearman 秩相关作为稳健性检查，比较其与 Pearson 的方向是否一致；若差异明显，提示可能存在非线性、等级结构或异常值影响。",
+      "检查散点图是否存在明显非线性、簇状分离、异方差或极端点，并记录其对线性解释的影响。",
+      "标记四分位距规则下的潜在异常值或高杠杆观测；不自动删除，仅报告其数量、位置和可能影响。",
+      "若发现高影响样本，报告排除该样本前后的 Pearson r、置信区间和简单斜率变化；该排除必须作为敏感性分析，而不是默认主分析。",
+      "检查完全重复记录是否改变相关估计；报告重复数量，并比较保留与去除完全重复后的结果差异。",
+      "比较总体相关与分物种相关，判断总体正相关是否主要由物种间均值差异驱动。"
+    ],
+    "sensitivity_analysis": [
+      "缺失处理敏感性：比较仅使用完整观测的结果与若存在少量缺失时的排除影响；当前解析摘要显示目标字段无缺失，但仍需以实际读取为准。",
+      "异常值敏感性：报告包含全部有效观测的主结果，并补充标记或排除潜在高影响观测后的结果变化。",
+      "重复记录敏感性：报告保留完全重复行的主结果，并补充去除完全重复行后的相关系数变化。",
+      "相关度量敏感性：报告 Pearson 主结果，并补充 Spearman 结果；若二者结论不一致，明确说明主结论以 Pearson 为准且存在稳健性限制。",
+      "物种间差异敏感性：除置信区间重叠外，可报告成对相关差异的近似检验；若样本量或近似条件不足，则只作描述性比较。",
+      "数据版本敏感性：若实际读取中出现与常见 UCI Iris 版本不一致的行、标签或数值，记录差异并说明结果仅适用于该上传文件。"
+    ],
+    "uncertainty_quantification": [
+      "为总体和每个物种的 Pearson 相关系数报告 95% Fisher z 置信区间。",
+      "为所有相关系数报告对应有效样本量；样本量较小的组需明确提示估计不确定性较高。",
+      "使用置信区间是否接近或包含零来判断线性关联的不确定性；不把点估计本身视为充分证据。",
+      "对物种间差异避免仅凭点估计大小下结论；必须结合置信区间重叠或近似差异检验的不确定性描述。",
+      "若置信区间过宽、接近边界或近似条件不足，明确降低结论强度，仅报告估计不确定。",
+      "明确区分：解析摘要中观察到的结构信息、实际统计计算结果、基于结果的推断；未执行的计算不得作为已完成结果报告。"
+    ],
+    "visualization_plan": [
+      "总体散点图：x=sepal_length_cm，y=petal_length_cm，用于观察总体线性趋势、簇状结构和异常点。",
+      "按物种着色散点图：在同一图中显示三个物种的观测分布，用于判断总体相关是否由物种间分离驱动。",
+      "分物种散点图：每个物种单独绘制，并可叠加简单线性拟合线，用于比较组内线性趋势。",
+      "简单线性拟合线：仅在散点图中作为描述性趋势线，不标注因果效应或预测区间。",
+      "若工具无法生成图像，则用数值摘要替代：包括各组数值范围、均值差异、相关系数、斜率方向和离散程度。"
+    ],
+    "success_criteria": [
+      "成功读取上传数据并确认 sepal_length_cm、petal_length_cm、species 三个目标字段可用。",
+      "报告总体有效样本量以及 Iris-setosa、Iris-versicolor、Iris-virginica 各组有效样本量。",
+      "报告总体和分物种的 sepal_length_cm、petal_length_cm 描述统计量。",
+      "报告总体 Pearson 相关系数、样本量和 95% 置信区间。",
+      "报告三个物种各自的 Pearson 相关系数、样本量和 95% 置信区间。",
+      "提供简单线性拟合斜率或等价趋势描述，用于辅助判断线性方向。",
+      "提供散点图或等价的数值趋势描述，并说明总体相关是否可能受物种间分离影响。",
+      "明确回答是否存在较稳定线性关联，以及三个物种之间是否存在可见差异，同时说明不确定性。",
+      "明确声明分析为描述性与关联性分析，不作因果推断。"
+    ],
+    "failure_criteria": [
+      "数据文件无法读取、目标列缺失、字段类型无法转换或行数显著异常。",
+      "有效样本量不足，尤其任一物种有效观测少于 3 条，导致无法形成可靠的组内相关估计。",
+      "目标字段缺失、重复或异常记录比例异常高，且无法通过敏感性分析说明影响。",
+      "相关系数置信区间无法计算或近似条件明显不满足，导致不确定性无法量化。",
+      "散点图或等价检查显示明显非线性、簇状分离或异常值主导，而仍强行给出稳定线性结论。",
+      "物种间差异仅凭点估计判断，未报告置信区间、样本量或其他不确定性信息。",
+      "实际读取结果与解析摘要不一致且差异无法定位，导致数据状态不可审计。",
+      "分析结果被解释为因果关系、生物学机制、遗传关系或超出上传数据范围的普遍规律。"
+    ]
+  },
+  "reproducibility_plan": {
+    "reproducibility_plan": [
+      "RP-001 数据资产溯源：固定使用用户上传材料 iris_uci.csv，asset_id=asset_f8860d8760ed4f01ba7389310e938d03；解析工件为 artifact_cd8f151c0d6c481d8b0798f95d928be5；文件内容哈希 SHA-256=24d7757511c6c8d4850aa86a6fad04b9426b319c635af26e6d413d94fe5bd73e。未经重新哈希或重新读取，不得声称当前文件与解析摘要完全一致。",
+      "RP-002 分析范围版本：本次复现对象为 study_design_v1 与 analysis_plan_v1 对应的分析任务；关键工件为 artifact_ae593d1bc486456eb24d81bc006204d6（study_design）与 artifact_c04bf35a2cbf4ba5bc9a6a34f86f38d3（analysis_plan）。",
+      "RP-003 输入字段固定：仅使用 sepal_length_cm、petal_length_cm、species 三列；不使用 sepal_width_cm 或 petal_width_cm。数值列按连续型读取，空白、缺失或无法转换为数值者记为缺失并报告行号。",
+      "RP-004 有效观测规则：同时具有非缺失 sepal_length_cm、petal_length_cm 和 species 的行进入分析。解析摘要显示扫描 150 行且三字段缺失为 0，但该摘要仅为结构证据；正式分析必须由工具重新读取并记录实际有效样本量。",
+      "RP-005 分组规则：按原始 species 标签分为 Iris-setosa、Iris-versicolor、Iris-virginica 三组；不重新聚类、不合并、不重命名。如出现预期之外标签，单独记录并评估影响。",
+      "RP-006 主分析方法固定：总体与各物种均计算 Pearson 相关系数 r；每个 r 必须报告对应样本量 n，并使用 Fisher z 变换计算 95% 置信区间。不得在看到结果后更换主相关度量。",
+      "RP-007 辅助线性趋势：对总体和各物种分别拟合 petal_length_cm ~ sepal_length_cm 简单线性模型，报告斜率，仅作为线性趋势辅助描述，不解释为因果效应。",
+      "RP-008 稳健性与敏感性：预先补充 Spearman 秩相关作为敏感性检查；报告完全重复记录数量；标记潜在异常值或高杠杆观测，不自动删除；如执行排除分析，必须同时报告排除前后的 r、置信区间和斜率变化。",
+      "RP-009 可视化或等价记录：生成总体散点图、按物种着色散点图、分物种散点图并叠加简单线性拟合线；若图像无法生成，保存等效数值趋势描述，包括范围、组间分离、斜率方向和离散程度。",
+      "RP-010 结果日志要求：记录每个分组的有效样本量、缺失数量、排除原因、重复数量、异常值标记数量、Pearson r、Fisher z 95% CI、简单线性斜率、Spearman 结果以及物种间差异比较结果。",
+      "RP-011 版本与环境记录：记录 workflow_version=general_research_v1@1.0，可用工具包括 dataset_inspector、statistical_analyzer、artifact_store；若统计实现涉及软件库，需记录库名称与版本。",
+      "RP-012 随机性说明：本设计使用全部有效观测，不抽样、不训练/测试划分、无随机化步骤，因此无需随机种子；若执行过程中引入随机成分，必须记录种子并重新归档。",
+      "RP-013 结论边界：最终报告仅描述该上传数据集中的线性关联，不声明因果关系、不外推到未测量鸢尾花群体，不将解析摘要等同于完整统计计算。",
+      "RP-014 工件归档：最终分析结果应以新的 analysis_result 或 report artifact 归档，并引用 asset_f8860d8760ed4f01ba7389310e938d03、artifact_cd8f151c0d6c481d8b0798f95d928be5、study_design 与 analysis_plan 工件 ID。"
+    ],
+    "required_artifacts": [
+      "asset_f8860d8760ed4f01ba7389310e938d03",
+      "artifact_cd8f151c0d6c481d8b0798f95d928be5",
+      "artifact_ae593d1bc486456eb24d81bc006204d6",
+      "artifact_c04bf35a2cbf4ba5bc9a6a34f86f38d3",
+      "dataset_inspector",
+      "statistical_analyzer",
+      "artifact_store"
+    ],
+    "missing_reproducibility_information": [
+      "尚未由统计工具重新读取数据文件，因此未确认实际行数、缺失数、重复数、有效样本量与解析摘要一致。",
+      "尚未生成实际统计结果，包括总体与各物种 Pearson r、Fisher z 95% 置信区间、简单线性斜率和 Spearman 敏感性结果。",
+      "尚未记录统计软件、库版本或函数实现细节；如由人工或其他环境复现，需要补充具体代码或工具版本。",
+      "尚未生成或归档分析日志、可视化文件、结果表格或最终 analysis_result/report artifact。",
+      "尚未提供文件读取时重新计算的内容哈希校验结果；现有哈希来自解析摘要，不能替代正式执行时的校验。",
+      "未明确异常值或高影响样本的具体判定阈值；计划中提到四分位距规则、Cook 距离/杠杆值，但尚未固定数值阈值。",
+      "物种间相关差异的近似检验方法尚未固定为唯一公式，需在正式分析时记录所选方法与软件实现。"
+    ],
+    "execution_readiness": "ready_if_assets_connected"
+  },
+  "reviewer": {
+    "evidence_quality_score": 9.0,
+    "methodological_validity_score": 9.0,
+    "feasibility_score": 10.0,
+    "reproducibility_score": 9.0,
+    "claim_support_score": 9.0,
+    "uncertainty_handling_score": 9.0,
+    "blocking_issues": [],
+    "non_blocking_issues": [
+      "计划中承诺的部分稳健性内容尚未全部执行，例如 Spearman 敏感性检查、重复记录影响检查、异常值或高影响样本检查，以及物种间相关差异的近似检验；这些不构成阻断问题，但应作为后续非阻断改进项记录。",
+      "散点图已生成但为总体散点图，未明确提供按物种着色或分物种叠加拟合线的图像证据；可用现有分组统计和相关系数描述替代，但应在报告中说明可视化限制。",
+      "上传文件为不可信研究材料，其‘与 UCI 官方版本一致’的声明来自人工修订说明和项目资产元数据，不能等同于独立外部验证；报告应继续保留该来源限制。",
+      "iris_analysis_results.json 中报告了 3 条完全重复行，但主分析仍基于全部 150 条有效观测；应在最终报告中明确重复行未被自动删除及其可能影响。"
+    ],
+    "recommendations": [
+      "在最终报告中保留并汇总已批准阻断问题的闭环证据：EVD-001/EVD-002 提供 UCI 权威来源，EVD-003 提供上传文件结构解析，evidence_3d4ec94b74d844a69643794d4aadc0e5 与 evidence_d81b9b2ba598462da51f5dade3750be8 提供确定性分析和受控 Python 复算。",
+      "最终报告应明确核心结果：总体 Pearson r=0.8718（n=150，95% CI 0.8270–0.9055）；Iris-setosa r=0.2639（n=50，95% CI -0.0156–0.5051）；Iris-versicolor r=0.7540（n=50，95% CI 0.6021–0.8533）；Iris-virginica r=0.8642（n=50，95% CI 0.7715–0.9210）。",
+      "结论表述应区分总体与物种层面：总体存在较强正向线性关联；物种间关联强度明显不同，setosa 内部关联弱且置信区间包含接近零的值，versicolor 与 virginica 内部关联较强。",
+      "保留‘相关不等于因果’的边界声明，避免将结果解释为生物学机制、遗传关系或野外鸢尾花群体的普遍规律。",
+      "若进入最终发布阶段，可补充 Spearman、重复行敏感性和高影响样本检查，但不将新改进作为当前修订闭环的阻断标准。"
+    ],
+    "decision": "approve",
+    "failed_quality_gates": [],
+    "required_revision_target": "none",
+    "revision_plan": [],
+    "approval_conditions": [
+      "最终报告必须引用项目资产和执行证据的标识，包括 asset_f8860d8760ed4f01ba7389310e938d03、artifact_cd8f151c0d6c481d8b0798f95d928be5、evidence_3d4ec94b74d844a69643794d4aadc0e5 和 evidence_d81b9b2ba598462da51f5dade3750be8。",
+      "最终报告必须报告总体与三个物种的样本量、Pearson 相关系数、Fisher-z 95% 置信区间和简单线性斜率。",
+      "最终报告必须说明 setosa 的置信区间包含接近零的值，因此不能将 setosa 内部描述为稳定强线性关联。",
+      "最终报告必须说明分析仅描述上传 Iris 数据集中的关联，不作因果推断，不外推到未测量群体。"
+    ]
+  },
+  "revision_workflow": {
+    "issues": [
+      {
+        "issue_id": "revision_issue_52c42cd7875846e982a732c700c536f3",
+        "source_action_ids": [
+          "ACT-EVID-001"
+        ],
+        "classification": "plan_blocking",
+        "target": "evidence",
+        "problem": "The only current evidence record is a partially verified candidate source URL without extracted content. It cannot support dataset confirmation, variable mapping, sample sizes, or correlation estimates.",
+        "severity": "需要在方案定稿前处理",
+        "impact": "若不处理，研究计划的可执行性或科学有效性可能下降。",
+        "reviewer_recommendations": [
+          "Obtain and record an accessible, parseable Iris dataset version or an extracted, verified statistical source.",
+          "Record dataset source, version, URL or file path, retrieval time, original field names, units, total rows, species labels, missing-value counts, and duplicate counts.",
+          "Verify that fields can be mapped to sepal length, petal length, and species before statistical execution.",
+          "If extraction or dataset access fails, explicitly document the failure and request human-provided data or verified statistics."
+        ],
+        "completion_criteria": [
+          "A primary dataset evidence record exists with extracted schema, sample counts, and field mapping.",
+          "The evidence confirms sepal length, petal length, and species variables or documents why they are unavailable.",
+          "No statistical results are claimed unless derived from confirmed data or verified extracted statistics."
+        ],
+        "priority": 1,
+        "status": "approved"
+      },
+      {
+        "issue_id": "revision_issue_5a766f711f8f43a786e7df9e002dbe36",
+        "source_action_ids": [
+          "ACT-EVID-002"
+        ],
+        "classification": "plan_blocking",
+        "target": "evidence",
+        "problem": "The current source URL is archive.ics.uci.edu and has only partial verification; a canonical or execution-verified source record is needed to avoid version ambiguity.",
+        "severity": "需要在方案定稿前处理",
+        "impact": "若不处理，研究计划的可执行性或科学有效性可能下降。",
+        "reviewer_recommendations": [
+          "Resolve the canonical UCI Iris record or select an equivalent authoritative public source.",
+          "Record whether the selected source is identical to the UCI candidate and note any differences in variable names, labels, or sample counts.",
+          "Do not treat candidate-level metadata as verified dataset content."
+        ],
+        "completion_criteria": [
+          "A canonical or clearly accepted dataset source is identified and recorded.",
+          "Source provenance is sufficient for reproducibility."
+        ],
+        "priority": 2,
+        "status": "approved"
+      },
+      {
+        "issue_id": "revision_issue_eda509d7c5bf49f0837fe2e0f705167f",
+        "source_action_ids": [],
+        "classification": "non_blocking",
+        "target": "methodology",
+        "problem": "稳定性判定阈值尚未预先设定，可在执行前明确为方向明确、置信区间不接近零且相关系数绝对值较高。",
+        "severity": "建议改进，但不阻止规划审批",
+        "impact": "该问题影响完整性，但不应阻止 planning-only 研究计划进入人工批准。",
+        "reviewer_recommendations": [
+          "稳定性判定阈值尚未预先设定，可在执行前明确为方向明确、置信区间不接近零且相关系数绝对值较高。"
+        ],
+        "completion_criteria": [],
+        "priority": 50,
+        "status": "limitation"
+      },
+      {
+        "issue_id": "revision_issue_922051c6d88748f09d89e1839b6f10fa",
+        "source_action_ids": [],
+        "classification": "non_blocking",
+        "target": "methodology",
+        "problem": "未说明是否必须报告 Spearman 相关系数；建议仅在非线性、异常值或分布异常可疑时作为补充。",
+        "severity": "建议改进，但不阻止规划审批",
+        "impact": "该问题影响完整性，但不应阻止 planning-only 研究计划进入人工批准。",
+        "reviewer_recommendations": [
+          "未说明是否必须报告 Spearman 相关系数；建议仅在非线性、异常值或分布异常可疑时作为补充。"
+        ],
+        "completion_criteria": [],
+        "priority": 50,
+        "status": "limitation"
+      },
+      {
+        "issue_id": "revision_issue_30ed329a987a4a6f8e90e8835f032475",
+        "source_action_ids": [],
+        "classification": "non_blocking",
+        "target": "methodology",
+        "problem": "置信区间计算方法已计划使用 Fisher z 变换，但需确认执行工具是否支持。",
+        "severity": "建议改进，但不阻止规划审批",
+        "impact": "该问题影响完整性，但不应阻止 planning-only 研究计划进入人工批准。",
+        "reviewer_recommendations": [
+          "置信区间计算方法已计划使用 Fisher z 变换，但需确认执行工具是否支持。"
+        ],
+        "completion_criteria": [],
+        "priority": 50,
+        "status": "limitation"
+      },
+      {
+        "issue_id": "revision_issue_49085b9288df456aa9831b7382e9ebb0",
+        "source_action_ids": [],
+        "classification": "non_blocking",
+        "target": "methodology",
+        "problem": "研究问题使用公开常见数据集，但当前项目状态没有数据内容，不能将计划本身视为已验证结果。",
+        "severity": "建议改进，但不阻止规划审批",
+        "impact": "该问题影响完整性，但不应阻止 planning-only 研究计划进入人工批准。",
+        "reviewer_recommendations": [
+          "研究问题使用公开常见数据集，但当前项目状态没有数据内容，不能将计划本身视为已验证结果。"
+        ],
+        "completion_criteria": [],
+        "priority": 50,
+        "status": "limitation"
+      }
+    ],
+    "approved_plans": [
+      {
+        "revision_plan_id": "approved_revision_plan_13eb8f42fddd4458924a814dd9a9c356",
+        "project_id": "project_f9374def244c4829b4b8d8c52f4d56d2",
+        "review_version": 1,
+        "revision_cycle": 1,
+        "approved_issues": [
+          "revision_issue_52c42cd7875846e982a732c700c536f3",
+          "revision_issue_5a766f711f8f43a786e7df9e002dbe36"
+        ],
+        "rejected_issues": [],
+        "deferred_issues": [],
+        "accepted_as_limitation": [
+          "revision_issue_eda509d7c5bf49f0837fe2e0f705167f",
+          "revision_issue_922051c6d88748f09d89e1839b6f10fa",
+          "revision_issue_30ed329a987a4a6f8e90e8835f032475",
+          "revision_issue_49085b9288df456aa9831b7382e9ebb0"
+        ],
+        "human_modified_instructions": {},
+        "target_batches": [
+          {
+            "batch_id": "revision_batch_7ff32918f69c432eb503d60595467f39",
+            "target": "evidence",
+            "issue_ids": [
+              "revision_issue_52c42cd7875846e982a732c700c536f3",
+              "revision_issue_5a766f711f8f43a786e7df9e002dbe36"
+            ],
+            "issue_snapshots": [
+              {
+                "issue_id": "revision_issue_52c42cd7875846e982a732c700c536f3",
+                "source_action_ids": [
+                  "ACT-EVID-001"
+                ],
+                "classification": "plan_blocking",
+                "target": "evidence",
+                "problem": "The only current evidence record is a partially verified candidate source URL without extracted content. It cannot support dataset confirmation, variable mapping, sample sizes, or correlation estimates.",
+                "severity": "需要在方案定稿前处理",
+                "impact": "若不处理，研究计划的可执行性或科学有效性可能下降。",
+                "reviewer_recommendations": [
+                  "Obtain and record an accessible, parseable Iris dataset version or an extracted, verified statistical source.",
+                  "Record dataset source, version, URL or file path, retrieval time, original field names, units, total rows, species labels, missing-value counts, and duplicate counts.",
+                  "Verify that fields can be mapped to sepal length, petal length, and species before statistical execution.",
+                  "If extraction or dataset access fails, explicitly document the failure and request human-provided data or verified statistics."
+                ],
+                "completion_criteria": [
+                  "A primary dataset evidence record exists with extracted schema, sample counts, and field mapping.",
+                  "The evidence confirms sepal length, petal length, and species variables or documents why they are unavailable.",
+                  "No statistical results are claimed unless derived from confirmed data or verified extracted statistics."
+                ],
+                "priority": 1,
+                "status": "approved"
+              },
+              {
+                "issue_id": "revision_issue_5a766f711f8f43a786e7df9e002dbe36",
+                "source_action_ids": [
+                  "ACT-EVID-002"
+                ],
+                "classification": "plan_blocking",
+                "target": "evidence",
+                "problem": "The current source URL is archive.ics.uci.edu and has only partial verification; a canonical or execution-verified source record is needed to avoid version ambiguity.",
+                "severity": "需要在方案定稿前处理",
+                "impact": "若不处理，研究计划的可执行性或科学有效性可能下降。",
+                "reviewer_recommendations": [
+                  "Resolve the canonical UCI Iris record or select an equivalent authoritative public source.",
+                  "Record whether the selected source is identical to the UCI candidate and note any differences in variable names, labels, or sample counts.",
+                  "Do not treat candidate-level metadata as verified dataset content."
+                ],
+                "completion_criteria": [
+                  "A canonical or clearly accepted dataset source is identified and recorded.",
+                  "Source provenance is sufficient for reproducibility."
+                ],
+                "priority": 2,
+                "status": "approved"
+              }
+            ],
+            "completion_criteria": [
+              "A primary dataset evidence record exists with extracted schema, sample counts, and field mapping.",
+              "The evidence confirms sepal length, petal length, and species variables or documents why they are unavailable.",
+              "No statistical results are claimed unless derived from confirmed data or verified extracted statistics.",
+              "A canonical or clearly accepted dataset source is identified and recorded.",
+              "Source provenance is sufficient for reproducibility."
+            ],
+            "instructions": [
+              "Obtain and record an accessible, parseable Iris dataset version or an extracted, verified statistical source.",
+              "Record dataset source, version, URL or file path, retrieval time, original field names, units, total rows, species labels, missing-value counts, and duplicate counts.",
+              "Verify that fields can be mapped to sepal length, petal length, and species before statistical execution.",
+              "If extraction or dataset access fails, explicitly document the failure and request human-provided data or verified statistics.",
+              "Resolve the canonical UCI Iris record or select an equivalent authoritative public source.",
+              "Record whether the selected source is identical to the UCI candidate and note any differences in variable names, labels, or sample counts.",
+              "Do not treat candidate-level metadata as verified dataset content."
+            ],
+            "provided_content": [],
+            "status": "needs_attention",
+            "old_artifact_version": 1,
+            "new_artifact_version": null,
+            "verification_id": null,
+            "job_id": null
+          }
+        ],
+        "created_at": "2026-09-01T06:40:49.674608Z",
+        "created_by": "human",
+        "status": "needs_attention"
+      },
+      {
+        "revision_plan_id": "approved_revision_plan_75e2fc0f7aba4f8693cf3c230abaf938",
+        "project_id": "project_f9374def244c4829b4b8d8c52f4d56d2",
+        "review_version": 1,
+        "revision_cycle": 2,
+        "approved_issues": [
+          "revision_issue_52c42cd7875846e982a732c700c536f3",
+          "revision_issue_5a766f711f8f43a786e7df9e002dbe36"
+        ],
+        "rejected_issues": [],
+        "deferred_issues": [],
+        "accepted_as_limitation": [
+          "revision_issue_eda509d7c5bf49f0837fe2e0f705167f",
+          "revision_issue_922051c6d88748f09d89e1839b6f10fa",
+          "revision_issue_30ed329a987a4a6f8e90e8835f032475",
+          "revision_issue_49085b9288df456aa9831b7382e9ebb0"
+        ],
+        "human_modified_instructions": {
+          "revision_issue_52c42cd7875846e982a732c700c536f3": "已上传 iris_uci.csv：来自 UCI Machine Learning Repository Iris Dataset（dataset id 53，DOI 10.24432/C56C76），150 行、5 列；字段 sepal_length_cm、sepal_width_cm、petal_length_cm、petal_width_cm、species；测量单位 cm；三个物种各 50 条；请引用项目资产的解析摘要，不要虚构统计结果。",
+          "revision_issue_5a766f711f8f43a786e7df9e002dbe36": "权威来源为 UCI Iris Dataset，官方页面 https://archive.ics.uci.edu/dataset/53/iris，下载包 https://archive.ics.uci.edu/static/public/53/iris.zip；本项目资产 iris_uci.csv 仅增加了明确列名，原始 150 行测量值保持不变。"
+        },
+        "target_batches": [
+          {
+            "batch_id": "revision_batch_c32367a764f14c9fb67517dc2ded76e7",
+            "target": "evidence",
+            "issue_ids": [
+              "revision_issue_52c42cd7875846e982a732c700c536f3",
+              "revision_issue_5a766f711f8f43a786e7df9e002dbe36"
+            ],
+            "issue_snapshots": [
+              {
+                "issue_id": "revision_issue_52c42cd7875846e982a732c700c536f3",
+                "source_action_ids": [
+                  "ACT-EVID-001"
+                ],
+                "classification": "plan_blocking",
+                "target": "evidence",
+                "problem": "The only current evidence record is a partially verified candidate source URL without extracted content. It cannot support dataset confirmation, variable mapping, sample sizes, or correlation estimates.",
+                "severity": "需要在方案定稿前处理",
+                "impact": "若不处理，研究计划的可执行性或科学有效性可能下降。",
+                "reviewer_recommendations": [
+                  "Obtain and record an accessible, parseable Iris dataset version or an extracted, verified statistical source.",
+                  "Record dataset source, version, URL or file path, retrieval time, original field names, units, total rows, species labels, missing-value counts, and duplicate counts.",
+                  "Verify that fields can be mapped to sepal length, petal length, and species before statistical execution.",
+                  "If extraction or dataset access fails, explicitly document the failure and request human-provided data or verified statistics."
+                ],
+                "completion_criteria": [
+                  "A primary dataset evidence record exists with extracted schema, sample counts, and field mapping.",
+                  "The evidence confirms sepal length, petal length, and species variables or documents why they are unavailable.",
+                  "No statistical results are claimed unless derived from confirmed data or verified extracted statistics."
+                ],
+                "priority": 1,
+                "status": "approved"
+              },
+              {
+                "issue_id": "revision_issue_5a766f711f8f43a786e7df9e002dbe36",
+                "source_action_ids": [
+                  "ACT-EVID-002"
+                ],
+                "classification": "plan_blocking",
+                "target": "evidence",
+                "problem": "The current source URL is archive.ics.uci.edu and has only partial verification; a canonical or execution-verified source record is needed to avoid version ambiguity.",
+                "severity": "需要在方案定稿前处理",
+                "impact": "若不处理，研究计划的可执行性或科学有效性可能下降。",
+                "reviewer_recommendations": [
+                  "Resolve the canonical UCI Iris record or select an equivalent authoritative public source.",
+                  "Record whether the selected source is identical to the UCI candidate and note any differences in variable names, labels, or sample counts.",
+                  "Do not treat candidate-level metadata as verified dataset content."
+                ],
+                "completion_criteria": [
+                  "A canonical or clearly accepted dataset source is identified and recorded.",
+                  "Source provenance is sufficient for reproducibility."
+                ],
+                "priority": 2,
+                "status": "approved"
+              }
+            ],
+            "completion_criteria": [
+              "A primary dataset evidence record exists with extracted schema, sample counts, and field mapping.",
+              "The evidence confirms sepal length, petal length, and species variables or documents why they are unavailable.",
+              "No statistical results are claimed unless derived from confirmed data or verified extracted statistics.",
+              "A canonical or clearly accepted dataset source is identified and recorded.",
+              "Source provenance is sufficient for reproducibility."
+            ],
+            "instructions": [
+              "已上传 iris_uci.csv：来自 UCI Machine Learning Repository Iris Dataset（dataset id 53，DOI 10.24432/C56C76），150 行、5 列；字段 sepal_length_cm、sepal_width_cm、petal_length_cm、petal_width_cm、species；测量单位 cm；三个物种各 50 条；请引用项目资产的解析摘要，不要虚构统计结果。",
+              "权威来源为 UCI Iris Dataset，官方页面 https://archive.ics.uci.edu/dataset/53/iris，下载包 https://archive.ics.uci.edu/static/public/53/iris.zip；本项目资产 iris_uci.csv 仅增加了明确列名，原始 150 行测量值保持不变。"
+            ],
+            "provided_content": [
+              "已上传 iris_uci.csv：来自 UCI Machine Learning Repository Iris Dataset（dataset id 53，DOI 10.24432/C56C76），150 行、5 列；字段 sepal_length_cm、sepal_width_cm、petal_length_cm、petal_width_cm、species；测量单位 cm；三个物种各 50 条；请引用项目资产的解析摘要，不要虚构统计结果。",
+              "权威来源为 UCI Iris Dataset，官方页面 https://archive.ics.uci.edu/dataset/53/iris，下载包 https://archive.ics.uci.edu/static/public/53/iris.zip；本项目资产 iris_uci.csv 仅增加了明确列名，原始 150 行测量值保持不变。"
+            ],
+            "status": "needs_attention",
+            "old_artifact_version": 1,
+            "new_artifact_version": null,
+            "verification_id": null,
+            "job_id": null
+          }
+        ],
+        "created_at": "2026-09-01T06:43:15.307917Z",
+        "created_by": "human",
+        "status": "needs_attention"
+      }
+    ],
+    "verifications": [],
+    "execution_requirements": [],
+    "accepted_limitations": [
+      "稳定性判定阈值尚未预先设定，可在执行前明确为方向明确、置信区间不接近零且相关系数绝对值较高。",
+      "未说明是否必须报告 Spearman 相关系数；建议仅在非线性、异常值或分布异常可疑时作为补充。",
+      "置信区间计算方法已计划使用 Fisher z 变换，但需确认执行工具是否支持。",
+      "研究问题使用公开常见数据集，但当前项目状态没有数据内容，不能将计划本身视为已验证结果。",
+      "稳定性判定阈值尚未预先设定，可在执行前明确为方向明确、置信区间不接近零且相关系数绝对值较高。",
+      "未说明是否必须报告 Spearman 相关系数；建议仅在非线性、异常值或分布异常可疑时作为补充。",
+      "置信区间计算方法已计划使用 Fisher z 变换，但需确认执行工具是否支持。",
+      "研究问题使用公开常见数据集，但当前项目状态没有数据内容，不能将计划本身视为已验证结果。"
+    ]
+  },
+  "conclusion": {
+    "planning_status_statement": "本报告包含项目内受控执行结果；输入哈希、参数、软件版本和输出校验和均已保存。",
+    "supported_findings": [
+      {
+        "conclusion_id": "CONC-001",
+        "statement": "在该分析所处理的上传 Iris 数据集中，总体样本存在较强正向线性关联：萼片长度与花瓣长度的 Pearson 相关系数约为 0.872（n=150，Fisher z 95% CI 约 0.827–0.906），置信区间不包含接近零的值，因此可在该数据集范围内描述为存在较稳定的总体正向线性关联。",
+        "supporting_claim_ids": [
+          "claim_78efc6e4ae0744daaaec465f70aef702",
+          "claim_f06a2d932527499e906fde28f8c7b5e9",
+          "claim_ab1d5f0719114fda895fea8a2aef24c5",
+          "CLM-001",
+          "CLM-002"
+        ],
+        "confidence": 0.92,
+        "limitations": [
+          "该结论仅描述统计关联，不证明因果关系、生物学机制或遗传关系。",
+          "总体相关可能部分由三个物种之间的均值分离驱动，不能直接等同于每个物种内部都存在同样强的线性关联。",
+          "结果仅适用于所读取的上传数据集版本，不外推到未测量的鸢尾花群体。"
+        ],
+        "scope_of_validity": [
+          "仅适用于上传的 iris_uci.csv 数据文件及其 150 条有效观测。",
+          "仅适用于 sepal_length_cm 与 petal_length_cm 两个变量。",
+          "仅适用于 Pearson 线性相关度量及已记录的确定性分析结果。"
+        ],
+        "dimension": "unspecified"
+      },
+      {
+        "conclusion_id": "CONC-002",
+        "statement": "三个物种内部的线性关联明显不同：Iris-versicolor 约为 0.754（n=50，95% CI 约 0.602–0.853），Iris-virginica 约为 0.864（n=50，95% CI 约 0.771–0.921），均表现为较强正向关联；Iris-setosa 约为 0.264（n=50，95% CI 约 -0.016–0.505），方向为正但区间接近并包含零，不能判定为稳定的组内线性关联。",
+        "supporting_claim_ids": [
+          "claim_f17e9490ed214ca29d26c9a0479e41f3",
+          "claim_d37f8b59ff3a4d35ad63e8042268f7ce",
+          "claim_778cb63281c54dee8f029d608471fa78",
+          "claim_f06a2d932527499e906fde28f8c7b5e9"
+        ],
+        "confidence": 0.9,
+        "limitations": [
+          "每组样本量为 50，物种内相关系数仍存在有限样本不确定性。",
+          "物种间差异主要通过点估计与置信区间重叠进行描述性比较，未执行正式成对相关差异检验作为主要证据。",
+          "不能将相关差异解释为物种间生物学机制差异的证明。"
+        ],
+        "scope_of_validity": [
+          "仅适用于该上传数据集中 Iris-setosa、Iris-versicolor、Iris-virginica 三类标签对应的观测。",
+          "仅适用于萼片长度与花瓣长度的 Pearson 相关及其 95% Fisher z 置信区间。"
+        ],
+        "dimension": "unspecified"
+      },
+      {
+        "conclusion_id": "CONC-003",
+        "statement": "数据集结构与分析样本量支持本次关联性分析：上传文件包含 150 行，物种字段显示三个类别各 50 条；项目内确定性执行与受控 Python 复算得到一致的总体与分物种 Pearson 相关点估计，增强了结果的结构一致性。",
+        "supporting_claim_ids": [
+          "claim_ab1d5f0719114fda895fea8a2aef24c5",
+          "CLM-001",
+          "CLM-003",
+          "CLM-004",
+          "claim_f06a2d932527499e906fde28f8c7b5e9"
+        ],
+        "confidence": 0.93,
+        "limitations": [
+          "上传文件属于用户提供的不可信研究材料，其与 UCI 官方版本的一致性未被独立验证。",
+          "解析预览只能证明文件结构和有限样本，不等同于对所有数值内容的独立验证。",
+          "UCI 文档提到样本 35 与 38 存在已知行级差异，本次结果未逐行核对这些样本在上传文件中的状态。"
+        ],
+        "scope_of_validity": [
+          "仅适用于项目内工具实际读取并记录的上传数据文件和执行产物。",
+          "仅适用于该数据集中报告的行数、列名、物种频数和目标字段缺失情况。"
+        ],
+        "dimension": "structural_existence"
+      }
+    ],
+    "tentative_inferences": [
+      "总体强正相关可能部分反映三个物种在萼片长度和花瓣长度上的均值分离，而不仅仅是每个物种内部都存在同等强度的线性共变；因此解释总体相关时应并列报告分物种相关。",
+      "Iris-setosa 内部萼片长度与花瓣长度的线性关联较弱或证据不足，可能受限于组内变异范围较小、样本量有限或线性度量对该组的拟合能力不足。",
+      "如果后续补充散点图按物种着色或分物种拟合线，可能进一步显示总体趋势由物种簇分离驱动，而 versicolor 与 virginica 的组内线性趋势更强。"
+    ],
+    "unsupported_claims": [
+      "不能声称萼片长度导致花瓣长度变化，或花瓣长度导致萼片长度变化。",
+      "不能声称该关联模式代表所有鸢尾花物种、野生群体或未来样本的普遍规律。",
+      "不能声称上传文件已被独立验证为 UCI 官方权威版本；当前仅能说明其元数据和项目元数据与 UCI Iris 数据集描述一致。",
+      "不能声称已完整执行所有计划的稳健性检查，例如 Spearman 相关、重复记录影响、异常值或高影响样本敏感性分析。"
+    ],
+    "negative_results": [
+      "Iris-setosa 组内 sepal_length_cm 与 petal_length_cm 的 Pearson 相关系数约为 0.264，95% Fisher z 置信区间约为 -0.016 至 0.505，包含接近零的值，因此不支持在该组中判定稳定线性关联。",
+      "当前证据未提供正式成对相关系数差异检验结果，因此不能以正式统计检验方式证明三个物种相关系数之间的差异具有统计学显著性。"
+    ],
+    "uncertainties": [
+      "相关系数的置信区间使用 Fisher z 近似；在每组 50 条观测且相关估计接近边界时，区间解释应保持谨慎。",
+      "Iris-setosa 的区间下限接近零，说明该组内关联方向为正但强度和稳定性不确定。",
+      "上传文件中样本 35 与样本 38 的 UCI 已知行级修正状态未被单独确认，可能带来轻微版本敏感性。",
+      "外部结果文件提及 3 条完全重复行，但主分析基于全部 150 条观测；重复行对相关估计的定量影响未在本轮结果中单独计算。",
+      "散点图证据为总体散点图记录，按物种着色或分物种拟合线的可视化未作为完整证据项呈现，因此视觉判断主要依赖数值结果。"
+    ],
+    "scope_of_validity": [
+      "结论仅适用于上传的 iris_uci.csv 数据集，其内容哈希为 24d7757511c6c8d4850aa86a6fad04b9426b319c635af26e6d413d94fe5bd73e，asset_id 为 asset_f8860d8760ed4f01ba7389310e938d03。",
+      "结论仅覆盖 150 条观测，其中 Iris-setosa、Iris-versicolor、Iris-virginica 各 50 条。",
+      "结论仅覆盖 sepal_length_cm 与 petal_length_cm 的线性关联，不覆盖其他变量组合。",
+      "结论基于 Pearson 相关系数及辅助简单线性斜率，不进行预测建模或因果推断。"
+    ],
+    "limitations": [
+      "本分析为描述性与关联性分析；所有结果不能解释为因果关系、生物学机制或遗传关系。",
+      "上传数据文件为用户提供的研究材料，其声称的 UCI 来源未被独立外部验证。",
+      "项目内确定性执行与受控 Python 复算提供了结构化结果，但生成代码和外部结果文件仍应接受科学复审。",
+      "计划中的部分稳健性项目未在本轮完整执行：Spearman 相关、重复记录敏感性、异常值或高影响样本检查、正式成对相关差异检验。",
+      "UCI 文档提到样本 35 与样本 38 存在已知差异，但本次未逐行核对其在上传文件中的具体数值状态。",
+      "总体相关与分物种相关的解释必须区分：总体相关可能受物种间均值差异驱动，不能直接替代物种内关联。"
+    ],
+    "next_questions": [
+      "补充按物种着色和分物种拟合线的散点图后，三个物种内部线性趋势的可视化证据是否一致支持当前数值结论？",
+      "执行 Spearman 秩相关后，总体与分物种的单调关联结论是否与 Pearson 结果一致？",
+      "移除或标记完全重复行、潜在异常值或高影响样本后，总体和分物种相关系数是否发生实质变化？",
+      "是否可以采用正式成对相关差异检验量化 setosa 与 versicolor、setosa 与 virginica、versicolor 与 virginica 之间相关系数差异的不确定性？",
+      "上传文件中样本 35 与样本 38 是否与 UCI 已知修正版本一致，若不一致，其对相关估计的影响有多大？"
+    ],
+    "human_verification_required": [
+      "人工核对上传 iris_uci.csv 与 UCI 官方 Iris 数据集版本是否一致，尤其是样本 35 与样本 38 的行级数值。",
+      "人工审阅项目内确定性分析和受控 Python 复算的代码、参数、输入哈希与输出结果，确认统计方法未误用。",
+      "人工确认是否接受 Fisher z 近似 95% 置信区间作为本次相关系数不确定性的报告方法。",
+      "人工确认外部结果文件 iris_analysis_results.json 仅作为辅助材料，不替代项目内执行证据。",
+      "如需正式发布，人工确认所有表述均保持描述性和关联性，不包含因果或机制性推断。"
+    ]
+  },
+  "unknowns": [
+    "实际使用的 Iris 数据版本、来源和字段名。",
+    "数据是否存在缺失值、异常值或重复记录。",
+    "每个物种样本量是否均衡。",
+    "稳定性的判定阈值是否需要预先设定。",
+    "是否需要报告相关系数置信区间或仅报告点估计。"
+  ],
+  "human_actions_required": [
+    "确认公开 Iris 数据集的可访问来源或版本；若多个版本存在字段差异，选择其一并记录。",
+    "确认缺失值和异常值处理规则，例如是否仅保留完整观测、是否剔除明显错误记录。",
+    "确认是否需要报告相关系数置信区间；若工具无法生成区间，需要接受不确定性描述替代。",
+    "确认“稳定线性关联”的判定标准；若未指定，可采用方向明确、相关系数绝对值较高且区间不接近零的描述性标准。",
+    "在缺少代码执行环境时，需要人工审查由数据集检查器和统计分析工具输出的统计结果，确认未发生未验证的计算声称。",
+    "确认使用的 Iris 数据集来源或版本，例如 UCI Machine Learning Repository、scikit-learn 内置版本或其他公开版本。",
+    "确认萼片长度、花瓣长度和物种对应的字段名。",
+    "确认缺失值、异常值和重复记录的处理规则。",
+    "确认是否必须使用 Pearson 相关系数，以及是否需要同时报告 Spearman 相关系数。",
+    "确认“稳定”的判定标准：是否要求相关系数置信区间不接近零、绝对值达到某一阈值，或仅需报告不确定性。",
+    "如果工具无法直接访问或解析公开 Iris 数据集，需人工提供可访问的数据文件、字段映射或已验证数据摘录。",
+    "如果数据版本不明确，需要人工确认使用哪一个公开 Iris 版本或来源。",
+    "如果统计工具无法计算相关系数置信区间，需要人工确认是否接受点估计加局限性说明，或提供替代统计输出。",
+    "如果出现字段名冲突、单位不明或物种标签异常，需要人工审核后再继续分析。",
+    "当前证据仅包含一个未提取内容的候选源记录，无法确认 Iris 数据集字段、样本量、物种标签、缺失值或相关结果。",
+    "缺少实际数据文件、数据预览、字段映射或已验证统计摘录，因此不能执行或声称任何统计分析。",
+    "缺少数据版本或来源确认；当前 URL 为 archive.ics.uci.edu，未验证其与 canonical UCI Iris 记录的一致性。",
+    "若统计工具不可用或无法计算相关系数及置信区间，应暂停并请人工确认替代方案。",
+    "若发现缺失值、重复记录、异常物种标签或异常数值，应由人工确认处理规则后再继续。",
+    "若需要区分 UCI 原始字段命名与上传文件字段命名，应由人工确认数据版本和字段映射。",
+    "如需最终发布，人工确认是否接受 Fisher z 近似置信区间作为不确定性报告方法。",
+    "如需正式引用数据，人工核对上传文件与 UCI 官方版本的一致性；当前材料来自上传文件，不将解析本身视为外部来源验证。"
+  ],
+  "missing_capabilities": [
+    "python_executor",
+    "code_runner",
+    "citation_manager"
+  ]
+}

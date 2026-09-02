@@ -1,0 +1,27 @@
+{
+  "dataset": {
+    "source": "UCI Machine Learning Repository",
+    "doi": "10.24432/C56C76",
+    "rows": 150,
+    "columns": [
+      "sepal_length_cm",
+      "sepal_width_cm",
+      "petal_length_cm",
+      "petal_width_cm",
+      "species"
+    ],
+    "missing_values": 0,
+    "duplicate_rows": 3
+  },
+  "descriptive_statistics": {
+    "sepal_length_cm": {"mean": 5.843333333333334, "std": 0.8280661279778629, "min": 4.3, "max": 7.9},
+    "petal_length_cm": {"mean": 3.758666666666666, "std": 1.7644204199522617, "min": 1.0, "max": 6.9}
+  },
+  "pearson": {
+    "overall": {"n": 150, "r": 0.8717541573048718, "ci95_fisher_z": [0.8270368317875931, 0.9055083349187738], "slope": 1.8575096654214442, "r_squared": 0.7599553107783272},
+    "Iris-setosa": {"n": 50, "r": 0.2638740929186868, "ci95_fisher_z": [-0.01562096606860649, 0.5051212836821029], "slope": 0.12989060806149566, "r_squared": 0.06962953691365975},
+    "Iris-versicolor": {"n": 50, "r": 0.754048958592016, "ci95_fisher_z": [0.6020679650918982, 0.8532995133152452], "slope": 0.6864697591764202, "r_squared": 0.5685898319537039},
+    "Iris-virginica": {"n": 50, "r": 0.8642247329355764, "ci95_fisher_z": [0.7714541554259746, 0.921017179721846], "slope": 0.7500807558749895, "r_squared": 0.7468843890175685}
+  },
+  "analysis_note": "Pearson correlations and Fisher-z 95% confidence intervals; observational association only, no causal inference."
+}

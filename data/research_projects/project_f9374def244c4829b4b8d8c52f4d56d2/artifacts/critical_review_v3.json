@@ -1,0 +1,32 @@
+{
+  "evidence_quality_score": 9.0,
+  "methodological_validity_score": 9.0,
+  "feasibility_score": 10.0,
+  "reproducibility_score": 9.0,
+  "claim_support_score": 9.0,
+  "uncertainty_handling_score": 9.0,
+  "blocking_issues": [],
+  "non_blocking_issues": [
+    "计划中承诺的部分稳健性内容尚未全部执行，例如 Spearman 敏感性检查、重复记录影响检查、异常值或高影响样本检查，以及物种间相关差异的近似检验；这些不构成阻断问题，但应作为后续非阻断改进项记录。",
+    "散点图已生成但为总体散点图，未明确提供按物种着色或分物种叠加拟合线的图像证据；可用现有分组统计和相关系数描述替代，但应在报告中说明可视化限制。",
+    "上传文件为不可信研究材料，其‘与 UCI 官方版本一致’的声明来自人工修订说明和项目资产元数据，不能等同于独立外部验证；报告应继续保留该来源限制。",
+    "iris_analysis_results.json 中报告了 3 条完全重复行，但主分析仍基于全部 150 条有效观测；应在最终报告中明确重复行未被自动删除及其可能影响。"
+  ],
+  "recommendations": [
+    "在最终报告中保留并汇总已批准阻断问题的闭环证据：EVD-001/EVD-002 提供 UCI 权威来源，EVD-003 提供上传文件结构解析，evidence_3d4ec94b74d844a69643794d4aadc0e5 与 evidence_d81b9b2ba598462da51f5dade3750be8 提供确定性分析和受控 Python 复算。",
+    "最终报告应明确核心结果：总体 Pearson r=0.8718（n=150，95% CI 0.8270–0.9055）；Iris-setosa r=0.2639（n=50，95% CI -0.0156–0.5051）；Iris-versicolor r=0.7540（n=50，95% CI 0.6021–0.8533）；Iris-virginica r=0.8642（n=50，95% CI 0.7715–0.9210）。",
+    "结论表述应区分总体与物种层面：总体存在较强正向线性关联；物种间关联强度明显不同，setosa 内部关联弱且置信区间包含接近零的值，versicolor 与 virginica 内部关联较强。",
+    "保留‘相关不等于因果’的边界声明，避免将结果解释为生物学机制、遗传关系或野外鸢尾花群体的普遍规律。",
+    "若进入最终发布阶段，可补充 Spearman、重复行敏感性和高影响样本检查，但不将新改进作为当前修订闭环的阻断标准。"
+  ],
+  "decision": "approve",
+  "failed_quality_gates": [],
+  "required_revision_target": "none",
+  "revision_plan": [],
+  "approval_conditions": [
+    "最终报告必须引用项目资产和执行证据的标识，包括 asset_f8860d8760ed4f01ba7389310e938d03、artifact_cd8f151c0d6c481d8b0798f95d928be5、evidence_3d4ec94b74d844a69643794d4aadc0e5 和 evidence_d81b9b2ba598462da51f5dade3750be8。",
+    "最终报告必须报告总体与三个物种的样本量、Pearson 相关系数、Fisher-z 95% 置信区间和简单线性斜率。",
+    "最终报告必须说明 setosa 的置信区间包含接近零的值，因此不能将 setosa 内部描述为稳定强线性关联。",
+    "最终报告必须说明分析仅描述上传 Iris 数据集中的关联，不作因果推断，不外推到未测量群体。"
+  ]
+}

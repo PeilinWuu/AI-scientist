@@ -1,0 +1,52 @@
+{
+  "run_id": "python_sandbox_b57c9b6151f845e499316f4b257fe500",
+  "status": "success",
+  "started_at": "2026-09-01T14:00:03.264071+00:00",
+  "finished_at": "2026-09-01T14:00:03.932888+00:00",
+  "duration_ms": 668,
+  "code": "overall = float(data['sepal_length_cm'].corr(data['petal_length_cm']))\nby_group = data.groupby('species').apply(\n    lambda frame: float(frame['sepal_length_cm'].corr(frame['petal_length_cm'])),\n    include_groups=False,\n).to_dict()\nresult = {'overall_correlation': overall, 'by_species': by_group}",
+  "code_sha256": "e4c50e8f46904d80aeeb92d8e26f5906c28763c146f075800aeb380515a66782",
+  "dataset_relative_path": "assets/asset_file_b2546cf3d39f4b46bbde5bbc95c47e58.csv",
+  "dataset_sha256": "24d7757511c6c8d4850aa86a6fad04b9426b319c635af26e6d413d94fe5bd73e",
+  "seed": 0,
+  "timeout_seconds": 15,
+  "memory_limit_mb": 1024,
+  "peak_memory_mb": 82.05,
+  "isolation": {
+    "mode": "restricted_subprocess_ast_guard",
+    "container_or_vm": false,
+    "imports_allowed": false,
+    "network_allowed": false,
+    "filesystem_api_allowed": false,
+    "child_processes_allowed": false,
+    "parent_environment_inherited": false,
+    "security_boundary_note": "Defence in depth; not equivalent to a container, VM, or separate OS account."
+  },
+  "available_names": [
+    "data",
+    "np",
+    "pd"
+  ],
+  "result": {
+    "overall_correlation": 0.8717541573048718,
+    "by_species": {
+      "Iris-setosa": 0.2638740929186868,
+      "Iris-versicolor": 0.754048958592016,
+      "Iris-virginica": 0.8642247329355764
+    }
+  },
+  "stdout": "",
+  "stderr": "",
+  "error_type": null,
+  "error": null,
+  "artifacts": [
+    {
+      "relative_path": "controlled_python/py_b57c9b61/workspace/analysis_result.json",
+      "checksum_sha256": "9c4d161132da981f1d5e92390a57772bad341f60340d2f7cf1ab8a921788535d",
+      "size_bytes": 199
+    }
+  ],
+  "worker_return_code": 0,
+  "dataset_asset_id": "asset_f8860d8760ed4f01ba7389310e938d03",
+  "dataset_filename": "iris_uci.csv"
+}

@@ -1,0 +1,302 @@
+{
+  "claims": [
+    {
+      "claim_id": "CL-001",
+      "statement": "The UCI Iris dataset documentation reports 150 instances, grouped into three classes/species with 50 instances each: Iris Setosa, Iris Versicolour, and Iris Virginica.",
+      "claim_type": "reported_fact",
+      "importance": "high",
+      "status": "supported",
+      "dimension": "unspecified",
+      "supporting_evidence_ids": [
+        "EVD-001",
+        "EVD-002"
+      ],
+      "contradicting_evidence_ids": [],
+      "assumptions": [
+        "The selected UCI repository pages accurately describe the version of the Iris dataset intended for analysis.",
+        "The species labels in the uploaded file correspond to the repository's three classes."
+      ],
+      "limitations": [
+        "The repository pages note discrepancies with Fisher's original article, so individual row values may vary across file versions.",
+        "This claim concerns dataset documentation, not computed analytical results."
+      ]
+    },
+    {
+      "claim_id": "CL-002",
+      "statement": "The UCI Iris dataset documentation includes sepal length and petal length as continuous variables measured in cm, alongside sepal width and petal width.",
+      "claim_type": "reported_fact",
+      "importance": "high",
+      "status": "supported",
+      "dimension": "unspecified",
+      "supporting_evidence_ids": [
+        "EVD-001",
+        "EVD-002"
+      ],
+      "contradicting_evidence_ids": [],
+      "assumptions": [
+        "The variable names in the analysis file can be mapped to the repository variables: sepal_length_cm to sepal length and petal_length_cm to petal length."
+      ],
+      "limitations": [
+        "Documentation alone does not verify the numeric accuracy of the uploaded file.",
+        "Units are reported by the repository page; independent metrological verification was not performed."
+      ]
+    },
+    {
+      "claim_id": "CL-003",
+      "statement": "The UCI repository pages state that the Iris dataset has no missing values.",
+      "claim_type": "reported_fact",
+      "importance": "medium",
+      "status": "supported",
+      "dimension": "unspecified",
+      "supporting_evidence_ids": [
+        "EVD-001",
+        "EVD-002"
+      ],
+      "contradicting_evidence_ids": [],
+      "assumptions": [
+        "The repository missing-value statement applies to the specific file version used for analysis."
+      ],
+      "limitations": [
+        "The repository statement does not independently verify the uploaded CSV.",
+        "The uploaded CSV preview also reported zero missing values, but that is an unverified local observation."
+      ]
+    },
+    {
+      "claim_id": "CL-004",
+      "statement": "The uploaded iris_uci.csv preview reports five columns, including sepal_length_cm, petal_length_cm, and species, with 150 scanned data rows and zero missing values in the scanned rows.",
+      "claim_type": "observation",
+      "importance": "medium",
+      "status": "partially_supported",
+      "dimension": "unspecified",
+      "supporting_evidence_ids": [
+        "EVD-003"
+      ],
+      "contradicting_evidence_ids": [],
+      "assumptions": [
+        "The structured summary accurately reflects the uploaded file content.",
+        "The scanned rows represent the full file because row_count_is_partial was false."
+      ],
+      "limitations": [
+        "Uploaded material is untrusted and not independently verified.",
+        "A parsed preview is not an executed statistical analysis.",
+        "The preview does not establish that the file is identical to the official UCI version."
+      ]
+    },
+    {
+      "claim_id": "CL-005",
+      "statement": "The UCI Iris dataset pages report known discrepancies from Fisher's original article, including corrected values for sample 35 and sample 38.",
+      "claim_type": "reported_fact",
+      "importance": "medium",
+      "status": "supported",
+      "dimension": "unspecified",
+      "supporting_evidence_ids": [
+        "EVD-001",
+        "EVD-002"
+      ],
+      "contradicting_evidence_ids": [],
+      "assumptions": [
+        "The repository's correction notes are relevant to the version of the data used for analysis."
+      ],
+      "limitations": [
+        "The extraction does not show whether the uploaded file contains the corrected or uncorrected values for those samples.",
+        "These row-level issues may affect descriptive statistics and correlations if the affected variables are included."
+      ]
+    },
+    {
+      "claim_id": "CL-006",
+      "statement": "The selected sources do not provide Pearson correlation coefficients, confidence intervals, descriptive statistics, or fitted slopes for sepal length versus petal length, either overall or by species.",
+      "claim_type": "observation",
+      "importance": "high",
+      "status": "supported",
+      "dimension": "unspecified",
+      "supporting_evidence_ids": [
+        "EVD-001",
+        "EVD-002",
+        "EVD-003"
+      ],
+      "contradicting_evidence_ids": [],
+      "assumptions": [
+        "The provided extractions and previews are complete enough to identify whether such statistics were present."
+      ],
+      "limitations": [
+        "This is a gap observation based on the available selected sources; other sources were not searched or extracted."
+      ]
+    },
+    {
+      "claim_id": "CL-007",
+      "statement": "Based on the available selected sources, it cannot be determined whether sepal length and petal length have a stable linear association overall or whether the association differs among setosa, versicolor, and virginica.",
+      "claim_type": "inference",
+      "importance": "high",
+      "status": "supported",
+      "dimension": "unspecified",
+      "supporting_evidence_ids": [
+        "EVD-001",
+        "EVD-002",
+        "EVD-003"
+      ],
+      "contradicting_evidence_ids": [],
+      "assumptions": [
+        "The evidence set contains no computed correlations for the requested variables.",
+        "No additional datasets or external statistical results may be introduced."
+      ],
+      "limitations": [
+        "The uploaded file could support such an analysis if a validated computation step is performed, but parsing alone does not produce estimates.",
+        "The inference addresses current evidence availability, not the underlying statistical truth."
+      ]
+    },
+    {
+      "claim_id": "CL-008",
+      "statement": "Any future correlation estimates from the uploaded file must be treated as conditional on the file being a valid representation of the intended UCI Iris dataset and on appropriate handling of the documented row-level corrections.",
+      "claim_type": "hypothesis",
+      "importance": "medium",
+      "status": "partially_supported",
+      "dimension": "unspecified",
+      "supporting_evidence_ids": [
+        "EVD-001",
+        "EVD-002",
+        "EVD-003"
+      ],
+      "contradicting_evidence_ids": [],
+      "assumptions": [
+        "The analysis will use the uploaded CSV as the data source.",
+        "Pearson correlation will be the primary linear association measure unless diagnostics justify another measure."
+      ],
+      "limitations": [
+        "No analysis has been executed in this evidence step.",
+        "The effect of samples 35 and 38 on sepal length and petal length correlations is not known from the current extraction."
+      ]
+    }
+  ],
+  "links": [
+    {
+      "claim_id": "CL-001",
+      "evidence_id": "EVD-001",
+      "relation": "supports",
+      "strength": 0.9,
+      "rationale": "EVD-001 explicitly documents 150 instances, three species classes, and 50 instances per class in the UCI Iris dataset."
+    },
+    {
+      "claim_id": "CL-001",
+      "evidence_id": "EVD-002",
+      "relation": "supports",
+      "strength": 0.9,
+      "rationale": "EVD-002 provides the canonical UCI page description with substantially the same dataset structure information, including 150 instances and 50 per species."
+    },
+    {
+      "claim_id": "CL-002",
+      "evidence_id": "EVD-001",
+      "relation": "supports",
+      "strength": 0.9,
+      "rationale": "EVD-001 states that the dataset contains sepal length and petal length among four continuous real-valued features measured in cm."
+    },
+    {
+      "claim_id": "CL-002",
+      "evidence_id": "EVD-002",
+      "relation": "supports",
+      "strength": 0.9,
+      "rationale": "EVD-002 duplicates the canonical UCI documentation identifying the four continuous cm-scale features, including sepal length and petal length."
+    },
+    {
+      "claim_id": "CL-003",
+      "evidence_id": "EVD-001",
+      "relation": "supports",
+      "strength": 0.85,
+      "rationale": "EVD-001 reports that the UCI repository page states the dataset has no missing values."
+    },
+    {
+      "claim_id": "CL-003",
+      "evidence_id": "EVD-002",
+      "relation": "supports",
+      "strength": 0.85,
+      "rationale": "EVD-002 similarly reports that the canonical UCI page states no missing values."
+    },
+    {
+      "claim_id": "CL-004",
+      "evidence_id": "EVD-003",
+      "relation": "supports",
+      "strength": 0.7,
+      "rationale": "EVD-003 is the parsed preview of the uploaded CSV and directly reports the five columns, 150 scanned rows, and zero missing values in scanned rows."
+    },
+    {
+      "claim_id": "CL-005",
+      "evidence_id": "EVD-001",
+      "relation": "supports",
+      "strength": 0.88,
+      "rationale": "EVD-001 notes that the UCI page identifies discrepancies with Fisher's original article, including corrections for samples 35 and 38."
+    },
+    {
+      "claim_id": "CL-005",
+      "evidence_id": "EVD-002",
+      "relation": "supports",
+      "strength": 0.88,
+      "rationale": "EVD-002 contains the same canonical repository note about differences from Fisher's original article and sample corrections."
+    },
+    {
+      "claim_id": "CL-006",
+      "evidence_id": "EVD-001",
+      "relation": "supports",
+      "strength": 0.95,
+      "rationale": "EVD-001 documents dataset metadata but does not provide descriptive statistics, correlation coefficients, or confidence intervals for sepal length and petal length."
+    },
+    {
+      "claim_id": "CL-006",
+      "evidence_id": "EVD-002",
+      "relation": "supports",
+      "strength": 0.95,
+      "rationale": "EVD-002 likewise provides dataset documentation only and does not include analytical results for the requested variables."
+    },
+    {
+      "claim_id": "CL-006",
+      "evidence_id": "EVD-003",
+      "relation": "supports",
+      "strength": 0.9,
+      "rationale": "EVD-003 provides only a structural and bounded preview of the uploaded CSV and does not include computed descriptive statistics, correlations, or confidence intervals."
+    },
+    {
+      "claim_id": "CL-007",
+      "evidence_id": "EVD-001",
+      "relation": "supports",
+      "strength": 0.9,
+      "rationale": "EVD-001 confirms dataset existence and structure but does not support any conclusion about the requested linear association."
+    },
+    {
+      "claim_id": "CL-007",
+      "evidence_id": "EVD-002",
+      "relation": "supports",
+      "strength": 0.9,
+      "rationale": "EVD-002 confirms canonical dataset documentation but contains no correlation or species-specific association results."
+    },
+    {
+      "claim_id": "CL-007",
+      "evidence_id": "EVD-003",
+      "relation": "supports",
+      "strength": 0.8,
+      "rationale": "EVD-003 shows that the uploaded file may contain the relevant variables, but the preview does not provide computed association estimates."
+    },
+    {
+      "claim_id": "CL-008",
+      "evidence_id": "EVD-001",
+      "relation": "supports",
+      "strength": 0.75,
+      "rationale": "EVD-001 establishes the official UCI documentation and row-level correction notes that make provenance and version handling relevant for future estimates."
+    },
+    {
+      "claim_id": "CL-008",
+      "evidence_id": "EVD-002",
+      "relation": "supports",
+      "strength": 0.75,
+      "rationale": "EVD-002 duplicates the canonical documentation and correction notes, supporting the conditional nature of future analyses."
+    },
+    {
+      "claim_id": "CL-008",
+      "evidence_id": "EVD-003",
+      "relation": "supports",
+      "strength": 0.65,
+      "rationale": "EVD-003 shows an uploaded file with relevant columns and row count, but because it is unverified and not analytically processed, future estimates must be conditional on validation."
+    }
+  ],
+  "unsupported_claim_ids": [],
+  "disputed_claim_ids": [],
+  "evidence_coverage": 0.55,
+  "display_markdown": "## Claim–Evidence Mapping\n\n- **CL-001**: Supported by EVD-001 and EVD-002 for dataset size, species categories, and balanced species counts.\n- **CL-002**: Supported by EVD-001 and EVD-002 for the presence and units of sepal length and petal length.\n- **CL-003**: Supported by EVD-001 and EVD-002 for the repository statement of no missing values.\n- **CL-004**: Partially supported by EVD-003 because the uploaded file preview shows the expected columns, row count, and zero missing values, but the file is untrusted and not independently verified.\n- **CL-005**: Supported by EVD-001 and EVD-002 for documented discrepancies and row-level corrections.\n- **CL-006**: Supported by EVD-001, EVD-002, and EVD-003 because none provide computed descriptive statistics or correlations for sepal length versus petal length.\n- **CL-007**: Supported as a gap-based inference: current evidence cannot answer whether the linear association is stable or differs by species.\n- **CL-008**: Partially supported as a conditional statement about future computation; no correlation analysis has been executed in the current evidence collection.\n\n**Overall**: The current evidence supports dataset structure and provenance but is insufficient for answering the analytical question about stable linear associations or species-specific differences."
+}

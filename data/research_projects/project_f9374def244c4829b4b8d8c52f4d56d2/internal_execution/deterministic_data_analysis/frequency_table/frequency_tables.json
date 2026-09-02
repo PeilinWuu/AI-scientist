@@ -1,0 +1,19 @@
+{
+  "species": [
+    {
+      "value": "Iris-setosa",
+      "count": 50,
+      "fraction": 0.3333333333333333
+    },
+    {
+      "value": "Iris-versicolor",
+      "count": 50,
+      "fraction": 0.3333333333333333
+    },
+    {
+      "value": "Iris-virginica",
+      "count": 50,
+      "fraction": 0.3333333333333333
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "evidence_quality_score": 7.0,
+  "methodological_validity_score": 9.0,
+  "feasibility_score": 9.0,
+  "reproducibility_score": 9.0,
+  "claim_support_score": 8.0,
+  "uncertainty_handling_score": 9.0,
+  "blocking_issues": [],
+  "non_blocking_issues": [
+    "上传文件 iris_uci.csv 的解析摘要仍只是结构与有限样本预览，不能作为已完成统计计算或数值真值的证明；后续必须由统计工具重新读取并报告实际有效样本量、缺失、重复与统计结果。",
+    "稳定性判定的操作阈值已给出方向性标准，但仍较定性；执行时建议预先记录用于解释“较大绝对值”和“不接近零”的具体数值边界或说明仅使用区间判断。",
+    "U1 记录称 species 样本值为 Iris-setosa、Iris-versicolor、Iris-virginica，但结构化摘要的 sample_rows 只展示了 Iris-setosa；这不影响总体字段映射，但需要实际读取时确认全部三类标签存在。",
+    "UCI 文档提及样本 35 与 38 的已知行级差异；当前计划要求记录版本敏感性，但未固定是否逐行核对这两条记录，可作为后续增强项。",
+    "物种间相关系数差异的近似检验方法尚未唯一固定；若正式执行，需要记录所选公式或软件实现。"
+  ],
+  "recommendations": [
+    "在执行分析时，将上传文件解析摘要作为结构证据引用，不得将解析本身等同为统计结果或数值验证。",
+    "统计执行报告应明确记录实际读取行数、目标三列缺失数、排除行数与原因、重复行数、物种标签类别及各组有效样本量。",
+    "主分析保持为 Pearson 相关，并按计划报告每组样本量与 95% Fisher z 置信区间；Spearman 仅作为稳健性检查，不替代主结论。",
+    "最终结论应明确说明总体相关可能受物种间均值分离驱动，物种内相关才是组内线性关联的主要依据。",
+    "如工具无法生成图像，按已规划的等效数值趋势描述记录范围、组间分离、斜率方向与离散程度。",
+    "建议在正式结果中记录数据版本边界：本项目使用用户上传文件作为分析对象，其声称与 UCI 官方数据一致的说法来自用户说明，非独立验证。"
+  ],
+  "decision": "approve",
+  "failed_quality_gates": [],
+  "required_revision_target": "none",
+  "revision_plan": [],
+  "approval_conditions": [
+    "本批准针对研究设计、证据溯源和分析计划的可执行性与方法论充分性；不批准任何尚未由工具实际执行的统计结果。",
+    "最终分析报告必须只报告由实际统计工具计算得到的结果，并保留失败、受限或缺失项。",
+    "最终报告必须引用 asset_f8860d8760ed4f01ba7389310e938d03、artifact_cd8f151c0d6c481d8b0798f95d928be5 以及 study_design 与 analysis_plan 工件 ID。"
+  ]
+}

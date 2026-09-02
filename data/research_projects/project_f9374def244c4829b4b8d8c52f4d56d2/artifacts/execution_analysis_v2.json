@@ -1,0 +1,941 @@
+{
+  "analysis_source": "internal_deterministic_executor",
+  "executor_binding": "deterministic_data_analysis_v1",
+  "comparison": {},
+  "feedback_signals": [],
+  "plan_adjustments": [],
+  "dataset_asset_id": "asset_d189e2602b104466a6ba39e11b853331",
+  "dataset_content_sha256": "24d7757511c6c8d4850aa86a6fad04b9426b319c635af26e6d413d94fe5bd73e",
+  "operations": [
+    {
+      "execution_id": "execution_a49aa2a3df7d4dda93d9eaf9e8e4d762",
+      "request_id": "request_263beb9b5c1a4790836539ef8c32b7f8",
+      "operation": "inspect_dataset",
+      "status": "success",
+      "started_at": "2026-09-01T11:58:27.919463Z",
+      "finished_at": "2026-09-01T11:58:27.924542Z",
+      "duration_ms": 5,
+      "seed": 0,
+      "input_fingerprint": "a63e1af6874a35a5e579527ee3effe23cf61af28ec2011d67a23a8320e370667",
+      "input_checksums": {
+        "dataset_path": "24d7757511c6c8d4850aa86a6fad04b9426b319c635af26e6d413d94fe5bd73e"
+      },
+      "actual_parameters": {},
+      "software_versions": {
+        "python": "3.12.7",
+        "numpy": "1.26.4",
+        "pandas": "2.2.3",
+        "platform": "win32"
+      },
+      "metrics": {
+        "rows": 150,
+        "columns": 5,
+        "column_names": [
+          "sepal_length_cm",
+          "sepal_width_cm",
+          "petal_length_cm",
+          "petal_width_cm",
+          "species"
+        ],
+        "dtypes": {
+          "sepal_length_cm": "float64",
+          "sepal_width_cm": "float64",
+          "petal_length_cm": "float64",
+          "petal_width_cm": "float64",
+          "species": "object"
+        }
+      },
+      "artifacts": [
+        {
+          "artifact_id": "artifact_7a572e74afb345b78939399935c86d85",
+          "artifact_type": "dataset_inspection",
+          "relative_path": "internal_execution/deterministic_data_analysis/inspect_dataset/dataset_inspection.json",
+          "media_type": "application/json",
+          "checksum_sha256": "204787a6a58dae9e8f23cd8f5e826b1da85fd7918ddd502fad9a982b293994f1",
+          "size_bytes": 356
+        }
+      ],
+      "run_log": [
+        "Inspected 150 rows and 5 columns."
+      ],
+      "failure_reason": null
+    },
+    {
+      "execution_id": "execution_764b5f2367a246d2ac3066a2e1f86729",
+      "request_id": "request_840eff96c9a54fd2b231a07d0b68430b",
+      "operation": "describe_dataset",
+      "status": "success",
+      "started_at": "2026-09-01T11:58:27.924542Z",
+      "finished_at": "2026-09-01T11:58:27.935842Z",
+      "duration_ms": 11,
+      "seed": 0,
+      "input_fingerprint": "43510b290424c52363cc4855f4c1213d9476bee2ae5af3f0ae029a250a29b3f1",
+      "input_checksums": {
+        "dataset_path": "24d7757511c6c8d4850aa86a6fad04b9426b319c635af26e6d413d94fe5bd73e"
+      },
+      "actual_parameters": {},
+      "software_versions": {
+        "python": "3.12.7",
+        "numpy": "1.26.4",
+        "pandas": "2.2.3",
+        "platform": "win32"
+      },
+      "metrics": {
+        "rows": 150,
+        "numeric_columns": 4
+      },
+      "artifacts": [
+        {
+          "artifact_id": "artifact_e062e5075f634c31aca5c24c4fb46c38",
+          "artifact_type": "descriptive_statistics",
+          "relative_path": "internal_execution/deterministic_data_analysis/describe_dataset/descriptive_statistics.json",
+          "media_type": "application/json",
+          "checksum_sha256": "5e3b99fcba9b341f541ded137a1c1605f2a7a167c7ced8d696f0668f4d4a28a2",
+          "size_bytes": 1317
+        },
+        {
+          "artifact_id": "artifact_9bf1820e9f5e4a0e8a463e444b7ab313",
+          "artifact_type": "descriptive_statistics",
+          "relative_path": "internal_execution/deterministic_data_analysis/describe_dataset/descriptive_statistics.csv",
+          "media_type": "text/csv",
+          "checksum_sha256": "c613d4f59faaa46849421a6be9e2c8dcdcbd4bfdbf8860f0e43836e1d813bf13",
+          "size_bytes": 429
+        }
+      ],
+      "run_log": [
+        "Computed deterministic descriptive statistics."
+      ],
+      "failure_reason": null
+    },
+    {
+      "execution_id": "execution_9e6b61dc65ff4f008b24180155d8a21e",
+      "request_id": "request_4d908bf0bc854ca896ebf911d1568aab",
+      "operation": "missingness",
+      "status": "success",
+      "started_at": "2026-09-01T11:58:27.935842Z",
+      "finished_at": "2026-09-01T11:58:27.947272Z",
+      "duration_ms": 12,
+      "seed": 0,
+      "input_fingerprint": "56d7bee43d9f098e0be4d75972dc8f601b052eda7b3c77c8ee2ebf8c9e64c3af",
+      "input_checksums": {
+        "dataset_path": "24d7757511c6c8d4850aa86a6fad04b9426b319c635af26e6d413d94fe5bd73e"
+      },
+      "actual_parameters": {},
+      "software_versions": {
+        "python": "3.12.7",
+        "numpy": "1.26.4",
+        "pandas": "2.2.3",
+        "platform": "win32"
+      },
+      "metrics": {
+        "total_missing": 0
+      },
+      "artifacts": [
+        {
+          "artifact_id": "artifact_97330483ff014b389b5aff4032388058",
+          "artifact_type": "missingness",
+          "relative_path": "internal_execution/deterministic_data_analysis/missingness/missingness.json",
+          "media_type": "application/json",
+          "checksum_sha256": "ac31858ec0c483e6b1f208da940ac8472b5444901b1e1c44b182920be9184f4b",
+          "size_bytes": 413
+        }
+      ],
+      "run_log": [
+        "Computed missing values without imputation."
+      ],
+      "failure_reason": null
+    },
+    {
+      "execution_id": "execution_d1fcd451d1c14618a1996903cbb38fa4",
+      "request_id": "request_7c7fa4fed80c4195840a56779095a3c8",
+      "operation": "plot_histogram",
+      "status": "success",
+      "started_at": "2026-09-01T11:58:27.947272Z",
+      "finished_at": "2026-09-01T11:58:27.964908Z",
+      "duration_ms": 18,
+      "seed": 0,
+      "input_fingerprint": "b86592d02a2772058d4662c1642d7ed68a49b398b14543b8a6d97dbae3d21524",
+      "input_checksums": {
+        "dataset_path": "24d7757511c6c8d4850aa86a6fad04b9426b319c635af26e6d413d94fe5bd73e"
+      },
+      "actual_parameters": {
+        "column": "sepal_length_cm",
+        "bins": 20
+      },
+      "software_versions": {
+        "python": "3.12.7",
+        "numpy": "1.26.4",
+        "pandas": "2.2.3",
+        "platform": "win32"
+      },
+      "metrics": {
+        "column": "sepal_length_cm",
+        "count": 150,
+        "bins": 20
+      },
+      "artifacts": [
+        {
+          "artifact_id": "artifact_59d766147bbb422fa0defe3dd3b31244",
+          "artifact_type": "histogram",
+          "relative_path": "internal_execution/deterministic_data_analysis/plot_histogram/histogram.png",
+          "media_type": "image/png",
+          "checksum_sha256": "5ef12babcad02576d14446335b2a1a6834c2a7fc2ca9968e9fcf5af461e653fe",
+          "size_bytes": 2485
+        }
+      ],
+      "run_log": [
+        "Rendered histogram PNG."
+      ],
+      "failure_reason": null
+    },
+    {
+      "execution_id": "execution_29332315689947e68159969c9face11a",
+      "request_id": "request_66fa6c9e92ae4f01b7cf8c95ef816bec",
+      "operation": "correlation",
+      "status": "success",
+      "started_at": "2026-09-01T11:58:27.964908Z",
+      "finished_at": "2026-09-01T11:58:28.008520Z",
+      "duration_ms": 43,
+      "seed": 0,
+      "input_fingerprint": "69a554bbe1c35e6e679a781bd837b71692028a7a8358fb6de01a48d36f3ceb14",
+      "input_checksums": {
+        "dataset_path": "24d7757511c6c8d4850aa86a6fad04b9426b319c635af26e6d413d94fe5bd73e"
+      },
+      "actual_parameters": {
+        "columns": [
+          "sepal_length_cm",
+          "petal_length_cm",
+          "sepal_width_cm",
+          "petal_width_cm"
+        ],
+        "method": "pearson",
+        "group_by": "species"
+      },
+      "software_versions": {
+        "python": "3.12.7",
+        "numpy": "1.26.4",
+        "pandas": "2.2.3",
+        "platform": "win32"
+      },
+      "metrics": {
+        "columns": [
+          "sepal_length_cm",
+          "petal_length_cm",
+          "sepal_width_cm",
+          "petal_width_cm"
+        ],
+        "method": "pearson",
+        "group_by": "species",
+        "pair_count": 24,
+        "pairs": [
+          {
+            "group": "overall",
+            "x": "sepal_length_cm",
+            "y": "petal_length_cm",
+            "method": "pearson",
+            "n": 150,
+            "coefficient": 0.8717541573048718,
+            "ci95_fisher_z": [
+              0.8270368317875931,
+              0.9055083349187738
+            ],
+            "slope": 1.8575096654214442,
+            "intercept": -7.095381478279307,
+            "r_squared": 0.7599553107783272
+          },
+          {
+            "group": "overall",
+            "x": "sepal_length_cm",
+            "y": "sepal_width_cm",
+            "method": "pearson",
+            "n": 150,
+            "coefficient": -0.10936924995064937,
+            "ci95_fisher_z": [
+              -0.26498618240245647,
+              0.05180021401095392
+            ],
+            "slope": -0.05726823379716463,
+            "intercept": 3.3886373794880984,
+            "r_squared": 0.011961632834767616
+          },
+          {
+            "group": "overall",
+            "x": "sepal_length_cm",
+            "y": "petal_width_cm",
+            "method": "pearson",
+            "n": 150,
+            "coefficient": 0.8179536333691636,
+            "ci95_fisher_z": [
+              0.7569132087059299,
+              0.864845581320743
+            ],
+            "slope": 0.753840883509241,
+            "intercept": -3.206276895972333,
+            "r_squared": 0.6690481463418161
+          },
+          {
+            "group": "overall",
+            "x": "petal_length_cm",
+            "y": "sepal_width_cm",
+            "method": "pearson",
+            "n": 150,
+            "coefficient": -0.42051609640115445,
+            "ci95_fisher_z": [
+              -0.5441087459960842,
+              -0.27906121762271163
+            ],
+            "slope": -0.10333896908804814,
+            "intercept": 3.4424167384789426,
+            "r_squared": 0.17683378733246502
+          },
+          {
+            "group": "overall",
+            "x": "petal_length_cm",
+            "y": "petal_width_cm",
+            "method": "pearson",
+            "n": 150,
+            "coefficient": 0.9627570970509663,
+            "ci95_fisher_z": [
+              0.9489048767247286,
+              0.9729060987109651
+            ],
+            "slope": 0.41641913228540106,
+            "intercept": -0.3665140452167273,
+            "r_squared": 0.9269012279220038
+          },
+          {
+            "group": "overall",
+            "x": "sepal_width_cm",
+            "y": "petal_width_cm",
+            "method": "pearson",
+            "n": 150,
+            "coefficient": -0.35654408961380535,
+            "ci95_fisher_z": [
+              -0.488871359707769,
+              -0.20817791170063615
+            ],
+            "slope": -0.6275461756495287,
+            "intercept": 3.115192687100327,
+            "r_squared": 0.12712368783853725
+          },
+          {
+            "group": "Iris-setosa",
+            "x": "sepal_length_cm",
+            "y": "petal_length_cm",
+            "method": "pearson",
+            "n": 50,
+            "coefficient": 0.2638740929186868,
+            "ci95_fisher_z": [
+              -0.015620966068606489,
+              0.5051212836821029
+            ],
+            "slope": 0.12989060806149566,
+            "intercept": 0.8137676160441526,
+            "r_squared": 0.06962953691365975
+          },
+          {
+            "group": "Iris-setosa",
+            "x": "sepal_length_cm",
+            "y": "sepal_width_cm",
+            "method": "pearson",
+            "n": 50,
+            "coefficient": 0.7467803732639267,
+            "ci95_fisher_z": [
+              0.5913542842621686,
+              0.8487110895049683
+            ],
+            "slope": 0.8072336651226958,
+            "intercept": -0.6230117276042152,
+            "r_squared": 0.5576809258922096
+          },
+          {
+            "group": "Iris-setosa",
+            "x": "sepal_length_cm",
+            "y": "petal_width_cm",
+            "method": "pearson",
+            "n": 50,
+            "coefficient": 0.27909157499959697,
+            "ci95_fisher_z": [
+              0.0008065097828323854,
+              0.5172564808093086
+            ],
+            "slope": 0.08488551624453843,
+            "intercept": -0.18093689432015947,
+            "r_squared": 0.07789210723575567
+          },
+          {
+            "group": "Iris-setosa",
+            "x": "petal_length_cm",
+            "y": "sepal_width_cm",
+            "method": "pearson",
+            "n": 50,
+            "coefficient": 0.1766946286968069,
+            "ci95_fisher_z": [
+              -0.10691125776755225,
+              0.4337113199457016
+            ],
+            "slope": 0.3880151843817783,
+            "intercept": 2.8499457700650765,
+            "r_squared": 0.03122099181030246
+          },
+          {
+            "group": "Iris-setosa",
+            "x": "petal_length_cm",
+            "y": "petal_width_cm",
+            "method": "pearson",
+            "n": 50,
+            "coefficient": 0.30630821115803575,
+            "ci95_fisher_z": [
+              0.030566607440815304,
+              0.5387242010120201
+            ],
+            "slope": 0.18926247288503267,
+            "intercept": -0.033080260303687846,
+            "r_squared": 0.09382472022283582
+          },
+          {
+            "group": "Iris-setosa",
+            "x": "sepal_width_cm",
+            "y": "petal_width_cm",
+            "method": "pearson",
+            "n": 50,
+            "coefficient": 0.27997288851690466,
+            "ci95_fisher_z": [
+              0.0017625230859814177,
+              0.5179563635739469
+            ],
+            "slope": 0.07877646265006048,
+            "intercept": -0.02525794933790673,
+            "r_squared": 0.07838481830449913
+          },
+          {
+            "group": "Iris-versicolor",
+            "x": "sepal_length_cm",
+            "y": "petal_length_cm",
+            "method": "pearson",
+            "n": 50,
+            "coefficient": 0.754048958592016,
+            "ci95_fisher_z": [
+              0.6020679650918983,
+              0.8532995133152452
+            ],
+            "slope": 0.6864697591764202,
+            "intercept": 0.18511550952877034,
+            "r_squared": 0.5685898319537039
+          },
+          {
+            "group": "Iris-versicolor",
+            "x": "sepal_length_cm",
+            "y": "sepal_width_cm",
+            "method": "pearson",
+            "n": 50,
+            "coefficient": 0.5259107172828243,
+            "ci95_fisher_z": [
+              0.2900175170084982,
+              0.7015598602235604
+            ],
+            "slope": 0.3197193455481347,
+            "intercept": 0.8721459648262735,
+            "r_squared": 0.2765820825529348
+          },
+          {
+            "group": "Iris-versicolor",
+            "x": "sepal_length_cm",
+            "y": "petal_width_cm",
+            "method": "pearson",
+            "n": 50,
+            "coefficient": 0.5464610715986299,
+            "ci95_fisher_z": [
+              0.3162110050957627,
+              0.715913858865548
+            ],
+            "slope": 0.20935719100435082,
+            "intercept": 0.08325571419817379,
+            "r_squared": 0.29861970277272293
+          },
+          {
+            "group": "Iris-versicolor",
+            "x": "petal_length_cm",
+            "y": "sepal_width_cm",
+            "method": "pearson",
+            "n": 50,
+            "coefficient": 0.560522091692982,
+            "ci95_fisher_z": [
+              0.33433776670763987,
+              0.7256533427374564
+            ],
+            "slope": 0.37430683918669105,
+            "intercept": 1.1754528650646967,
+            "r_squared": 0.31418501527587567
+          },
+          {
+            "group": "Iris-versicolor",
+            "x": "petal_length_cm",
+            "y": "petal_width_cm",
+            "method": "pearson",
+            "n": 50,
+            "coefficient": 0.7866680885228169,
+            "ci95_fisher_z": [
+              0.6508310714251958,
+              0.8737033678342782
+            ],
+            "slope": 0.3310536044362293,
+            "intercept": -0.084288354898336,
+            "r_squared": 0.6188466815001424
+          },
+          {
+            "group": "Iris-versicolor",
+            "x": "sepal_width_cm",
+            "y": "petal_width_cm",
+            "method": "pearson",
+            "n": 50,
+            "coefficient": 0.6639987200241115,
+            "ci95_fisher_z": [
+              0.4730883950208974,
+              0.7953481771548667
+            ],
+            "slope": 0.4184455958549222,
+            "intercept": 0.1669056994818657,
+            "r_squared": 0.44089430019365844
+          },
+          {
+            "group": "Iris-virginica",
+            "x": "sepal_length_cm",
+            "y": "petal_length_cm",
+            "method": "pearson",
+            "n": 50,
+            "coefficient": 0.8642247329355764,
+            "ci95_fisher_z": [
+              0.7714541554259746,
+              0.9210171797218459
+            ],
+            "slope": 0.7500807558749895,
+            "intercept": 0.6104679802955697,
+            "r_squared": 0.7468843890175685
+          },
+          {
+            "group": "Iris-virginica",
+            "x": "sepal_length_cm",
+            "y": "sepal_width_cm",
+            "method": "pearson",
+            "n": 50,
+            "coefficient": 0.4572278163941129,
+            "ci95_fisher_z": [
+              0.20496574361951947,
+              0.6525292356500412
+            ],
+            "slope": 0.23189049503351328,
+            "intercept": 1.4463054187192141,
+            "r_squared": 0.20905727608452862
+          },
+          {
+            "group": "Iris-virginica",
+            "x": "sepal_length_cm",
+            "y": "petal_width_cm",
+            "method": "pearson",
+            "n": 50,
+            "coefficient": 0.28110770915731925,
+            "ci95_fisher_z": [
+              0.0029942801431514653,
+              0.5188570964219071
+            ],
+            "slope": 0.12141645804732276,
+            "intercept": 1.2261083743842378,
+            "r_squared": 0.079021544147676
+          },
+          {
+            "group": "Iris-virginica",
+            "x": "petal_length_cm",
+            "y": "sepal_width_cm",
+            "method": "pearson",
+            "n": 50,
+            "coefficient": 0.4010445773427854,
+            "ci95_fisher_z": [
+              0.1381145661699926,
+              0.6111677372365135
+            ],
+            "slope": 0.23434819897084044,
+            "intercept": 1.672898799313895,
+            "r_squared": 0.1608367530160534
+          },
+          {
+            "group": "Iris-virginica",
+            "x": "petal_length_cm",
+            "y": "petal_width_cm",
+            "method": "pearson",
+            "n": 50,
+            "coefficient": 0.3221082159003183,
+            "ci95_fisher_z": [
+              0.048070397229428276,
+              0.5510498582850494
+            ],
+            "slope": 0.1602969554030874,
+            "intercept": 1.1360313036020595,
+            "r_squared": 0.10375370275048607
+          },
+          {
+            "group": "Iris-virginica",
+            "x": "sepal_width_cm",
+            "y": "petal_width_cm",
+            "method": "pearson",
+            "n": 50,
+            "coefficient": 0.5377280262661887,
+            "ci95_fisher_z": [
+              0.30503680403111283,
+              0.7098314590244511
+            ],
+            "slope": 0.45794906008398406,
+            "intercept": 0.664059495310231,
+            "r_squared": 0.28915143023213086
+          }
+        ]
+      },
+      "artifacts": [
+        {
+          "artifact_id": "artifact_aeaf500a19654f46b58ca2b03bb49dab",
+          "artifact_type": "correlation",
+          "relative_path": "internal_execution/deterministic_data_analysis/correlation/correlation.csv",
+          "media_type": "text/csv",
+          "checksum_sha256": "b8d472a557bc5b724128904d69810bd9e42af646b3f5a8e78206c0ee4d2014fd",
+          "size_bytes": 386
+        },
+        {
+          "artifact_id": "artifact_186c8bf39b14437d91bd1ee66420af2b",
+          "artifact_type": "correlation_details",
+          "relative_path": "internal_execution/deterministic_data_analysis/correlation/correlation_details.json",
+          "media_type": "application/json",
+          "checksum_sha256": "47cd64839d8e0f8f4a775ef456c430d8f37d6614df185ea4e7d6a03a1924f105",
+          "size_bytes": 9003
+        }
+      ],
+      "run_log": [
+        "Computed deterministic Pearson correlations."
+      ],
+      "failure_reason": null
+    },
+    {
+      "execution_id": "execution_644522f59668418cb2f90b5a7c656dc2",
+      "request_id": "request_1fe1d06902b94eaab9948e35d14883db",
+      "operation": "plot_scatter",
+      "status": "success",
+      "started_at": "2026-09-01T11:58:28.008520Z",
+      "finished_at": "2026-09-01T11:58:28.019664Z",
+      "duration_ms": 10,
+      "seed": 0,
+      "input_fingerprint": "3961f7139b7abcc661aae5ad7d1a374ab294c91330b07692927f1f73deb27039",
+      "input_checksums": {
+        "dataset_path": "24d7757511c6c8d4850aa86a6fad04b9426b319c635af26e6d413d94fe5bd73e"
+      },
+      "actual_parameters": {
+        "x": "sepal_length_cm",
+        "y": "petal_length_cm"
+      },
+      "software_versions": {
+        "python": "3.12.7",
+        "numpy": "1.26.4",
+        "pandas": "2.2.3",
+        "platform": "win32"
+      },
+      "metrics": {
+        "x": "sepal_length_cm",
+        "y": "petal_length_cm",
+        "count": 150
+      },
+      "artifacts": [
+        {
+          "artifact_id": "artifact_86de1d924dc74d7cab15ea3db0c0ebc4",
+          "artifact_type": "scatter",
+          "relative_path": "internal_execution/deterministic_data_analysis/plot_scatter/scatter.png",
+          "media_type": "image/png",
+          "checksum_sha256": "60fa6e8abfc17fbcea2468f2b6844598e3b9da780cc65c141ddc6b9095bf74cb",
+          "size_bytes": 3645
+        }
+      ],
+      "run_log": [
+        "Rendered scatter PNG."
+      ],
+      "failure_reason": null
+    },
+    {
+      "execution_id": "execution_2d218a5728164a23916e12eb6b8e86f7",
+      "request_id": "request_9aef62fa934e4c95aa01ce2571d15254",
+      "operation": "linear_regression",
+      "status": "success",
+      "started_at": "2026-09-01T11:58:28.019664Z",
+      "finished_at": "2026-09-01T11:58:28.023661Z",
+      "duration_ms": 4,
+      "seed": 0,
+      "input_fingerprint": "37b81896db400e36ffa3bb26ea12a4ada2c8e188b906d1d9d0d95900d917d736",
+      "input_checksums": {
+        "dataset_path": "24d7757511c6c8d4850aa86a6fad04b9426b319c635af26e6d413d94fe5bd73e"
+      },
+      "actual_parameters": {
+        "target": "petal_length_cm",
+        "features": [
+          "sepal_length_cm"
+        ]
+      },
+      "software_versions": {
+        "python": "3.12.7",
+        "numpy": "1.26.4",
+        "pandas": "2.2.3",
+        "platform": "win32"
+      },
+      "metrics": {
+        "intercept": -7.095381478279314,
+        "coefficients": {
+          "sepal_length_cm": 1.8575096654214451
+        },
+        "r_squared": 0.7599553107783261,
+        "rmse": 0.8615800435216119,
+        "n": 150
+      },
+      "artifacts": [
+        {
+          "artifact_id": "artifact_27cb8a369bcb424cad2fd035d3f4a535",
+          "artifact_type": "linear_regression",
+          "relative_path": "internal_execution/deterministic_data_analysis/linear_regression/linear_regression.json",
+          "media_type": "application/json",
+          "checksum_sha256": "7df596bbd3ff55cf49672059aab098fe3d58474122ae8fa9f474053b59267094",
+          "size_bytes": 189
+        }
+      ],
+      "run_log": [
+        "Fit deterministic least-squares regression on 150 rows."
+      ],
+      "failure_reason": null
+    },
+    {
+      "execution_id": "execution_71c41376a1a24f9e940744d9435659a2",
+      "request_id": "request_8c876f21ae544ac19ecb144500604fb1",
+      "operation": "frequency_table",
+      "status": "success",
+      "started_at": "2026-09-01T11:58:28.023661Z",
+      "finished_at": "2026-09-01T11:58:28.028814Z",
+      "duration_ms": 5,
+      "seed": 0,
+      "input_fingerprint": "5694140870ae1b67973c94327f59dc9ef3ddce47778b45c3ad4f939e1ce9ed2c",
+      "input_checksums": {
+        "dataset_path": "24d7757511c6c8d4850aa86a6fad04b9426b319c635af26e6d413d94fe5bd73e"
+      },
+      "actual_parameters": {
+        "columns": [
+          "species"
+        ]
+      },
+      "software_versions": {
+        "python": "3.12.7",
+        "numpy": "1.26.4",
+        "pandas": "2.2.3",
+        "platform": "win32"
+      },
+      "metrics": {
+        "columns": [
+          "species"
+        ],
+        "tables": {
+          "species": [
+            {
+              "value": "Iris-setosa",
+              "count": 50,
+              "fraction": 0.3333333333333333
+            },
+            {
+              "value": "Iris-versicolor",
+              "count": 50,
+              "fraction": 0.3333333333333333
+            },
+            {
+              "value": "Iris-virginica",
+              "count": 50,
+              "fraction": 0.3333333333333333
+            }
+          ]
+        }
+      },
+      "artifacts": [
+        {
+          "artifact_id": "artifact_060841d4cde2473d8e3d69d6817b0a17",
+          "artifact_type": "frequency_tables",
+          "relative_path": "internal_execution/deterministic_data_analysis/frequency_table/frequency_tables.json",
+          "media_type": "application/json",
+          "checksum_sha256": "758a4cbfd142d64c7b9344330c4684b808d488c2a004f79bbe6b555271771d0a",
+          "size_bytes": 343
+        }
+      ],
+      "run_log": [
+        "Computed bounded categorical frequency tables."
+      ],
+      "failure_reason": null
+    },
+    {
+      "execution_id": "execution_61024ffa50f244d4b5848c42514db69b",
+      "request_id": "request_7d3da355af2041b0b579819ceb6cb9f1",
+      "operation": "grouped_summary",
+      "status": "success",
+      "started_at": "2026-09-01T11:58:28.028814Z",
+      "finished_at": "2026-09-01T11:58:28.035065Z",
+      "duration_ms": 6,
+      "seed": 0,
+      "input_fingerprint": "c8b1f4ed96c10f6666afdea3eac21e6d6e3f313067f0330e059c5703c4f7c26d",
+      "input_checksums": {
+        "dataset_path": "24d7757511c6c8d4850aa86a6fad04b9426b319c635af26e6d413d94fe5bd73e"
+      },
+      "actual_parameters": {
+        "group_by": "species",
+        "columns": [
+          "sepal_length_cm",
+          "petal_length_cm",
+          "sepal_width_cm",
+          "petal_width_cm"
+        ]
+      },
+      "software_versions": {
+        "python": "3.12.7",
+        "numpy": "1.26.4",
+        "pandas": "2.2.3",
+        "platform": "win32"
+      },
+      "metrics": {
+        "group_by": "species",
+        "groups": 3,
+        "summaries": [
+          {
+            "group": "Iris-setosa",
+            "column": "sepal_length_cm",
+            "n": 50,
+            "mean": 5.006,
+            "std": 0.3524896872134512,
+            "min": 4.3,
+            "median": 5.0,
+            "max": 5.8
+          },
+          {
+            "group": "Iris-setosa",
+            "column": "petal_length_cm",
+            "n": 50,
+            "mean": 1.464,
+            "std": 0.1735111594364455,
+            "min": 1.0,
+            "median": 1.5,
+            "max": 1.9
+          },
+          {
+            "group": "Iris-setosa",
+            "column": "sepal_width_cm",
+            "n": 50,
+            "mean": 3.418,
+            "std": 0.38102439795469095,
+            "min": 2.3,
+            "median": 3.4,
+            "max": 4.4
+          },
+          {
+            "group": "Iris-setosa",
+            "column": "petal_width_cm",
+            "n": 50,
+            "mean": 0.244,
+            "std": 0.10720950308167837,
+            "min": 0.1,
+            "median": 0.2,
+            "max": 0.6
+          },
+          {
+            "group": "Iris-versicolor",
+            "column": "sepal_length_cm",
+            "n": 50,
+            "mean": 5.936,
+            "std": 0.5161711470638635,
+            "min": 4.9,
+            "median": 5.9,
+            "max": 7.0
+          },
+          {
+            "group": "Iris-versicolor",
+            "column": "petal_length_cm",
+            "n": 50,
+            "mean": 4.26,
+            "std": 0.46991097723995806,
+            "min": 3.0,
+            "median": 4.35,
+            "max": 5.1
+          },
+          {
+            "group": "Iris-versicolor",
+            "column": "sepal_width_cm",
+            "n": 50,
+            "mean": 2.7700000000000005,
+            "std": 0.3137983233784114,
+            "min": 2.0,
+            "median": 2.8,
+            "max": 3.4
+          },
+          {
+            "group": "Iris-versicolor",
+            "column": "petal_width_cm",
+            "n": 50,
+            "mean": 1.3259999999999998,
+            "std": 0.197752680004544,
+            "min": 1.0,
+            "median": 1.3,
+            "max": 1.8
+          },
+          {
+            "group": "Iris-virginica",
+            "column": "sepal_length_cm",
+            "n": 50,
+            "mean": 6.587999999999998,
+            "std": 0.635879593274432,
+            "min": 4.9,
+            "median": 6.5,
+            "max": 7.9
+          },
+          {
+            "group": "Iris-virginica",
+            "column": "petal_length_cm",
+            "n": 50,
+            "mean": 5.5520000000000005,
+            "std": 0.5518946956639835,
+            "min": 4.5,
+            "median": 5.55,
+            "max": 6.9
+          },
+          {
+            "group": "Iris-virginica",
+            "column": "sepal_width_cm",
+            "n": 50,
+            "mean": 2.974,
+            "std": 0.3224966381726376,
+            "min": 2.2,
+            "median": 3.0,
+            "max": 3.8
+          },
+          {
+            "group": "Iris-virginica",
+            "column": "petal_width_cm",
+            "n": 50,
+            "mean": 2.0260000000000002,
+            "std": 0.27465005563666733,
+            "min": 1.4,
+            "median": 2.0,
+            "max": 2.5
+          }
+        ]
+      },
+      "artifacts": [
+        {
+          "artifact_id": "artifact_d81775aea691412ebba81c53f2aee3a0",
+          "artifact_type": "grouped_summary",
+          "relative_path": "internal_execution/deterministic_data_analysis/grouped_summary/grouped_summary.json",
+          "media_type": "application/json",
+          "checksum_sha256": "42d1691432805ed3384ee81c3ff23a7cf3a3be0c563f41c3247e7e822a8dd1ab",
+          "size_bytes": 2408
+        }
+      ],
+      "run_log": [
+        "Computed grouped descriptive statistics."
+      ],
+      "failure_reason": null
+    }
+  ]
+}

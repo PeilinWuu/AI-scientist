@@ -1,0 +1,24 @@
+{
+  "analysis_source": "researcher_provided_external_result",
+  "provided_manifest_artifact_ids": [
+    "artifact_ce52e5a2336f4eddb6e241aec0e8179d"
+  ],
+  "experimental_assets": [
+    {
+      "asset_id": "asset_d189e2602b104466a6ba39e11b853331",
+      "filename": "iris_uci.csv",
+      "research_round": 1,
+      "source": "UCI Machine Learning Repository / external deterministic analysis",
+      "parsed_artifact_id": "artifact_882ff82a64944634b4cf705213cce144"
+    },
+    {
+      "asset_id": "asset_5f69e292ef0f4314b611f8f8bc6a4015",
+      "filename": "iris_analysis_results.json",
+      "research_round": 1,
+      "source": "UCI Machine Learning Repository / external deterministic analysis",
+      "parsed_artifact_id": "artifact_9e557595d4494b74ae70efa3d21eb23a"
+    }
+  ],
+  "generated_metrics": {},
+  "handling_rule": "No execution metrics were generated or inferred by the system."
+}

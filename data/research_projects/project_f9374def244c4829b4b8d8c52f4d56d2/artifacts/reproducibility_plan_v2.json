@@ -1,0 +1,37 @@
+{
+  "reproducibility_plan": [
+    "RP-001 数据资产溯源：固定使用用户上传材料 iris_uci.csv，asset_id=asset_f8860d8760ed4f01ba7389310e938d03；解析工件为 artifact_cd8f151c0d6c481d8b0798f95d928be5；文件内容哈希 SHA-256=24d7757511c6c8d4850aa86a6fad04b9426b319c635af26e6d413d94fe5bd73e。未经重新哈希或重新读取，不得声称当前文件与解析摘要完全一致。",
+    "RP-002 分析范围版本：本次复现对象为 study_design_v1 与 analysis_plan_v1 对应的分析任务；关键工件为 artifact_ae593d1bc486456eb24d81bc006204d6（study_design）与 artifact_c04bf35a2cbf4ba5bc9a6a34f86f38d3（analysis_plan）。",
+    "RP-003 输入字段固定：仅使用 sepal_length_cm、petal_length_cm、species 三列；不使用 sepal_width_cm 或 petal_width_cm。数值列按连续型读取，空白、缺失或无法转换为数值者记为缺失并报告行号。",
+    "RP-004 有效观测规则：同时具有非缺失 sepal_length_cm、petal_length_cm 和 species 的行进入分析。解析摘要显示扫描 150 行且三字段缺失为 0，但该摘要仅为结构证据；正式分析必须由工具重新读取并记录实际有效样本量。",
+    "RP-005 分组规则：按原始 species 标签分为 Iris-setosa、Iris-versicolor、Iris-virginica 三组；不重新聚类、不合并、不重命名。如出现预期之外标签，单独记录并评估影响。",
+    "RP-006 主分析方法固定：总体与各物种均计算 Pearson 相关系数 r；每个 r 必须报告对应样本量 n，并使用 Fisher z 变换计算 95% 置信区间。不得在看到结果后更换主相关度量。",
+    "RP-007 辅助线性趋势：对总体和各物种分别拟合 petal_length_cm ~ sepal_length_cm 简单线性模型，报告斜率，仅作为线性趋势辅助描述，不解释为因果效应。",
+    "RP-008 稳健性与敏感性：预先补充 Spearman 秩相关作为敏感性检查；报告完全重复记录数量；标记潜在异常值或高杠杆观测，不自动删除；如执行排除分析，必须同时报告排除前后的 r、置信区间和斜率变化。",
+    "RP-009 可视化或等价记录：生成总体散点图、按物种着色散点图、分物种散点图并叠加简单线性拟合线；若图像无法生成，保存等效数值趋势描述，包括范围、组间分离、斜率方向和离散程度。",
+    "RP-010 结果日志要求：记录每个分组的有效样本量、缺失数量、排除原因、重复数量、异常值标记数量、Pearson r、Fisher z 95% CI、简单线性斜率、Spearman 结果以及物种间差异比较结果。",
+    "RP-011 版本与环境记录：记录 workflow_version=general_research_v1@1.0，可用工具包括 dataset_inspector、statistical_analyzer、artifact_store；若统计实现涉及软件库，需记录库名称与版本。",
+    "RP-012 随机性说明：本设计使用全部有效观测，不抽样、不训练/测试划分、无随机化步骤，因此无需随机种子；若执行过程中引入随机成分，必须记录种子并重新归档。",
+    "RP-013 结论边界：最终报告仅描述该上传数据集中的线性关联，不声明因果关系、不外推到未测量鸢尾花群体，不将解析摘要等同于完整统计计算。",
+    "RP-014 工件归档：最终分析结果应以新的 analysis_result 或 report artifact 归档，并引用 asset_f8860d8760ed4f01ba7389310e938d03、artifact_cd8f151c0d6c481d8b0798f95d928be5、study_design 与 analysis_plan 工件 ID。"
+  ],
+  "required_artifacts": [
+    "asset_f8860d8760ed4f01ba7389310e938d03",
+    "artifact_cd8f151c0d6c481d8b0798f95d928be5",
+    "artifact_ae593d1bc486456eb24d81bc006204d6",
+    "artifact_c04bf35a2cbf4ba5bc9a6a34f86f38d3",
+    "dataset_inspector",
+    "statistical_analyzer",
+    "artifact_store"
+  ],
+  "missing_reproducibility_information": [
+    "尚未由统计工具重新读取数据文件，因此未确认实际行数、缺失数、重复数、有效样本量与解析摘要一致。",
+    "尚未生成实际统计结果，包括总体与各物种 Pearson r、Fisher z 95% 置信区间、简单线性斜率和 Spearman 敏感性结果。",
+    "尚未记录统计软件、库版本或函数实现细节；如由人工或其他环境复现，需要补充具体代码或工具版本。",
+    "尚未生成或归档分析日志、可视化文件、结果表格或最终 analysis_result/report artifact。",
+    "尚未提供文件读取时重新计算的内容哈希校验结果；现有哈希来自解析摘要，不能替代正式执行时的校验。",
+    "未明确异常值或高影响样本的具体判定阈值；计划中提到四分位距规则、Cook 距离/杠杆值，但尚未固定数值阈值。",
+    "物种间相关差异的近似检验方法尚未固定为唯一公式，需在正式分析时记录所选方法与软件实现。"
+  ],
+  "execution_readiness": "ready_if_assets_connected"
+}

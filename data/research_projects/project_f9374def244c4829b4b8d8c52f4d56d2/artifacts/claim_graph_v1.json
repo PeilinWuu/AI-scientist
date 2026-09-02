@@ -1,0 +1,79 @@
+{
+  "evidence_ids": [
+    "EVD-001"
+  ],
+  "claims": [
+    {
+      "claim_id": "CLM-001",
+      "statement": "A selected candidate source points to the UCI Machine Learning Repository Iris dataset page at https://archive.ics.uci.edu/ml/datasets/iris.",
+      "status": "partially_supported",
+      "supporting_evidence_ids": [
+        "EVD-001"
+      ],
+      "contradicting_evidence_ids": []
+    },
+    {
+      "claim_id": "CLM-002",
+      "statement": "No extracted source content was available to verify Iris dataset sample sizes, variable names, species labels, missing-data status, or sepal-length/petal-length correlations.",
+      "status": "supported",
+      "supporting_evidence_ids": [
+        "EVD-001"
+      ],
+      "contradicting_evidence_ids": []
+    },
+    {
+      "claim_id": "CLM-003",
+      "statement": "The available selected source evidence is insufficient to determine whether sepal length and petal length have a stable linear association in the public Iris dataset overall.",
+      "status": "supported",
+      "supporting_evidence_ids": [
+        "EVD-001"
+      ],
+      "contradicting_evidence_ids": []
+    },
+    {
+      "claim_id": "CLM-004",
+      "statement": "The available selected source evidence is insufficient to determine whether the sepal-length/petal-length linear association differs among setosa, versicolor, and virginica.",
+      "status": "supported",
+      "supporting_evidence_ids": [
+        "EVD-001"
+      ],
+      "contradicting_evidence_ids": []
+    },
+    {
+      "claim_id": "CLM-005",
+      "statement": "Any answer about the Iris dataset would require direct computation on a clearly identified dataset version or extraction of reported statistics from a verified source; neither was available in the provided evidence.",
+      "status": "supported",
+      "supporting_evidence_ids": [
+        "EVD-001"
+      ],
+      "contradicting_evidence_ids": []
+    }
+  ],
+  "links": [
+    {
+      "claim_id": "CLM-001",
+      "evidence_id": "EVD-001",
+      "relation": "supports"
+    },
+    {
+      "claim_id": "CLM-002",
+      "evidence_id": "EVD-001",
+      "relation": "supports"
+    },
+    {
+      "claim_id": "CLM-003",
+      "evidence_id": "EVD-001",
+      "relation": "supports"
+    },
+    {
+      "claim_id": "CLM-004",
+      "evidence_id": "EVD-001",
+      "relation": "supports"
+    },
+    {
+      "claim_id": "CLM-005",
+      "evidence_id": "EVD-001",
+      "relation": "supports"
+    }
+  ]
+}

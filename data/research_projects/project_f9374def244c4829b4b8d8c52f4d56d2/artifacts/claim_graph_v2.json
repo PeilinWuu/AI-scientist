@@ -1,0 +1,183 @@
+{
+  "evidence_ids": [
+    "EVD-001",
+    "EVD-002",
+    "EVD-003"
+  ],
+  "claims": [
+    {
+      "claim_id": "CLM-001",
+      "statement": "The UCI Iris dataset documentation reports 150 instances, grouped into three classes/species with 50 instances each: Iris Setosa, Iris Versicolour, and Iris Virginica.",
+      "status": "supported",
+      "supporting_evidence_ids": [
+        "EVD-001",
+        "EVD-002"
+      ],
+      "contradicting_evidence_ids": []
+    },
+    {
+      "claim_id": "CLM-002",
+      "statement": "The UCI Iris dataset documentation includes sepal length and petal length as continuous variables measured in cm, alongside sepal width and petal width.",
+      "status": "supported",
+      "supporting_evidence_ids": [
+        "EVD-001",
+        "EVD-002"
+      ],
+      "contradicting_evidence_ids": []
+    },
+    {
+      "claim_id": "CLM-003",
+      "statement": "The UCI repository pages state that the Iris dataset has no missing values.",
+      "status": "supported",
+      "supporting_evidence_ids": [
+        "EVD-001",
+        "EVD-002"
+      ],
+      "contradicting_evidence_ids": []
+    },
+    {
+      "claim_id": "CLM-004",
+      "statement": "The uploaded iris_uci.csv preview reports five columns, including sepal_length_cm, petal_length_cm, and species, with 150 scanned data rows and zero missing values in the scanned rows.",
+      "status": "partially_supported",
+      "supporting_evidence_ids": [
+        "EVD-003"
+      ],
+      "contradicting_evidence_ids": []
+    },
+    {
+      "claim_id": "CLM-005",
+      "statement": "The UCI Iris dataset pages report known discrepancies from Fisher's original article, including corrected values for sample 35 and sample 38.",
+      "status": "supported",
+      "supporting_evidence_ids": [
+        "EVD-001",
+        "EVD-002"
+      ],
+      "contradicting_evidence_ids": []
+    },
+    {
+      "claim_id": "CLM-006",
+      "statement": "The selected sources do not provide Pearson correlation coefficients, confidence intervals, descriptive statistics, or fitted slopes for sepal length versus petal length, either overall or by species.",
+      "status": "supported",
+      "supporting_evidence_ids": [
+        "EVD-001",
+        "EVD-002",
+        "EVD-003"
+      ],
+      "contradicting_evidence_ids": []
+    },
+    {
+      "claim_id": "CLM-007",
+      "statement": "Based on the available selected sources, it cannot be determined whether sepal length and petal length have a stable linear association overall or whether the association differs among setosa, versicolor, and virginica.",
+      "status": "supported",
+      "supporting_evidence_ids": [
+        "EVD-001",
+        "EVD-002",
+        "EVD-003"
+      ],
+      "contradicting_evidence_ids": []
+    },
+    {
+      "claim_id": "CLM-008",
+      "statement": "Any future correlation estimates from the uploaded file must be treated as conditional on the file being a valid representation of the intended UCI Iris dataset and on appropriate handling of the documented row-level corrections.",
+      "status": "partially_supported",
+      "supporting_evidence_ids": [
+        "EVD-001",
+        "EVD-002",
+        "EVD-003"
+      ],
+      "contradicting_evidence_ids": []
+    }
+  ],
+  "links": [
+    {
+      "claim_id": "CLM-001",
+      "evidence_id": "EVD-001",
+      "relation": "supports"
+    },
+    {
+      "claim_id": "CLM-001",
+      "evidence_id": "EVD-002",
+      "relation": "supports"
+    },
+    {
+      "claim_id": "CLM-002",
+      "evidence_id": "EVD-001",
+      "relation": "supports"
+    },
+    {
+      "claim_id": "CLM-002",
+      "evidence_id": "EVD-002",
+      "relation": "supports"
+    },
+    {
+      "claim_id": "CLM-003",
+      "evidence_id": "EVD-001",
+      "relation": "supports"
+    },
+    {
+      "claim_id": "CLM-003",
+      "evidence_id": "EVD-002",
+      "relation": "supports"
+    },
+    {
+      "claim_id": "CLM-004",
+      "evidence_id": "EVD-003",
+      "relation": "supports"
+    },
+    {
+      "claim_id": "CLM-005",
+      "evidence_id": "EVD-001",
+      "relation": "supports"
+    },
+    {
+      "claim_id": "CLM-005",
+      "evidence_id": "EVD-002",
+      "relation": "supports"
+    },
+    {
+      "claim_id": "CLM-006",
+      "evidence_id": "EVD-001",
+      "relation": "supports"
+    },
+    {
+      "claim_id": "CLM-006",
+      "evidence_id": "EVD-002",
+      "relation": "supports"
+    },
+    {
+      "claim_id": "CLM-006",
+      "evidence_id": "EVD-003",
+      "relation": "supports"
+    },
+    {
+      "claim_id": "CLM-007",
+      "evidence_id": "EVD-001",
+      "relation": "supports"
+    },
+    {
+      "claim_id": "CLM-007",
+      "evidence_id": "EVD-002",
+      "relation": "supports"
+    },
+    {
+      "claim_id": "CLM-007",
+      "evidence_id": "EVD-003",
+      "relation": "supports"
+    },
+    {
+      "claim_id": "CLM-008",
+      "evidence_id": "EVD-001",
+      "relation": "supports"
+    },
+    {
+      "claim_id": "CLM-008",
+      "evidence_id": "EVD-002",
+      "relation": "supports"
+    },
+    {
+      "claim_id": "CLM-008",
+      "evidence_id": "EVD-003",
+      "relation": "supports"
+    }
+  ]
+}

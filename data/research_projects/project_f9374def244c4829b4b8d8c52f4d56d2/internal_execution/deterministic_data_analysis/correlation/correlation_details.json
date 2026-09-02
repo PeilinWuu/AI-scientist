@@ -1,0 +1,362 @@
+[
+  {
+    "group": "overall",
+    "x": "sepal_length_cm",
+    "y": "petal_length_cm",
+    "method": "pearson",
+    "n": 150,
+    "coefficient": 0.8717541573048718,
+    "ci95_fisher_z": [
+      0.8270368317875931,
+      0.9055083349187738
+    ],
+    "slope": 1.8575096654214442,
+    "intercept": -7.095381478279307,
+    "r_squared": 0.7599553107783272
+  },
+  {
+    "group": "overall",
+    "x": "sepal_length_cm",
+    "y": "sepal_width_cm",
+    "method": "pearson",
+    "n": 150,
+    "coefficient": -0.10936924995064937,
+    "ci95_fisher_z": [
+      -0.26498618240245647,
+      0.05180021401095392
+    ],
+    "slope": -0.05726823379716463,
+    "intercept": 3.3886373794880984,
+    "r_squared": 0.011961632834767616
+  },
+  {
+    "group": "overall",
+    "x": "sepal_length_cm",
+    "y": "petal_width_cm",
+    "method": "pearson",
+    "n": 150,
+    "coefficient": 0.8179536333691636,
+    "ci95_fisher_z": [
+      0.7569132087059299,
+      0.864845581320743
+    ],
+    "slope": 0.753840883509241,
+    "intercept": -3.206276895972333,
+    "r_squared": 0.6690481463418161
+  },
+  {
+    "group": "overall",
+    "x": "petal_length_cm",
+    "y": "sepal_width_cm",
+    "method": "pearson",
+    "n": 150,
+    "coefficient": -0.42051609640115445,
+    "ci95_fisher_z": [
+      -0.5441087459960842,
+      -0.27906121762271163
+    ],
+    "slope": -0.10333896908804814,
+    "intercept": 3.4424167384789426,
+    "r_squared": 0.17683378733246502
+  },
+  {
+    "group": "overall",
+    "x": "petal_length_cm",
+    "y": "petal_width_cm",
+    "method": "pearson",
+    "n": 150,
+    "coefficient": 0.9627570970509663,
+    "ci95_fisher_z": [
+      0.9489048767247286,
+      0.9729060987109651
+    ],
+    "slope": 0.41641913228540106,
+    "intercept": -0.3665140452167273,
+    "r_squared": 0.9269012279220038
+  },
+  {
+    "group": "overall",
+    "x": "sepal_width_cm",
+    "y": "petal_width_cm",
+    "method": "pearson",
+    "n": 150,
+    "coefficient": -0.35654408961380535,
+    "ci95_fisher_z": [
+      -0.488871359707769,
+      -0.20817791170063615
+    ],
+    "slope": -0.6275461756495287,
+    "intercept": 3.115192687100327,
+    "r_squared": 0.12712368783853725
+  },
+  {
+    "group": "Iris-setosa",
+    "x": "sepal_length_cm",
+    "y": "petal_length_cm",
+    "method": "pearson",
+    "n": 50,
+    "coefficient": 0.2638740929186868,
+    "ci95_fisher_z": [
+      -0.015620966068606489,
+      0.5051212836821029
+    ],
+    "slope": 0.12989060806149566,
+    "intercept": 0.8137676160441526,
+    "r_squared": 0.06962953691365975
+  },
+  {
+    "group": "Iris-setosa",
+    "x": "sepal_length_cm",
+    "y": "sepal_width_cm",
+    "method": "pearson",
+    "n": 50,
+    "coefficient": 0.7467803732639267,
+    "ci95_fisher_z": [
+      0.5913542842621686,
+      0.8487110895049683
+    ],
+    "slope": 0.8072336651226958,
+    "intercept": -0.6230117276042152,
+    "r_squared": 0.5576809258922096
+  },
+  {
+    "group": "Iris-setosa",
+    "x": "sepal_length_cm",
+    "y": "petal_width_cm",
+    "method": "pearson",
+    "n": 50,
+    "coefficient": 0.27909157499959697,
+    "ci95_fisher_z": [
+      0.0008065097828323854,
+      0.5172564808093086
+    ],
+    "slope": 0.08488551624453843,
+    "intercept": -0.18093689432015947,
+    "r_squared": 0.07789210723575567
+  },
+  {
+    "group": "Iris-setosa",
+    "x": "petal_length_cm",
+    "y": "sepal_width_cm",
+    "method": "pearson",
+    "n": 50,
+    "coefficient": 0.1766946286968069,
+    "ci95_fisher_z": [
+      -0.10691125776755225,
+      0.4337113199457016
+    ],
+    "slope": 0.3880151843817783,
+    "intercept": 2.8499457700650765,
+    "r_squared": 0.03122099181030246
+  },
+  {
+    "group": "Iris-setosa",
+    "x": "petal_length_cm",
+    "y": "petal_width_cm",
+    "method": "pearson",
+    "n": 50,
+    "coefficient": 0.30630821115803575,
+    "ci95_fisher_z": [
+      0.030566607440815304,
+      0.5387242010120201
+    ],
+    "slope": 0.18926247288503267,
+    "intercept": -0.033080260303687846,
+    "r_squared": 0.09382472022283582
+  },
+  {
+    "group": "Iris-setosa",
+    "x": "sepal_width_cm",
+    "y": "petal_width_cm",
+    "method": "pearson",
+    "n": 50,
+    "coefficient": 0.27997288851690466,
+    "ci95_fisher_z": [
+      0.0017625230859814177,
+      0.5179563635739469
+    ],
+    "slope": 0.07877646265006048,
+    "intercept": -0.02525794933790673,
+    "r_squared": 0.07838481830449913
+  },
+  {
+    "group": "Iris-versicolor",
+    "x": "sepal_length_cm",
+    "y": "petal_length_cm",
+    "method": "pearson",
+    "n": 50,
+    "coefficient": 0.754048958592016,
+    "ci95_fisher_z": [
+      0.6020679650918983,
+      0.8532995133152452
+    ],
+    "slope": 0.6864697591764202,
+    "intercept": 0.18511550952877034,
+    "r_squared": 0.5685898319537039
+  },
+  {
+    "group": "Iris-versicolor",
+    "x": "sepal_length_cm",
+    "y": "sepal_width_cm",
+    "method": "pearson",
+    "n": 50,
+    "coefficient": 0.5259107172828243,
+    "ci95_fisher_z": [
+      0.2900175170084982,
+      0.7015598602235604
+    ],
+    "slope": 0.3197193455481347,
+    "intercept": 0.8721459648262735,
+    "r_squared": 0.2765820825529348
+  },
+  {
+    "group": "Iris-versicolor",
+    "x": "sepal_length_cm",
+    "y": "petal_width_cm",
+    "method": "pearson",
+    "n": 50,
+    "coefficient": 0.5464610715986299,
+    "ci95_fisher_z": [
+      0.3162110050957627,
+      0.715913858865548
+    ],
+    "slope": 0.20935719100435082,
+    "intercept": 0.08325571419817379,
+    "r_squared": 0.29861970277272293
+  },
+  {
+    "group": "Iris-versicolor",
+    "x": "petal_length_cm",
+    "y": "sepal_width_cm",
+    "method": "pearson",
+    "n": 50,
+    "coefficient": 0.560522091692982,
+    "ci95_fisher_z": [
+      0.33433776670763987,
+      0.7256533427374564
+    ],
+    "slope": 0.37430683918669105,
+    "intercept": 1.1754528650646967,
+    "r_squared": 0.31418501527587567
+  },
+  {
+    "group": "Iris-versicolor",
+    "x": "petal_length_cm",
+    "y": "petal_width_cm",
+    "method": "pearson",
+    "n": 50,
+    "coefficient": 0.7866680885228169,
+    "ci95_fisher_z": [
+      0.6508310714251958,
+      0.8737033678342782
+    ],
+    "slope": 0.3310536044362293,
+    "intercept": -0.084288354898336,
+    "r_squared": 0.6188466815001424
+  },
+  {
+    "group": "Iris-versicolor",
+    "x": "sepal_width_cm",
+    "y": "petal_width_cm",
+    "method": "pearson",
+    "n": 50,
+    "coefficient": 0.6639987200241115,
+    "ci95_fisher_z": [
+      0.4730883950208974,
+      0.7953481771548667
+    ],
+    "slope": 0.4184455958549222,
+    "intercept": 0.1669056994818657,
+    "r_squared": 0.44089430019365844
+  },
+  {
+    "group": "Iris-virginica",
+    "x": "sepal_length_cm",
+    "y": "petal_length_cm",
+    "method": "pearson",
+    "n": 50,
+    "coefficient": 0.8642247329355764,
+    "ci95_fisher_z": [
+      0.7714541554259746,
+      0.9210171797218459
+    ],
+    "slope": 0.7500807558749895,
+    "intercept": 0.6104679802955697,
+    "r_squared": 0.7468843890175685
+  },
+  {
+    "group": "Iris-virginica",
+    "x": "sepal_length_cm",
+    "y": "sepal_width_cm",
+    "method": "pearson",
+    "n": 50,
+    "coefficient": 0.4572278163941129,
+    "ci95_fisher_z": [
+      0.20496574361951947,
+      0.6525292356500412
+    ],
+    "slope": 0.23189049503351328,
+    "intercept": 1.4463054187192141,
+    "r_squared": 0.20905727608452862
+  },
+  {
+    "group": "Iris-virginica",
+    "x": "sepal_length_cm",
+    "y": "petal_width_cm",
+    "method": "pearson",
+    "n": 50,
+    "coefficient": 0.28110770915731925,
+    "ci95_fisher_z": [
+      0.0029942801431514653,
+      0.5188570964219071
+    ],
+    "slope": 0.12141645804732276,
+    "intercept": 1.2261083743842378,
+    "r_squared": 0.079021544147676
+  },
+  {
+    "group": "Iris-virginica",
+    "x": "petal_length_cm",
+    "y": "sepal_width_cm",
+    "method": "pearson",
+    "n": 50,
+    "coefficient": 0.4010445773427854,
+    "ci95_fisher_z": [
+      0.1381145661699926,
+      0.6111677372365135
+    ],
+    "slope": 0.23434819897084044,
+    "intercept": 1.672898799313895,
+    "r_squared": 0.1608367530160534
+  },
+  {
+    "group": "Iris-virginica",
+    "x": "petal_length_cm",
+    "y": "petal_width_cm",
+    "method": "pearson",
+    "n": 50,
+    "coefficient": 0.3221082159003183,
+    "ci95_fisher_z": [
+      0.048070397229428276,
+      0.5510498582850494
+    ],
+    "slope": 0.1602969554030874,
+    "intercept": 1.1360313036020595,
+    "r_squared": 0.10375370275048607
+  },
+  {
+    "group": "Iris-virginica",
+    "x": "sepal_width_cm",
+    "y": "petal_width_cm",
+    "method": "pearson",
+    "n": 50,
+    "coefficient": 0.5377280262661887,
+    "ci95_fisher_z": [
+      0.30503680403111283,
+      0.7098314590244511
+    ],
+    "slope": 0.45794906008398406,
+    "intercept": 0.664059495310231,
+    "r_squared": 0.28915143023213086
+  }
+]

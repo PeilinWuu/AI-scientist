@@ -1,0 +1,338 @@
+{
+  "evidence": [
+    {
+      "evidence_id": "EVD-001",
+      "title": "UCI Machine Learning Repository: Iris dataset page (classic path)",
+      "source_type": "unknown",
+      "source_url": "https://archive.ics.uci.edu/ml/datasets/iris",
+      "source_asset_id": null,
+      "citation": "Fisher, R. (1936). Iris [Dataset]. UCI Machine Learning Repository. https://doi.org/10.24432/C56C76",
+      "authors": [
+        "R. A. Fisher"
+      ],
+      "doi": "10.24432/c56c76",
+      "pmid": null,
+      "arxiv_id": null,
+      "official_record_url": "https://archive.ics.uci.edu/ml/datasets/iris",
+      "journal_or_publisher": "UCI Machine Learning Repository",
+      "summary": "Repository page describing the Iris dataset: 150 instances, 4 continuous real-valued features measured in cm (sepal length, sepal width, petal length, petal width), and a categorical class/species target with Iris Setosa, Iris Versicolour, and Iris Virginica. The page reports no missing values and states that the three classes contain 50 instances each. It also notes known discrepancies with Fisher's original article, including corrections for samples 35 and 38. The page documents dataset structure but does not report descriptive statistics or correlation coefficients.",
+      "extracted_claims": [
+        "The UCI Iris dataset contains 150 instances.",
+        "The dataset contains 4 continuous feature variables measured in cm: sepal length, sepal width, petal length, and petal width.",
+        "The class/species variable has three categories: Iris Setosa, Iris Versicolour, and Iris Virginica.",
+        "The three classes contain 50 instances each.",
+        "The repository page states that the dataset has no missing values.",
+        "The page notes that the repository data differ from Fisher's original article and identifies corrections for samples 35 and 38."
+      ],
+      "reliability": "high",
+      "relevance": "high",
+      "limitations": [
+        "The page documents dataset metadata and known row-level corrections but does not provide variable-level statistics, correlation coefficients, or confidence intervals.",
+        "The page notes a discrepancy with Fisher's original article, so the exact numeric values used for analysis may depend on the downloaded file version.",
+        "Candidate verification was only partial; the page content was extracted and summarized but not independently re-verified beyond the provided extraction."
+      ],
+      "publication_date": null,
+      "publication_year": "1936",
+      "status": "partially_verified",
+      "source_level": "A",
+      "is_primary_source": true,
+      "verified": true,
+      "verification_status": "verified",
+      "verification_method": "doi",
+      "verification_note": "DOI is present and normalized; source can be independently checked.",
+      "duplicate_of": null,
+      "retrieval_date": "2026-09-01T07:20:35.102326Z",
+      "reliability_score": 1.0,
+      "relevance_score": 1.0,
+      "selection_provenance": {
+        "selected_by": "human",
+        "selection_id": "source_selection_260bbeebfa3f40ff88055e74f5c0aaf0",
+        "candidate_id": "candidate_b161cd1b77b94394a8c02d70ef772446",
+        "verification_method": "doi"
+      }
+    },
+    {
+      "evidence_id": "EVD-002",
+      "title": "UCI Machine Learning Repository: Iris dataset page (canonical dataset ID 53)",
+      "source_type": "unknown",
+      "source_url": "https://archive.ics.uci.edu/dataset/53/iris",
+      "source_asset_id": null,
+      "citation": "Fisher, R. (1936). Iris [Dataset]. UCI Machine Learning Repository. https://doi.org/10.24432/C56C76",
+      "authors": [
+        "R. A. Fisher"
+      ],
+      "doi": "10.24432/c56c76",
+      "pmid": null,
+      "arxiv_id": null,
+      "official_record_url": "https://archive.ics.uci.edu/dataset/53/iris",
+      "journal_or_publisher": "UCI Machine Learning Repository",
+      "summary": "Canonical UCI repository page for dataset ID 53 with substantially the same Iris dataset description as the classic path: 150 instances, 4 continuous cm-scale features, three species/class labels, no reported missing values, 50 instances per class, and notes about discrepancies with Fisher's original article. This page provides dataset documentation rather than analytical results.",
+      "extracted_claims": [
+        "The canonical UCI Iris dataset page corresponds to dataset ID 53.",
+        "The dataset is described as having 150 instances and 4 features.",
+        "The species/class labels are Iris Setosa, Iris Versicolour, and Iris Virginica.",
+        "The page reports no missing values.",
+        "The page reports known differences from Fisher's original article, including sample 35 and sample 38 corrections."
+      ],
+      "reliability": "high",
+      "relevance": "high",
+      "limitations": [
+        "This page largely duplicates EV-001; it does not add independent evidence for correlations.",
+        "No descriptive statistics or correlation results are provided on the page.",
+        "Verification remains partial because it relies on the provided extraction rather than independent retrieval."
+      ],
+      "publication_date": null,
+      "publication_year": "1936",
+      "status": "partially_verified",
+      "source_level": "A",
+      "is_primary_source": true,
+      "verified": true,
+      "verification_status": "verified",
+      "verification_method": "doi",
+      "verification_note": "DOI is present and normalized; source can be independently checked.",
+      "duplicate_of": "EV-001",
+      "retrieval_date": "2026-09-01T07:20:35.102326Z",
+      "reliability_score": 1.0,
+      "relevance_score": 1.0,
+      "selection_provenance": {
+        "selected_by": "human",
+        "selection_id": "source_selection_260bbeebfa3f40ff88055e74f5c0aaf0",
+        "candidate_id": "candidate_61d4693ecfb54d949cb049094898b79e",
+        "verification_method": "doi"
+      }
+    },
+    {
+      "evidence_id": "EVD-003",
+      "title": "Uploaded tabular research material: iris_uci.csv (UCI Iris dataset file, parsed preview only)",
+      "source_type": "uploaded_dataset",
+      "source_url": null,
+      "source_asset_id": "asset_f8860d8760ed4f01ba7389310e938d03",
+      "citation": null,
+      "authors": [],
+      "doi": "10.24432/c56c76",
+      "pmid": null,
+      "arxiv_id": null,
+      "official_record_url": null,
+      "journal_or_publisher": "UCI Machine Learning Repository (as described in user-provided asset metadata)",
+      "summary": "Parsed preview of an uploaded CSV described as UCI Iris dataset ID 53. The structured summary reports UTF-8-BOM encoding, comma delimiter, five columns (sepal_length_cm, sepal_width_cm, petal_length_cm, petal_width_cm, species), 150 scanned data rows, and zero missing values across the scanned columns. Ten sample rows show Iris-setosa observations with numeric sepal and petal lengths in cm. This is an observation of file structure and a bounded preview; it does not establish that statistical analysis was executed, and values remain unverified user-provided material.",
+      "extracted_claims": [
+        "The uploaded file contains column names sepal_length_cm, sepal_width_cm, petal_length_cm, petal_width_cm, and species.",
+        "The parsed preview scanned 150 data rows and reported the row count as not partial.",
+        "The parsed preview reported zero missing values in the scanned rows for all five columns.",
+        "The sample rows include observations labeled Iris-setosa with numeric sepal_length_cm and petal_length_cm values.",
+        "The asset metadata states the file corresponds to UCI dataset ID 53 with DOI 10.24432/C56C76."
+      ],
+      "reliability": "medium",
+      "relevance": "high",
+      "limitations": [
+        "Uploaded files are untrusted research material; the file's stated provenance is not independently verified.",
+        "Parsing or previewing does not verify that the file is the authoritative UCI version or that all values are error-free.",
+        "The preview does not provide computed means, standard deviations, ranges, correlations, or confidence intervals.",
+        "Content digest and asset_id preserve provenance, but analytical claims require a separate validated computation step."
+      ],
+      "publication_date": null,
+      "publication_year": null,
+      "status": "unverified",
+      "source_level": "C",
+      "is_primary_source": false,
+      "verified": true,
+      "verification_status": "verified",
+      "verification_method": "doi",
+      "verification_note": "DOI is present and normalized; source can be independently checked.",
+      "duplicate_of": "EV-001",
+      "retrieval_date": "2026-09-01T07:20:35.102326Z",
+      "reliability_score": 0.7,
+      "relevance_score": 1.0,
+      "selection_provenance": null
+    }
+  ],
+  "claims": [
+    {
+      "claim_id": "CL-001",
+      "statement": "The UCI Iris dataset documentation reports 150 instances, grouped into three classes/species with 50 instances each: Iris Setosa, Iris Versicolour, and Iris Virginica.",
+      "claim_type": "reported_fact",
+      "supporting_evidence_ids": [
+        "EVD-001",
+        "EVD-002"
+      ],
+      "contradicting_evidence_ids": [],
+      "confidence": 0.9,
+      "assumptions": [
+        "The selected UCI repository pages accurately describe the version of the Iris dataset intended for analysis.",
+        "The species labels in the uploaded file correspond to the repository's three classes."
+      ],
+      "limitations": [
+        "The repository pages note discrepancies with Fisher's original article, so individual row values may vary across file versions.",
+        "This claim concerns dataset documentation, not computed analytical results."
+      ],
+      "status": "supported",
+      "dimension": "unspecified"
+    },
+    {
+      "claim_id": "CL-002",
+      "statement": "The UCI Iris dataset documentation includes sepal length and petal length as continuous variables measured in cm, alongside sepal width and petal width.",
+      "claim_type": "reported_fact",
+      "supporting_evidence_ids": [
+        "EVD-001",
+        "EVD-002"
+      ],
+      "contradicting_evidence_ids": [],
+      "confidence": 0.9,
+      "assumptions": [
+        "The variable names in the analysis file can be mapped to the repository variables: sepal_length_cm to sepal length and petal_length_cm to petal length."
+      ],
+      "limitations": [
+        "Documentation alone does not verify the numeric accuracy of the uploaded file.",
+        "Units are reported by the repository page; independent metrological verification was not performed."
+      ],
+      "status": "supported",
+      "dimension": "unspecified"
+    },
+    {
+      "claim_id": "CL-003",
+      "statement": "The UCI repository pages state that the Iris dataset has no missing values.",
+      "claim_type": "reported_fact",
+      "supporting_evidence_ids": [
+        "EVD-001",
+        "EVD-002"
+      ],
+      "contradicting_evidence_ids": [],
+      "confidence": 0.85,
+      "assumptions": [
+        "The repository missing-value statement applies to the specific file version used for analysis."
+      ],
+      "limitations": [
+        "The repository statement does not independently verify the uploaded CSV.",
+        "The uploaded CSV preview also reported zero missing values, but that is an unverified local observation."
+      ],
+      "status": "supported",
+      "dimension": "unspecified"
+    },
+    {
+      "claim_id": "CL-004",
+      "statement": "The uploaded iris_uci.csv preview reports five columns, including sepal_length_cm, petal_length_cm, and species, with 150 scanned data rows and zero missing values in the scanned rows.",
+      "claim_type": "observation",
+      "supporting_evidence_ids": [
+        "EVD-003"
+      ],
+      "contradicting_evidence_ids": [],
+      "confidence": 0.7,
+      "assumptions": [
+        "The structured summary accurately reflects the uploaded file content.",
+        "The scanned rows represent the full file because row_count_is_partial was false."
+      ],
+      "limitations": [
+        "Uploaded material is untrusted and not independently verified.",
+        "A parsed preview is not an executed statistical analysis.",
+        "The preview does not establish that the file is identical to the official UCI version."
+      ],
+      "status": "partially_supported",
+      "dimension": "unspecified"
+    },
+    {
+      "claim_id": "CL-005",
+      "statement": "The UCI Iris dataset pages report known discrepancies from Fisher's original article, including corrected values for sample 35 and sample 38.",
+      "claim_type": "reported_fact",
+      "supporting_evidence_ids": [
+        "EVD-001",
+        "EVD-002"
+      ],
+      "contradicting_evidence_ids": [],
+      "confidence": 0.88,
+      "assumptions": [
+        "The repository's correction notes are relevant to the version of the data used for analysis."
+      ],
+      "limitations": [
+        "The extraction does not show whether the uploaded file contains the corrected or uncorrected values for those samples.",
+        "These row-level issues may affect descriptive statistics and correlations if the affected variables are included."
+      ],
+      "status": "supported",
+      "dimension": "unspecified"
+    },
+    {
+      "claim_id": "CL-006",
+      "statement": "The selected sources do not provide Pearson correlation coefficients, confidence intervals, descriptive statistics, or fitted slopes for sepal length versus petal length, either overall or by species.",
+      "claim_type": "observation",
+      "supporting_evidence_ids": [
+        "EVD-001",
+        "EVD-002",
+        "EVD-003"
+      ],
+      "contradicting_evidence_ids": [],
+      "confidence": 0.95,
+      "assumptions": [
+        "The provided extractions and previews are complete enough to identify whether such statistics were present."
+      ],
+      "limitations": [
+        "This is a gap observation based on the available selected sources; other sources were not searched or extracted."
+      ],
+      "status": "supported",
+      "dimension": "unspecified"
+    },
+    {
+      "claim_id": "CL-007",
+      "statement": "Based on the available selected sources, it cannot be determined whether sepal length and petal length have a stable linear association overall or whether the association differs among setosa, versicolor, and virginica.",
+      "claim_type": "inference",
+      "supporting_evidence_ids": [
+        "EVD-001",
+        "EVD-002",
+        "EVD-003",
+        "CL-006"
+      ],
+      "contradicting_evidence_ids": [],
+      "confidence": 0.93,
+      "assumptions": [
+        "The evidence set contains no computed correlations for the requested variables.",
+        "No additional datasets or external statistical results may be introduced."
+      ],
+      "limitations": [
+        "The uploaded file could support such an analysis if a validated computation step is performed, but parsing alone does not produce estimates.",
+        "The inference addresses current evidence availability, not the underlying statistical truth."
+      ],
+      "status": "supported",
+      "dimension": "unspecified"
+    },
+    {
+      "claim_id": "CL-008",
+      "statement": "Any future correlation estimates from the uploaded file must be treated as conditional on the file being a valid representation of the intended UCI Iris dataset and on appropriate handling of the documented row-level corrections.",
+      "claim_type": "hypothesis",
+      "supporting_evidence_ids": [
+        "EVD-001",
+        "EVD-002",
+        "EVD-003"
+      ],
+      "contradicting_evidence_ids": [],
+      "confidence": 0.75,
+      "assumptions": [
+        "The analysis will use the uploaded CSV as the data source.",
+        "Pearson correlation will be the primary linear association measure unless diagnostics justify another measure."
+      ],
+      "limitations": [
+        "No analysis has been executed in this evidence step.",
+        "The effect of samples 35 and 38 on sepal length and petal length correlations is not known from the current extraction."
+      ],
+      "status": "partially_supported",
+      "dimension": "unspecified"
+    }
+  ],
+  "evidence_gaps": [
+    "No computed overall Pearson correlation between sepal length and petal length is available from the selected sources.",
+    "No computed species-specific Pearson correlations for setosa, versicolor, or virginica are available from the selected sources.",
+    "No confidence intervals or uncertainty estimates for correlations are available.",
+    "Descriptive statistics such as means, standard deviations, minima, maxima, and quartiles for sepal length and petal length have not been computed or reported.",
+    "It is not confirmed whether the uploaded CSV contains the corrected or uncorrected values for UCI samples 35 and 38.",
+    "The uploaded file's provenance as the official UCI dataset version is asserted in metadata but not independently verified.",
+    "Only two web sources were extracted, below the configured minimum of three; however, supplementary search is not performed in this step."
+  ],
+  "conflicting_evidence": [
+    "The UCI repository pages state that the data differ from Fisher's original article, creating a potential conflict between the repository version and the original published version; the extraction does not resolve which version the uploaded file matches.",
+    "The repository documentation states no missing values, while the uploaded file is untrusted and cannot be independently confirmed as the same version; however, the parsed preview also reported zero missing values, so this is a provenance uncertainty rather than an observed numeric conflict."
+  ],
+  "unsupported_claims": [
+    "The claim that sepal length and petal length have a stable positive linear association overall is unsupported by the current evidence because no correlation estimate was provided or computed.",
+    "The claim that the linear association differs among the three species is unsupported by the current evidence because no species-specific correlation estimates were provided or computed.",
+    "The claim that the uploaded CSV is definitively identical to the official UCI Iris dataset is unsupported beyond user-provided metadata and structural preview.",
+    "The claim that the data contain no relevant outliers or nonlinearity for Pearson correlation is unsupported because distributional diagnostics and scatterplot evidence were not provided."
+  ],
+  "confidence_summary": "Confidence is high for documented dataset structure: 150 rows, three species with 50 rows each, continuous cm-scale variables including sepal length and petal length, and repository notes of no missing values and known sample corrections. Confidence is medium for the uploaded CSV's structural preview because it is untrusted user-provided material and parsing does not verify provenance or values. Confidence is low or unavailable for the central analytical conclusions: no overall or species-specific Pearson correlation estimates, confidence intervals, descriptive statistics, or regression slopes are available from the selected sources. Therefore, the research question cannot be answered from the current evidence alone without a validated analysis of the uploaded dataset. Competing explanation: if future correlations differ by species, the pattern could reflect species-specific morphology rather than a single homogeneous linear relationship; this remains a hypothesis until computed."
+}

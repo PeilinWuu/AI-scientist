@@ -1,0 +1,164 @@
+{
+  "evidence": [
+    {
+      "evidence_id": "EVD-001",
+      "title": "UCI Machine Learning Repository Iris dataset landing page (selected candidate metadata)",
+      "source_type": "unknown",
+      "source_url": "https://archive.ics.uci.edu/ml/datasets/iris",
+      "source_asset_id": null,
+      "citation": null,
+      "authors": [],
+      "doi": null,
+      "pmid": null,
+      "arxiv_id": null,
+      "official_record_url": "https://archive.ics.uci.edu/ml/datasets/iris",
+      "journal_or_publisher": "UCI Machine Learning Repository",
+      "summary": "Selected source candidate points to the UCI Machine Learning Repository page for the Iris dataset. Only candidate-level metadata was available: the URL, a search query referring to Iris, sepal length, petal length, Pearson correlation, and species, plus a partial verification note. No extracted page text, abstract, schema, sample counts, variable names, missing-value information, or correlation results were available.",
+      "extracted_claims": [
+        "A candidate source record identifies an Iris dataset location at https://archive.ics.uci.edu/ml/datasets/iris.",
+        "The candidate was only partially verified at selection stage, and formal verification was deferred.",
+        "No extracted content from the source page was provided."
+      ],
+      "reliability": "low",
+      "relevance": "medium",
+      "limitations": [
+        "No extracted content was available for this source.",
+        "The selected candidate has no title, authors, publication year, snippet, DOI, PMID, or arXiv ID.",
+        "The source was only partially verified at candidate stage.",
+        "It cannot confirm dataset fields, sample size, species labels, missingness, or correlation values.",
+        "The candidate URL uses archive.ics.uci.edu, which may differ from canonical UCI repository URL forms; this was not resolved by extraction."
+      ],
+      "publication_date": null,
+      "publication_year": null,
+      "status": "unverified",
+      "source_level": "A",
+      "is_primary_source": true,
+      "verified": true,
+      "verification_status": "verified",
+      "verification_method": "official_url",
+      "verification_note": "Official or publisher-like URL is present.",
+      "duplicate_of": null,
+      "retrieval_date": "2026-09-01T06:00:43.400525Z",
+      "reliability_score": 1.0,
+      "relevance_score": 0.65,
+      "selection_provenance": {
+        "selected_by": "human",
+        "selection_id": "source_selection_f584c116b4b54c2fa381ca74e477759f",
+        "candidate_id": "candidate_d44454b4e0114ba9a4039fadb4cc94f5",
+        "verification_method": "official_url"
+      }
+    }
+  ],
+  "claims": [
+    {
+      "claim_id": "CL-001",
+      "statement": "A selected candidate source points to the UCI Machine Learning Repository Iris dataset page at https://archive.ics.uci.edu/ml/datasets/iris.",
+      "claim_type": "reported_fact",
+      "supporting_evidence_ids": [
+        "EVD-001"
+      ],
+      "contradicting_evidence_ids": [],
+      "confidence": 0.8,
+      "assumptions": [
+        "The selected candidate metadata accurately records the source URL."
+      ],
+      "limitations": [
+        "The page content was not extracted, so the existence and exact contents of the page are not independently confirmed.",
+        "The URL form was not validated against a canonical repository record."
+      ],
+      "status": "partially_supported",
+      "dimension": "unspecified"
+    },
+    {
+      "claim_id": "CL-002",
+      "statement": "No extracted source content was available to verify Iris dataset sample sizes, variable names, species labels, missing-data status, or sepal-length/petal-length correlations.",
+      "claim_type": "observation",
+      "supporting_evidence_ids": [
+        "EVD-001"
+      ],
+      "contradicting_evidence_ids": [],
+      "confidence": 0.95,
+      "assumptions": [
+        "The provided task warnings and empty extracted_source_content field accurately reflect extraction failure."
+      ],
+      "limitations": [
+        "This observation describes the current evidence state, not the underlying Iris dataset itself."
+      ],
+      "status": "supported",
+      "dimension": "unspecified"
+    },
+    {
+      "claim_id": "CL-003",
+      "statement": "The available selected source evidence is insufficient to determine whether sepal length and petal length have a stable linear association in the public Iris dataset overall.",
+      "claim_type": "inference",
+      "supporting_evidence_ids": [
+        "EVD-001"
+      ],
+      "contradicting_evidence_ids": [],
+      "confidence": 0.9,
+      "assumptions": [
+        "Answering the research question requires observed data or extracted literature/data results."
+      ],
+      "limitations": [
+        "This does not imply the association is absent; it indicates current evidence is insufficient."
+      ],
+      "status": "supported",
+      "dimension": "unspecified"
+    },
+    {
+      "claim_id": "CL-004",
+      "statement": "The available selected source evidence is insufficient to determine whether the sepal-length/petal-length linear association differs among setosa, versicolor, and virginica.",
+      "claim_type": "inference",
+      "supporting_evidence_ids": [
+        "EVD-001"
+      ],
+      "contradicting_evidence_ids": [],
+      "confidence": 0.9,
+      "assumptions": [
+        "Species-specific comparisons require species labels and group-level data or reported group-level statistics."
+      ],
+      "limitations": [
+        "No species-level data, counts, or correlation estimates were available from the selected source."
+      ],
+      "status": "supported",
+      "dimension": "unspecified"
+    },
+    {
+      "claim_id": "CL-005",
+      "statement": "Any answer about the Iris dataset would require direct computation on a clearly identified dataset version or extraction of reported statistics from a verified source; neither was available in the provided evidence.",
+      "claim_type": "conclusion",
+      "supporting_evidence_ids": [
+        "EVD-001"
+      ],
+      "contradicting_evidence_ids": [],
+      "confidence": 0.85,
+      "assumptions": [
+        "The task forbids inventing data, statistics, or source content."
+      ],
+      "limitations": [
+        "This is a procedural evidence-gap conclusion, not a substantive finding about the Iris data."
+      ],
+      "status": "supported",
+      "dimension": "unspecified"
+    }
+  ],
+  "evidence_gaps": [
+    "No extracted content from the selected UCI Iris repository page was available.",
+    "No dataset version, file format, schema, or field names for sepal length, petal length, and species were confirmed.",
+    "No total or per-species sample sizes were confirmed.",
+    "No missing-value, duplicate-record, or outlier information was confirmed.",
+    "No overall Pearson correlation or confidence interval for sepal length versus petal length was available.",
+    "No species-specific Pearson correlations or confidence intervals were available.",
+    "No verified alternative sources were extracted to compare or corroborate dataset characteristics.",
+    "The canonical form and current availability of the provided UCI URL were not verified."
+  ],
+  "conflicting_evidence": [],
+  "unsupported_claims": [
+    "The public Iris dataset contains complete paired sepal-length and petal-length values for all samples.",
+    "The overall sepal-length/petal-length Pearson correlation is positive, strong, or stable.",
+    "The sepal-length/petal-length correlation differs across setosa, versicolor, and virginica.",
+    "Each Iris species has a specific sample size.",
+    "Any specific numeric correlation coefficient, mean, standard deviation, minimum, maximum, or quartile for the Iris variables."
+  ],
+  "confidence_summary": "Confidence in substantive findings about the Iris dataset is very low because no source content or dataset values were extracted. The only supported observations concern the existence of a partially verified selected candidate URL and the current evidence gap. No stable linear association or species difference can be asserted from the provided evidence. Competing explanation: if the UCI page or dataset were successfully extracted or a dataset were supplied, descriptive and correlation analyses could be performed; without that, all dataset-specific claims remain unsupported."
+}

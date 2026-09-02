@@ -1,0 +1,111 @@
+{
+  "asset_id": "asset_d189e2602b104466a6ba39e11b853331",
+  "filename": "iris_uci.csv",
+  "purpose": "data",
+  "asset_role": "experimental_result",
+  "research_round": 1,
+  "source": "UCI Machine Learning Repository / external deterministic analysis",
+  "description": "UCI Iris raw data used for the approved observational analysis.",
+  "parsed_content": {
+    "parser_name": "local_delimited_v1",
+    "content_kind": "tabular",
+    "summary": "Tabular data with 5 columns and 150 scanned data rows.",
+    "extracted_text": "{\n  \"encoding\": \"utf-8-sig\",\n  \"delimiter\": \",\",\n  \"column_names\": [\n    \"sepal_length_cm\",\n    \"sepal_width_cm\",\n    \"petal_length_cm\",\n    \"petal_width_cm\",\n    \"species\"\n  ],\n  \"scanned_data_rows\": 150,\n  \"row_count_is_partial\": false,\n  \"missing_values_in_scanned_rows\": {\n    \"sepal_length_cm\": 0,\n    \"sepal_width_cm\": 0,\n    \"petal_length_cm\": 0,\n    \"petal_width_cm\": 0,\n    \"species\": 0\n  },\n  \"sample_rows\": [\n    {\n      \"sepal_length_cm\": \"5.1\",\n      \"sepal_width_cm\": \"3.5\",\n      \"petal_length_cm\": \"1.4\",\n      \"petal_width_cm\": \"0.2\",\n      \"species\": \"Iris-setosa\"\n    },\n    {\n      \"sepal_length_cm\": \"4.9\",\n      \"sepal_width_cm\": \"3.0\",\n      \"petal_length_cm\": \"1.4\",\n      \"petal_width_cm\": \"0.2\",\n      \"species\": \"Iris-setosa\"\n    },\n    {\n      \"sepal_length_cm\": \"4.7\",\n      \"sepal_width_cm\": \"3.2\",\n      \"petal_length_cm\": \"1.3\",\n      \"petal_width_cm\": \"0.2\",\n      \"species\": \"Iris-setosa\"\n    },\n    {\n      \"sepal_length_cm\": \"4.6\",\n      \"sepal_width_cm\": \"3.1\",\n      \"petal_length_cm\": \"1.5\",\n      \"petal_width_cm\": \"0.2\",\n      \"species\": \"Iris-setosa\"\n    },\n    {\n      \"sepal_length_cm\": \"5.0\",\n      \"sepal_width_cm\": \"3.6\",\n      \"petal_length_cm\": \"1.4\",\n      \"petal_width_cm\": \"0.2\",\n      \"species\": \"Iris-setosa\"\n    },\n    {\n      \"sepal_length_cm\": \"5.4\",\n      \"sepal_width_cm\": \"3.9\",\n      \"petal_length_cm\": \"1.7\",\n      \"petal_width_cm\": \"0.4\",\n      \"species\": \"Iris-setosa\"\n    },\n    {\n      \"sepal_length_cm\": \"4.6\",\n      \"sepal_width_cm\": \"3.4\",\n      \"petal_length_cm\": \"1.4\",\n      \"petal_width_cm\": \"0.3\",\n      \"species\": \"Iris-setosa\"\n    },\n    {\n      \"sepal_length_cm\": \"5.0\",\n      \"sepal_width_cm\": \"3.4\",\n      \"petal_length_cm\": \"1.5\",\n      \"petal_width_cm\": \"0.2\",\n      \"species\": \"Iris-setosa\"\n    },\n    {\n      \"sepal_length_cm\": \"4.4\",\n      \"sepal_width_cm\": \"2.9\",\n      \"petal_length_cm\": \"1.4\",\n      \"petal_width_cm\": \"0.2\",\n      \"species\": \"Iris-setosa\"\n    },\n    {\n      \"sepal_length_cm\": \"4.9\",\n      \"sepal_width_cm\": \"3.1\",\n      \"petal_length_cm\": \"1.5\",\n      \"petal_width_cm\": \"0.1\",\n      \"species\": \"Iris-setosa\"\n    }\n  ]\n}",
+    "structured_summary": {
+      "encoding": "utf-8-sig",
+      "delimiter": ",",
+      "column_names": [
+        "sepal_length_cm",
+        "sepal_width_cm",
+        "petal_length_cm",
+        "petal_width_cm",
+        "species"
+      ],
+      "scanned_data_rows": 150,
+      "row_count_is_partial": false,
+      "missing_values_in_scanned_rows": {
+        "sepal_length_cm": 0,
+        "sepal_width_cm": 0,
+        "petal_length_cm": 0,
+        "petal_width_cm": 0,
+        "species": 0
+      },
+      "sample_rows": [
+        {
+          "sepal_length_cm": "5.1",
+          "sepal_width_cm": "3.5",
+          "petal_length_cm": "1.4",
+          "petal_width_cm": "0.2",
+          "species": "Iris-setosa"
+        },
+        {
+          "sepal_length_cm": "4.9",
+          "sepal_width_cm": "3.0",
+          "petal_length_cm": "1.4",
+          "petal_width_cm": "0.2",
+          "species": "Iris-setosa"
+        },
+        {
+          "sepal_length_cm": "4.7",
+          "sepal_width_cm": "3.2",
+          "petal_length_cm": "1.3",
+          "petal_width_cm": "0.2",
+          "species": "Iris-setosa"
+        },
+        {
+          "sepal_length_cm": "4.6",
+          "sepal_width_cm": "3.1",
+          "petal_length_cm": "1.5",
+          "petal_width_cm": "0.2",
+          "species": "Iris-setosa"
+        },
+        {
+          "sepal_length_cm": "5.0",
+          "sepal_width_cm": "3.6",
+          "petal_length_cm": "1.4",
+          "petal_width_cm": "0.2",
+          "species": "Iris-setosa"
+        },
+        {
+          "sepal_length_cm": "5.4",
+          "sepal_width_cm": "3.9",
+          "petal_length_cm": "1.7",
+          "petal_width_cm": "0.4",
+          "species": "Iris-setosa"
+        },
+        {
+          "sepal_length_cm": "4.6",
+          "sepal_width_cm": "3.4",
+          "petal_length_cm": "1.4",
+          "petal_width_cm": "0.3",
+          "species": "Iris-setosa"
+        },
+        {
+          "sepal_length_cm": "5.0",
+          "sepal_width_cm": "3.4",
+          "petal_length_cm": "1.5",
+          "petal_width_cm": "0.2",
+          "species": "Iris-setosa"
+        },
+        {
+          "sepal_length_cm": "4.4",
+          "sepal_width_cm": "2.9",
+          "petal_length_cm": "1.4",
+          "petal_width_cm": "0.2",
+          "species": "Iris-setosa"
+        },
+        {
+          "sepal_length_cm": "4.9",
+          "sepal_width_cm": "3.1",
+          "petal_length_cm": "1.5",
+          "petal_width_cm": "0.1",
+          "species": "Iris-setosa"
+        }
+      ]
+    },
+    "warnings": [],
+    "content_sha256": "24d7757511c6c8d4850aa86a6fad04b9426b319c635af26e6d413d94fe5bd73e",
+    "truncated": false,
+    "parsed_at": "2026-09-01T08:05:37.692092Z"
+  }
+}

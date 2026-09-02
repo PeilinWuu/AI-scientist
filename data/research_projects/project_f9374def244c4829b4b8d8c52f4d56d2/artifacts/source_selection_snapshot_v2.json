@@ -1,0 +1,192 @@
+{
+  "selection_id": "source_selection_260bbeebfa3f40ff88055e74f5c0aaf0",
+  "project_id": "project_f9374def244c4829b4b8d8c52f4d56d2",
+  "iteration": 2,
+  "research_question_version": 1,
+  "search_plan_version": 2,
+  "kept_candidate_ids": [
+    "candidate_b161cd1b77b94394a8c02d70ef772446",
+    "candidate_61d4693ecfb54d949cb049094898b79e"
+  ],
+  "rejected_candidate_ids": [
+    "candidate_1a48e2a9136b45e9887faa27bf3f5ec9"
+  ],
+  "deferred_candidate_ids": [
+    "candidate_00d6480998854274a1222b15b6aa8298",
+    "candidate_753ef52e03c94ff588c70fbfe17d3748",
+    "candidate_2730c39cea5446b59d6d62d0ad69546f",
+    "candidate_7e41a95a2b5b4a888c8f46cbd5dcf1a6",
+    "candidate_79178b46e652434f8ba830e9a0036244",
+    "candidate_281a7d47a045448e9c2924571fe7bb73",
+    "candidate_de96baa877054f8abedad6ca1a6da1a0",
+    "candidate_421371f61a7e4478b0ab9054cf9d08d0",
+    "candidate_d7eaa52bc63048e8ba4abf6d3813790a",
+    "candidate_115ff194b3034cd389457caa3283d37a",
+    "candidate_996cf665641d412ca2238179dc8b0d1d",
+    "candidate_67efd05150ed482e8b1369614aa7fde9",
+    "candidate_e4802c44e4ee4312bcd523ec9cb4ff84",
+    "candidate_39e8b4898c214396852b04233ba43537",
+    "candidate_fbebfc45bfdd4391a2220f31c620106a",
+    "candidate_8c3d7166799f4243b4cfbfe5dfac02db"
+  ],
+  "human_added_source_ids": [
+    "candidate_61d4693ecfb54d949cb049094898b79e"
+  ],
+  "decisions": [
+    {
+      "candidate_id": "candidate_00d6480998854274a1222b15b6aa8298",
+      "decision": "defer",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "",
+      "decided_at": "2026-09-01T07:21:29.361253Z"
+    },
+    {
+      "candidate_id": "candidate_753ef52e03c94ff588c70fbfe17d3748",
+      "decision": "defer",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "",
+      "decided_at": "2026-09-01T07:21:29.361253Z"
+    },
+    {
+      "candidate_id": "candidate_2730c39cea5446b59d6d62d0ad69546f",
+      "decision": "defer",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "",
+      "decided_at": "2026-09-01T07:21:29.361253Z"
+    },
+    {
+      "candidate_id": "candidate_7e41a95a2b5b4a888c8f46cbd5dcf1a6",
+      "decision": "defer",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "",
+      "decided_at": "2026-09-01T07:21:29.361253Z"
+    },
+    {
+      "candidate_id": "candidate_79178b46e652434f8ba830e9a0036244",
+      "decision": "defer",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "",
+      "decided_at": "2026-09-01T07:21:29.361253Z"
+    },
+    {
+      "candidate_id": "candidate_b161cd1b77b94394a8c02d70ef772446",
+      "decision": "keep",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "",
+      "decided_at": "2026-09-01T07:21:29.361253Z"
+    },
+    {
+      "candidate_id": "candidate_281a7d47a045448e9c2924571fe7bb73",
+      "decision": "defer",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "",
+      "decided_at": "2026-09-01T07:21:29.361253Z"
+    },
+    {
+      "candidate_id": "candidate_de96baa877054f8abedad6ca1a6da1a0",
+      "decision": "defer",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "",
+      "decided_at": "2026-09-01T07:21:29.361253Z"
+    },
+    {
+      "candidate_id": "candidate_421371f61a7e4478b0ab9054cf9d08d0",
+      "decision": "defer",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "",
+      "decided_at": "2026-09-01T07:21:29.361253Z"
+    },
+    {
+      "candidate_id": "candidate_d7eaa52bc63048e8ba4abf6d3813790a",
+      "decision": "defer",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "",
+      "decided_at": "2026-09-01T07:21:29.361253Z"
+    },
+    {
+      "candidate_id": "candidate_115ff194b3034cd389457caa3283d37a",
+      "decision": "defer",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "",
+      "decided_at": "2026-09-01T07:21:29.361253Z"
+    },
+    {
+      "candidate_id": "candidate_996cf665641d412ca2238179dc8b0d1d",
+      "decision": "defer",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "",
+      "decided_at": "2026-09-01T07:21:29.361253Z"
+    },
+    {
+      "candidate_id": "candidate_67efd05150ed482e8b1369614aa7fde9",
+      "decision": "defer",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "",
+      "decided_at": "2026-09-01T07:21:29.361253Z"
+    },
+    {
+      "candidate_id": "candidate_e4802c44e4ee4312bcd523ec9cb4ff84",
+      "decision": "defer",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "",
+      "decided_at": "2026-09-01T07:21:29.361253Z"
+    },
+    {
+      "candidate_id": "candidate_39e8b4898c214396852b04233ba43537",
+      "decision": "defer",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "",
+      "decided_at": "2026-09-01T07:21:29.361253Z"
+    },
+    {
+      "candidate_id": "candidate_fbebfc45bfdd4391a2220f31c620106a",
+      "decision": "defer",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "",
+      "decided_at": "2026-09-01T07:21:29.361253Z"
+    },
+    {
+      "candidate_id": "candidate_8c3d7166799f4243b4cfbfe5dfac02db",
+      "decision": "defer",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "",
+      "decided_at": "2026-09-01T07:21:29.361253Z"
+    },
+    {
+      "candidate_id": "candidate_61d4693ecfb54d949cb049094898b79e",
+      "decision": "keep",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "",
+      "decided_at": "2026-09-01T07:21:29.361253Z"
+    },
+    {
+      "candidate_id": "candidate_1a48e2a9136b45e9887faa27bf3f5ec9",
+      "decision": "reject",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "主题无关",
+      "decided_at": "2026-09-01T07:21:29.361253Z"
+    }
+  ],
+  "created_at": "2026-09-01T07:21:29.361253Z",
+  "created_by": "human",
+  "selection_note": "保留 UCI Machine Learning Repository 的官方 Iris 数据集记录及其旧版官方 URL；项目内 iris_uci.csv 来自该官方归档，DOI 10.24432/C56C76。其他博客、课程作业与二手页面不作为正式证据。"
+}

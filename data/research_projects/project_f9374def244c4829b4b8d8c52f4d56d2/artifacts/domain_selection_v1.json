@@ -1,0 +1,34 @@
+{
+  "selection": {
+    "primary_domain": "data_analysis",
+    "secondary_domains": [
+      "biology"
+    ],
+    "confidence": 0.96,
+    "selected_domain_skills": [
+      "descriptive statistics",
+      "correlation analysis",
+      "Pearson correlation",
+      "confidence intervals",
+      "group-wise comparison",
+      "data visualization",
+      "linear association interpretation",
+      "data quality assessment"
+    ],
+    "clarification_needed": false,
+    "clarification_questions": []
+  },
+  "domain_resolution": {
+    "reported_primary_domain": "data_analysis",
+    "reported_secondary_domains": [
+      "biology"
+    ],
+    "canonical_primary_domain": "general",
+    "canonical_secondary_domains": [
+      "biology"
+    ],
+    "loaded_domain_skill": "general",
+    "fallback_used": true,
+    "mapping_reason": "Domain 'data_analysis' is not registered; using general research rules."
+  }
+}

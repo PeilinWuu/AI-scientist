@@ -1,0 +1,72 @@
+{
+  "evidence_quality_score": 2.0,
+  "methodological_validity_score": 8.0,
+  "feasibility_score": 6.0,
+  "reproducibility_score": 7.0,
+  "claim_support_score": 2.0,
+  "uncertainty_handling_score": 9.0,
+  "blocking_issues": [
+    "当前证据仅包含一个未提取内容的候选源记录，无法确认 Iris 数据集字段、样本量、物种标签、缺失值或相关结果。",
+    "缺少实际数据文件、数据预览、字段映射或已验证统计摘录，因此不能执行或声称任何统计分析。",
+    "缺少数据版本或来源确认；当前 URL 为 archive.ics.uci.edu，未验证其与 canonical UCI Iris 记录的一致性。"
+  ],
+  "non_blocking_issues": [
+    "稳定性判定阈值尚未预先设定，可在执行前明确为方向明确、置信区间不接近零且相关系数绝对值较高。",
+    "未说明是否必须报告 Spearman 相关系数；建议仅在非线性、异常值或分布异常可疑时作为补充。",
+    "置信区间计算方法已计划使用 Fisher z 变换，但需确认执行工具是否支持。",
+    "研究问题使用公开常见数据集，但当前项目状态没有数据内容，不能将计划本身视为已验证结果。"
+  ],
+  "recommendations": [
+    "在执行前先获取或确认一个可访问、可解析的公开 Iris 数据集版本，例如 UCI Iris Data Set、Fisher Iris data 或 scikit-learn load_iris，并记录来源、版本、获取时间和字段映射。",
+    "仅在实际获得数据文件、完整预览或已验证统计摘录后，才可报告总样本量、分物种样本量、描述统计、Pearson 相关系数、置信区间、线性拟合和可视化结果。",
+    "保留当前分析计划作为执行规范；在缺少数据或计算能力时，应报告证据缺口并请求人工提供数据或已验证统计结果，不得虚构计算输出。",
+    "若无法获取置信区间，应降级为点估计描述并明确不确定性限制。"
+  ],
+  "decision": "revise_evidence",
+  "failed_quality_gates": [
+    "reviewer_score_below_6",
+    "blocking_issues_present"
+  ],
+  "required_revision_target": "evidence",
+  "revision_plan": [
+    {
+      "target": "evidence",
+      "priority": 1,
+      "reason": "The only current evidence record is a partially verified candidate source URL without extracted content. It cannot support dataset confirmation, variable mapping, sample sizes, or correlation estimates.",
+      "required_changes": [
+        "Obtain and record an accessible, parseable Iris dataset version or an extracted, verified statistical source.",
+        "Record dataset source, version, URL or file path, retrieval time, original field names, units, total rows, species labels, missing-value counts, and duplicate counts.",
+        "Verify that fields can be mapped to sepal length, petal length, and species before statistical execution.",
+        "If extraction or dataset access fails, explicitly document the failure and request human-provided data or verified statistics."
+      ],
+      "completion_criteria": [
+        "A primary dataset evidence record exists with extracted schema, sample counts, and field mapping.",
+        "The evidence confirms sepal length, petal length, and species variables or documents why they are unavailable.",
+        "No statistical results are claimed unless derived from confirmed data or verified extracted statistics."
+      ],
+      "action_id": "ACT-EVID-001",
+      "status": "pending"
+    },
+    {
+      "target": "evidence",
+      "priority": 2,
+      "reason": "The current source URL is archive.ics.uci.edu and has only partial verification; a canonical or execution-verified source record is needed to avoid version ambiguity.",
+      "required_changes": [
+        "Resolve the canonical UCI Iris record or select an equivalent authoritative public source.",
+        "Record whether the selected source is identical to the UCI candidate and note any differences in variable names, labels, or sample counts.",
+        "Do not treat candidate-level metadata as verified dataset content."
+      ],
+      "completion_criteria": [
+        "A canonical or clearly accepted dataset source is identified and recorded.",
+        "Source provenance is sufficient for reproducibility."
+      ],
+      "action_id": "ACT-EVID-002",
+      "status": "pending"
+    }
+  ],
+  "approval_conditions": [
+    "Approval is not possible until a usable Iris dataset version or verified statistical extraction is available.",
+    "After evidence acquisition, execution may proceed if field mapping, sample sizes, missingness, and species labels are confirmed.",
+    "Statistical outputs must be generated only after data confirmation; no analysis results should be reported in this evidence-gap state."
+  ]
+}

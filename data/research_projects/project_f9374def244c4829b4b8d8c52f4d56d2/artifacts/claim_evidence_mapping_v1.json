@@ -1,0 +1,136 @@
+{
+  "claims": [
+    {
+      "claim_id": "CL-001",
+      "statement": "A selected candidate source points to the UCI Machine Learning Repository Iris dataset page at https://archive.ics.uci.edu/ml/datasets/iris.",
+      "claim_type": "reported_fact",
+      "importance": "low",
+      "status": "partially_supported",
+      "dimension": "unspecified",
+      "supporting_evidence_ids": [
+        "EVD-001"
+      ],
+      "contradicting_evidence_ids": [],
+      "assumptions": [
+        "The selected candidate metadata accurately records the source URL."
+      ],
+      "limitations": [
+        "The page content was not extracted, so the existence and exact contents of the page are not independently confirmed.",
+        "The URL form was not validated against a canonical repository record."
+      ]
+    },
+    {
+      "claim_id": "CL-002",
+      "statement": "No extracted source content was available to verify Iris dataset sample sizes, variable names, species labels, missing-data status, or sepal-length/petal-length correlations.",
+      "claim_type": "observation",
+      "importance": "high",
+      "status": "supported",
+      "dimension": "unspecified",
+      "supporting_evidence_ids": [
+        "EVD-001"
+      ],
+      "contradicting_evidence_ids": [],
+      "assumptions": [
+        "The provided task warnings and empty extracted_source_content field accurately reflect extraction failure."
+      ],
+      "limitations": [
+        "This observation describes the current evidence state, not the underlying Iris dataset itself."
+      ]
+    },
+    {
+      "claim_id": "CL-003",
+      "statement": "The available selected source evidence is insufficient to determine whether sepal length and petal length have a stable linear association in the public Iris dataset overall.",
+      "claim_type": "inference",
+      "importance": "high",
+      "status": "supported",
+      "dimension": "unspecified",
+      "supporting_evidence_ids": [
+        "EVD-001"
+      ],
+      "contradicting_evidence_ids": [],
+      "assumptions": [
+        "Answering the research question requires observed data or extracted literature/data results."
+      ],
+      "limitations": [
+        "This does not imply the association is absent; it indicates current evidence is insufficient."
+      ]
+    },
+    {
+      "claim_id": "CL-004",
+      "statement": "The available selected source evidence is insufficient to determine whether the sepal-length/petal-length linear association differs among setosa, versicolor, and virginica.",
+      "claim_type": "inference",
+      "importance": "high",
+      "status": "supported",
+      "dimension": "unspecified",
+      "supporting_evidence_ids": [
+        "EVD-001"
+      ],
+      "contradicting_evidence_ids": [],
+      "assumptions": [
+        "Species-specific comparisons require species labels and group-level data or reported group-level statistics."
+      ],
+      "limitations": [
+        "No species-level data, counts, or correlation estimates were available from the selected source."
+      ]
+    },
+    {
+      "claim_id": "CL-005",
+      "statement": "Any answer about the Iris dataset would require direct computation on a clearly identified dataset version or extraction of reported statistics from a verified source; neither was available in the provided evidence.",
+      "claim_type": "conclusion",
+      "importance": "medium",
+      "status": "supported",
+      "dimension": "unspecified",
+      "supporting_evidence_ids": [
+        "EVD-001"
+      ],
+      "contradicting_evidence_ids": [],
+      "assumptions": [
+        "The task forbids inventing data, statistics, or source content."
+      ],
+      "limitations": [
+        "This is a procedural evidence-gap conclusion, not a substantive finding about the Iris data."
+      ]
+    }
+  ],
+  "links": [
+    {
+      "claim_id": "CL-001",
+      "evidence_id": "EVD-001",
+      "relation": "supports",
+      "strength": 0.5,
+      "rationale": "EVD-001 contains candidate-level metadata indicating that a selected source points to the UCI Iris dataset URL. Because the source page content was not extracted, support is limited to the existence of the candidate record and URL, not to the page contents."
+    },
+    {
+      "claim_id": "CL-002",
+      "evidence_id": "EVD-001",
+      "relation": "supports",
+      "strength": 0.9,
+      "rationale": "EVD-001 explicitly states that no extracted page text, schema, sample counts, variable names, missing-value information, or correlation results were available, directly supporting the claim of missing extracted content."
+    },
+    {
+      "claim_id": "CL-003",
+      "evidence_id": "EVD-001",
+      "relation": "insufficient",
+      "strength": 0.9,
+      "rationale": "EVD-001 provides no dataset values, statistics, or extracted content that could establish the overall linear association between sepal length and petal length; therefore it is insufficient for answering the substantive association question."
+    },
+    {
+      "claim_id": "CL-004",
+      "evidence_id": "EVD-001",
+      "relation": "insufficient",
+      "strength": 0.9,
+      "rationale": "EVD-001 contains no species-level sample data, correlation estimates, or confidence intervals; therefore it cannot support or refute differences in the sepal-length/petal-length association among the three Iris species."
+    },
+    {
+      "claim_id": "CL-005",
+      "evidence_id": "EVD-001",
+      "relation": "supports",
+      "strength": 0.8,
+      "rationale": "Because EVD-001 is the only available evidence and lacks extracted dataset content or reported statistics, it supports the procedural conclusion that a valid answer requires direct computation or verified extracted statistics not currently available."
+    }
+  ],
+  "unsupported_claim_ids": [],
+  "disputed_claim_ids": [],
+  "evidence_coverage": 0.15,
+  "display_markdown": "## Claim–Evidence Mapping Summary\n\nThe current EvidenceCollection contains one evidence record, **EVD-001**, which is a candidate-level reference to the UCI Machine Learning Repository Iris dataset page. It confirms only that a candidate source URL was selected; it does **not** provide extracted dataset content, sample sizes, variable names, species labels, missing-data information, or correlation estimates.\n\n### Key mapped claims\n\n- **CL-001**: A candidate source points to the UCI Iris dataset URL. This is partially supported because the URL metadata exists, but page content was not extracted.\n- **CL-002**: No extracted content is available to verify Iris dataset characteristics or correlations. This is supported by EVD-001.\n- **CL-003**: The current evidence is insufficient to determine whether sepal length and petal length have a stable overall linear association. EVD-001 is insufficient for this substantive question.\n- **CL-004**: The current evidence is insufficient to determine whether the association differs among setosa, versicolor, and virginica. EVD-001 provides no species-level statistics.\n- **CL-005**: A valid answer requires direct computation from a clearly identified dataset version or extraction of verified reported statistics; neither is available in the current evidence.\n\n### Evidence state\n\n- No claim is contradicted by the available evidence.\n- No substantive statistical finding about the Iris dataset can be supported from the current evidence.\n- The main gap is absence of extracted data or verified reported statistics."
+}

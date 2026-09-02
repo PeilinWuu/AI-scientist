@@ -1,0 +1,18 @@
+{
+  "rows": 150,
+  "columns": 5,
+  "column_names": [
+    "sepal_length_cm",
+    "sepal_width_cm",
+    "petal_length_cm",
+    "petal_width_cm",
+    "species"
+  ],
+  "dtypes": {
+    "sepal_length_cm": "float64",
+    "sepal_width_cm": "float64",
+    "petal_length_cm": "float64",
+    "petal_width_cm": "float64",
+    "species": "object"
+  }
+}

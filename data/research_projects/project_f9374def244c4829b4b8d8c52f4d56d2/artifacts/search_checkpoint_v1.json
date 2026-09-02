@@ -1,0 +1,55 @@
+{
+  "project_id": "project_f9374def244c4829b4b8d8c52f4d56d2",
+  "question_hash": "c238de55d8067641f8211466d15868f719a70cfd8952555859107291de589148",
+  "search_plan_id": "sp_f9374def_iris_sepal_petal_corr_v1",
+  "search_artifact_id": null,
+  "search_completed": false,
+  "normalization_completed": false,
+  "search_payload": null,
+  "search_plan": {
+    "search_plan_id": "sp_f9374def_iris_sepal_petal_corr_v1",
+    "project_id": "project_f9374def244c4829b4b8d8c52f4d56d2",
+    "research_question_version": 1,
+    "question_hash": "c238de55d8067641f8211466d15868f719a70cfd8952555859107291de589148",
+    "version": 1,
+    "generated_at": "2026-01-01T00:00:00Z",
+    "planner_model": "qwen3.8-max",
+    "queries": [
+      "UCI Machine Learning Repository Iris dataset sepal length petal length Pearson correlation species",
+      "Fisher Iris dataset sepal length petal length correlation setosa versicolor virginica",
+      "Iris dataset descriptive statistics sepal length petal length species comparison",
+      "Iris dataset correlation confidence interval species-specific sepal petal length"
+    ],
+    "target_source_types": [
+      "dataset documentation",
+      "methodological or educational statistics sources",
+      "peer-reviewed or repository sources describing Iris variables and correlations"
+    ],
+    "preferred_databases": [
+      "UCI Machine Learning Repository",
+      "general web search index",
+      "academic or educational sources"
+    ],
+    "date_constraints": [
+      "No date restriction; prioritize canonical dataset documentation and reproducible statistical descriptions"
+    ],
+    "maximum_queries": 4,
+    "rationale": "Queries target the public Iris dataset provenance, variable definitions, overall and species-specific sepal-petal length correlations, and uncertainty reporting needed to answer the descriptive/association question without causal inference.",
+    "relevance_status": "relevant",
+    "relevance_note": "检索式覆盖核心概念：iris, setosa, versicolor, virginica。 检索式围绕公开 Iris 数据集中萼片长度与花瓣长度的线性关联、Pearson 相关、分物种比较以及置信区间/描述统计展开，与研究问题高度一致。",
+    "approved_at": null,
+    "approved_by": null
+  },
+  "query_records": [],
+  "candidates": [],
+  "selected_candidates": [],
+  "source_selection_completed": false,
+  "awaiting_search_plan_review": true,
+  "search_plan_approved": false,
+  "awaiting_source_review": false,
+  "source_selection_id": null,
+  "extraction_completed": false,
+  "started_at": "2026-09-01T05:57:55.108166Z",
+  "last_activity_at": null,
+  "elapsed_seconds": 0.0
+}

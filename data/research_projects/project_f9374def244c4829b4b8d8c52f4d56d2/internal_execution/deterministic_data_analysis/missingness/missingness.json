@@ -1,0 +1,22 @@
+{
+  "sepal_length_cm": {
+    "missing_count": 0,
+    "missing_fraction": 0.0
+  },
+  "sepal_width_cm": {
+    "missing_count": 0,
+    "missing_fraction": 0.0
+  },
+  "petal_length_cm": {
+    "missing_count": 0,
+    "missing_fraction": 0.0
+  },
+  "petal_width_cm": {
+    "missing_count": 0,
+    "missing_fraction": 0.0
+  },
+  "species": {
+    "missing_count": 0,
+    "missing_fraction": 0.0
+  }
+}

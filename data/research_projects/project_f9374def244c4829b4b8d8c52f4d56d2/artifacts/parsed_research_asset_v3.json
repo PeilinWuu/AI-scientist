@@ -1,0 +1,30 @@
+{
+  "asset_id": "asset_5f69e292ef0f4314b611f8f8bc6a4015",
+  "filename": "iris_analysis_results.json",
+  "purpose": "other",
+  "asset_role": "experimental_result",
+  "research_round": 1,
+  "source": "UCI Machine Learning Repository / external deterministic analysis",
+  "description": "Deterministic external analysis results: descriptive statistics, overall and species-specific Pearson correlations, Fisher-z 95% confidence intervals, slopes and R-squared.",
+  "parsed_content": {
+    "parser_name": "local_json_v1",
+    "content_kind": "structured_data",
+    "summary": "JSON document with root type dict.",
+    "extracted_text": "{\n  \"dataset\": {\n    \"source\": \"UCI Machine Learning Repository\",\n    \"doi\": \"10.24432/C56C76\",\n    \"rows\": 150,\n    \"columns\": [\n      \"sepal_length_cm\",\n      \"sepal_width_cm\",\n      \"petal_length_cm\",\n      \"petal_width_cm\",\n      \"species\"\n    ],\n    \"missing_values\": 0,\n    \"duplicate_rows\": 3\n  },\n  \"descriptive_statistics\": {\n    \"sepal_length_cm\": {\n      \"mean\": 5.843333333333334,\n      \"std\": 0.8280661279778629,\n      \"min\": 4.3,\n      \"max\": 7.9\n    },\n    \"petal_length_cm\": {\n      \"mean\": 3.758666666666666,\n      \"std\": 1.7644204199522617,\n      \"min\": 1.0,\n      \"max\": 6.9\n    }\n  },\n  \"pearson\": {\n    \"overall\": {\n      \"n\": 150,\n      \"r\": 0.8717541573048718,\n      \"ci95_fisher_z\": [\n        0.8270368317875931,\n        0.9055083349187738\n      ],\n      \"slope\": 1.8575096654214442,\n      \"r_squared\": 0.7599553107783272\n    },\n    \"Iris-setosa\": {\n      \"n\": 50,\n      \"r\": 0.2638740929186868,\n      \"ci95_fisher_z\": [\n        -0.01562096606860649,\n        0.5051212836821029\n      ],\n      \"slope\": 0.12989060806149566,\n      \"r_squared\": 0.06962953691365975\n    },\n    \"Iris-versicolor\": {\n      \"n\": 50,\n      \"r\": 0.754048958592016,\n      \"ci95_fisher_z\": [\n        0.6020679650918982,\n        0.8532995133152452\n      ],\n      \"slope\": 0.6864697591764202,\n      \"r_squared\": 0.5685898319537039\n    },\n    \"Iris-virginica\": {\n      \"n\": 50,\n      \"r\": 0.8642247329355764,\n      \"ci95_fisher_z\": [\n        0.7714541554259746,\n        0.921017179721846\n      ],\n      \"slope\": 0.7500807558749895,\n      \"r_squared\": 0.7468843890175685\n    }\n  },\n  \"analysis_note\": \"Pearson correlations and Fisher-z 95% confidence intervals; observational association only, no causal inference.\"\n}",
+    "structured_summary": {
+      "encoding": "utf-8-sig",
+      "root_type": "dict",
+      "top_level_keys": [
+        "dataset",
+        "descriptive_statistics",
+        "pearson",
+        "analysis_note"
+      ],
+      "top_level_key_count": 4
+    },
+    "warnings": [],
+    "content_sha256": "c9694aa9975dd7ef7d0a49290ff0cb90323a1e24c4acf68891dbfd9ca7438eb6",
+    "truncated": false,
+    "parsed_at": "2026-09-01T08:05:37.792122Z"
+  }
+}

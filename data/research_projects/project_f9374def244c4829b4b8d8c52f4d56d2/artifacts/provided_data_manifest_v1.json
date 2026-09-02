@@ -1,0 +1,8 @@
+{
+  "artifact_paths": [
+    "assets\\asset_file_e46e82d421a04c1ba3eef6bc8290635f.csv",
+    "assets\\asset_file_6127e967081343ff86c197b1e3fbdc0a.json"
+  ],
+  "description": "UCI Iris 官方数据（150 行）及外部确定性统计结果。总体和分物种 Pearson 相关、Fisher-z 95% 置信区间、线性斜率与 R² 均由该 CSV 实际计算；仅解释为观察性关联，不作因果推断。",
+  "data_type": "CSV raw dataset + JSON statistical analysis results"
+}
