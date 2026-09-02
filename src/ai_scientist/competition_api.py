@@ -28,7 +28,7 @@ def demo_root() -> Path:
     return Path(configured).resolve() / "api_demo"
 
 
-@router.get("/readiness", summary="Check whether the deterministic demo backend is ready")
+@router.get("/readiness", summary="检查 Competition 1B 演示后端就绪状态", description="确认确定性演示输出目录可写；不调用 Qwen。")
 def competition_readiness() -> dict:
     root = demo_root()
     return {
@@ -43,7 +43,8 @@ def competition_readiness() -> dict:
 @router.post(
     "/demo/run",
     response_model=CompetitionRunState,
-    summary="Run the complete Round 1 → feedback → Round 2 → baseline demo",
+    summary="运行完整 Competition 1B 两轮反馈演示",
+    description="运行 Round 1、反馈、Round 2 与 baseline；使用确定性运行时，不执行任意代码。",
     responses={422: {"description": "Invalid seed or request shape"}, 500: {"description": "Deterministic execution failed"}},
 )
 def run_competition_demo(request: CompetitionDemoRequest) -> CompetitionRunState:
@@ -53,7 +54,7 @@ def run_competition_demo(request: CompetitionDemoRequest) -> CompetitionRunState
     return state
 
 
-@router.get("/demo", response_model=CompetitionRunState, summary="Load the latest demo state")
+@router.get("/demo", response_model=CompetitionRunState, summary="读取最新 Competition 1B 演示状态")
 def get_competition_demo() -> CompetitionRunState:
     path = demo_root() / "audit/run_state.json"
     if not path.exists():
@@ -61,7 +62,7 @@ def get_competition_demo() -> CompetitionRunState:
     return CompetitionRunState.model_validate_json(path.read_text(encoding="utf-8"))
 
 
-@router.get("/demo/history", summary="Return append-only iteration events")
+@router.get("/demo/history", summary="读取演示审计事件时间线")
 def get_competition_history() -> list[dict]:
     path = demo_root() / "audit/event_log_excerpt.jsonl"
     if not path.exists():
@@ -69,7 +70,7 @@ def get_competition_history() -> list[dict]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
 
-@router.get("/demo/artifacts", summary="List generated demo artifacts with checksums")
+@router.get("/demo/artifacts", summary="列出演示产物及校验和")
 def get_competition_artifacts() -> list[dict]:
     root = demo_root()
     if not (root / "audit/run_state.json").exists():
@@ -85,7 +86,7 @@ def get_competition_artifacts() -> list[dict]:
     ]
 
 
-@router.get("/demo/artifacts/{artifact_path:path}", summary="Download or display one generated artifact")
+@router.get("/demo/artifacts/{artifact_path:path}", summary="下载或查看一个演示产物")
 def get_competition_artifact(artifact_path: str) -> FileResponse:
     root = demo_root().resolve()
     path = (root / artifact_path).resolve()
@@ -98,7 +99,7 @@ def get_competition_artifact(artifact_path: str) -> FileResponse:
     return FileResponse(path)
 
 
-@router.post("/demo/failure-cases", summary="Run controlled rejection and human-review cases")
+@router.post("/demo/failure-cases", summary="运行受控拒绝与人工复核案例")
 def run_competition_failure_cases() -> list[dict]:
     return CompetitionRuntime(demo_root()).run_failure_cases()
 

@@ -1298,6 +1298,17 @@ class ReproducibilityOutput(StrictModel):
 
 
 class ResearchStartRequest(StrictModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [{
+                "objective": "分析公开 Iris 数据中萼片长度与花瓣长度的关联",
+                "domain_hint": "biology",
+                "planning_only": False,
+                "max_iterations": 1,
+            }]
+        },
+    )
     objective: str
     domain_hint: str | None = None
     constraints_text: str = ""

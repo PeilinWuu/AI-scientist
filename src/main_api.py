@@ -45,6 +45,8 @@ app = FastAPI(
 )
 app.include_router(competition_router)
 
+MAX_UPLOAD_BYTES = 20 * 1024 * 1024
+
 INLINE_ASSET_MEDIA_TYPES = {
     ".pdf": "application/pdf",
     ".md": "text/plain; charset=utf-8",
@@ -167,7 +169,15 @@ def _responses_endpoint_host() -> str:
     return urlparse(base_url).netloc
 
 
-@app.post("/api/research/start")
+@app.post(
+    "/api/research/start",
+    summary="创建研究项目",
+    description="创建持久化 AI Scientist 项目；此接口只创建项目，不自动消耗模型调用。",
+    responses={
+        200: {"description": "项目已创建", "content": {"application/json": {"example": {"project_id": "project_demo123", "phase": "QUESTION_INTAKE", "status": "created"}}}},
+        422: {"description": "请求字段校验失败"},
+    },
+)
 def research_start(request: ResearchStartRequest) -> dict:
     """Create a persisted AI Scientist project without running a model stage."""
 
@@ -256,7 +266,12 @@ def research_debug_claim_mapping(request: dict) -> dict:
         raise _research_http_error(exc) from exc
 
 
-@app.get("/api/research/{project_id}")
+@app.get(
+    "/api/research/{project_id}",
+    summary="查询研究项目状态与结果",
+    description="返回项目阶段、证据、主张、审计信息、产物和最终综合结果。",
+    responses={404: {"description": "项目不存在"}},
+)
 def research_get(project_id: str) -> dict:
     """Return display-safe structured project state."""
 
@@ -276,7 +291,17 @@ def research_step(project_id: str) -> dict:
         raise _research_http_error(exc) from exc
 
 
-@app.post("/api/research/{project_id}/step_async", status_code=status.HTTP_202_ACCEPTED)
+@app.post(
+    "/api/research/{project_id}/step_async",
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="异步运行一个研究阶段",
+    description="推进一次状态机阶段并返回 job_id；评委可轮询 GET /api/research/jobs/{job_id}。",
+    responses={
+        202: {"description": "任务已排队", "content": {"application/json": {"example": {"job_id": "job_demo123", "project_id": "project_demo123", "phase": "QUESTION_INTAKE", "status": "queued"}}}},
+        409: {"description": "项目已有运行中的阶段任务"},
+        404: {"description": "项目不存在"},
+    },
+)
 def research_step_async(project_id: str) -> dict:
     """Queue one state-machine phase and return immediately."""
 
@@ -312,7 +337,12 @@ def research_step_async(project_id: str) -> dict:
         raise _research_http_error(exc) from exc
 
 
-@app.get("/api/research/jobs/{job_id}")
+@app.get(
+    "/api/research/jobs/{job_id}",
+    summary="查询异步研究任务",
+    description="查询一个阶段任务的 queued、running、completed 或 failed 状态。",
+    responses={404: {"description": "任务不存在"}},
+)
 def research_job_status(job_id: str) -> dict:
     """Return a persisted asynchronous AI Scientist job record."""
 
@@ -426,6 +456,8 @@ def research_human_sources(project_id: str, request: HumanSourceRequest) -> dict
 def research_upload_asset(project_id: str, request: ResearchAssetUploadRequest) -> dict:
     try:
         content = base64.b64decode(request.content_base64, validate=True)
+        if len(content) > MAX_UPLOAD_BYTES:
+            raise HTTPException(status_code=413, detail={"error": "upload_too_large", "max_bytes": MAX_UPLOAD_BYTES})
         project = research_orchestrator.register_research_asset(
             project_id,
             request.filename,
@@ -447,6 +479,8 @@ def research_upload_asset(project_id: str, request: ResearchAssetUploadRequest) 
                 else "文件已登记，但解析未完成；可在项目文件区查看原因并重试。"
             ),
         }
+    except HTTPException:
+        raise
     except Exception as exc:  # noqa: BLE001
         raise _research_http_error(exc) from exc
 
@@ -458,6 +492,8 @@ def research_delete_asset(project_id: str, asset_id: str) -> dict:
     try:
         project = research_orchestrator.delete_research_asset(project_id, asset_id)
         return {"project_id": project.project_id, "asset_id": asset_id, "status": "deleted"}
+    except HTTPException:
+        raise
     except Exception as exc:  # noqa: BLE001
         raise _research_http_error(exc) from exc
 
