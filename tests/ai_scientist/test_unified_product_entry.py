@@ -18,6 +18,8 @@ from src.ai_scientist.job_store import ResearchJobStore
 from src.ai_scientist.orchestrator import ResearchOrchestrator
 from src.ai_scientist.schemas import Conclusion, ResearchMode, ResearchPhase
 
+APP_STREAMLIT_PATH = Path(__file__).resolve().parents[2] / "app_streamlit.py"
+
 
 def api_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[TestClient, ResearchOrchestrator]:
     orchestrator = ResearchOrchestrator(tmp_path)
@@ -193,7 +195,7 @@ def test_streamlit_has_one_product_entry_and_example_is_editable_without_auto_ru
         )
         from streamlit.testing.v1 import AppTest
 
-        app = AppTest.from_file("app_streamlit.py").run(timeout=20)
+        app = AppTest.from_file(APP_STREAMLIT_PATH).run(timeout=20)
     assert not app.exception
     assert [title.value for title in app.title] == ["AI Scientist"]
     assert not any(radio.label == "产品入口" for radio in app.radio)
@@ -216,7 +218,7 @@ def test_streamlit_has_one_product_entry_and_example_is_editable_without_auto_ru
     ).value is False
     assert not app.exception
 
-    own = AppTest.from_file("app_streamlit.py").run(timeout=20)
+    own = AppTest.from_file(APP_STREAMLIT_PATH).run(timeout=20)
     own_question = next(area for area in own.text_area if area.label.startswith("科学问题"))
     own_question.set_value("用户已经输入的研究问题").run(timeout=20)
     next(button for button in own.button if button.label.startswith("加载示例")).click().run(timeout=20)
@@ -486,7 +488,7 @@ def test_existing_project_workspace_does_not_nest_streamlit_expanders(
         return SuccessfulResponse([] if url.endswith("/events") else {})
 
     monkeypatch.setattr("requests.get", fake_get)
-    app = AppTest.from_file("app_streamlit.py")
+    app = AppTest.from_file(APP_STREAMLIT_PATH)
     app.session_state["research_project_id"] = "project_test"
     app.session_state["research_project"] = {
         "project_id": "project_test",
@@ -524,7 +526,7 @@ def test_rejected_source_card_does_not_nest_streamlit_expanders(
         return SuccessfulResponse([] if url.endswith("/events") else {})
 
     monkeypatch.setattr("requests.get", fake_get)
-    app = AppTest.from_file("app_streamlit.py")
+    app = AppTest.from_file(APP_STREAMLIT_PATH)
     app.session_state["research_project_id"] = "project_test"
     app.session_state["research_project"] = {
         "project_id": "project_test",

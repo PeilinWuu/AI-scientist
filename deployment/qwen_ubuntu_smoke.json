@@ -1,0 +1,10 @@
+{
+  "provider": "Alibaba Cloud Bailian / Qwen",
+  "model": "qwen3.8-max",
+  "safe_endpoint": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+  "timestamp": "2026-09-02T04:17:43.534355+00:00",
+  "latency_ms": 1871,
+  "success": true,
+  "response_marker": "QWEN_UBUNTU_OK",
+  "status": "PASSED"
+}

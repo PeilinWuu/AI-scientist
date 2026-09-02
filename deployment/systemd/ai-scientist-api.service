@@ -1,0 +1,18 @@
+[Unit]
+Description=AI Scientist FastAPI service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=aiscientist
+Group=aiscientist
+WorkingDirectory=/opt/ai-scientist
+EnvironmentFile=/etc/ai-scientist/ai-scientist.env
+ExecStart=/opt/ai-scientist/.venv/bin/python -m uvicorn src.main_api:app --host 127.0.0.1 --port 8000 --proxy-headers
+Restart=always
+RestartSec=5
+UMask=0027
+
+[Install]
+WantedBy=multi-user.target

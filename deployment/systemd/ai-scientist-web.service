@@ -1,0 +1,18 @@
+[Unit]
+Description=AI Scientist Streamlit web service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=aiscientist
+Group=aiscientist
+WorkingDirectory=/opt/ai-scientist
+EnvironmentFile=/etc/ai-scientist/ai-scientist.env
+ExecStart=/opt/ai-scientist/.venv/bin/streamlit run /opt/ai-scientist/app_streamlit.py --server.address 127.0.0.1 --server.port 8501 --server.headless true
+Restart=always
+RestartSec=5
+UMask=0027
+
+[Install]
+WantedBy=multi-user.target
