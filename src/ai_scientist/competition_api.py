@@ -35,7 +35,7 @@ def competition_readiness() -> dict:
         "status": "ready",
         "execution_backend": "controlled_local_deterministic",
         "arbitrary_code_execution": False,
-        "output_root": str(root),
+        "output_root": "competition/1b/api_demo",
         "output_root_writable": _writable(root),
     }
 
