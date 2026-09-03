@@ -176,3 +176,19 @@ def test_planning_only_missing_execution_tools_does_not_fail_review(tmp_path: Pa
     assert result["current_phase"] == ResearchPhase.HUMAN_APPROVAL.value
     assert project.phase == ResearchPhase.HUMAN_APPROVAL
     assert project.planning_only is True
+
+
+def test_critical_rereview_approval_still_requires_human_approval(tmp_path: Path) -> None:
+    orchestrator = ResearchOrchestrator(tmp_path)
+    project, fake_run_agent = ready_project(orchestrator, "approve")
+    project.phase = ResearchPhase.CRITICAL_REVIEW
+    orchestrator.store.save(project)
+    orchestrator._run_agent = fake_run_agent  # type: ignore[method-assign]
+
+    result = orchestrator.run_next_step(project.project_id)
+    updated = orchestrator.get_project(project.project_id)
+
+    assert result["current_phase"] == ResearchPhase.HUMAN_APPROVAL.value
+    assert updated.phase == ResearchPhase.HUMAN_APPROVAL
+    assert updated.approval_status == "pending"
+    assert updated.human_approval_history == []

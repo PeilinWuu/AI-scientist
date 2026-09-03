@@ -1,0 +1,35 @@
+{
+  "verification_id": "revision_verification_3de7dbe8192e41e682f156ebfb7fe297",
+  "action_id": "revision_batch_01fa1169c4a04a8885cca0bfc0ff6431",
+  "target_artifact": "study_design",
+  "artifact_version": 2,
+  "criteria_results": [
+    {
+      "criterion": "存在可核对的数据来源元信息记录。",
+      "passed": true,
+      "evidence": "new_artifact.population_or_system: “固定使用 UCI Machine Learning Repository 的 Iris Data Set 作为主数据源，文件名为 iris.data，访问入口为 https://archive.ics.uci.edu/ml/machine-learning-databases/iris/iris.data，并以执行当天的访问日期记录为审计字段。”; new_artifact.data_collection_plan[0]: “选择 UCI Machine Learning Repository 的 Iris Data Set，来源名称为 “Iris Data Set”，访问入口为 https://archive.ics.uci.edu/ml/machine-learning-databases/iris/iris.data；执行时记录实际访问日期和访问时间。”; new_artifact.data_collection_plan[1]: “版本或快照标识：以 “UCI ML Repository iris.data, accessed YYYY-MM-DD” 作为版本快照标识…”; new_artifact.data_collection_plan[2]: “许可说明：执行时核对并记录 UCI Machine Learning Repository 对 Iris Data Set 的使用条款…”; new_artifact.quality_controls[0]: “审计记录必须包含来源名称 “UCI Machine Learning Repository Iris Data Set”、URL …、访问日期、版本或快照标识和许可说明。”",
+      "note": "Deterministic: Advisory semantic token check; independent verification is authoritative. Independent: 来源名称、URL/访问路径、访问日期记录要求、版本/快照标识和许可说明均在新工件中显式给出。访问日期以执行时记录的要求形式固定为审计字段，属于规划工件中的可核对元信息定义，不是未执行的模型调用承诺。"
+    },
+    {
+      "criterion": "原始数据路径或等效获取方式已明确。",
+      "passed": true,
+      "evidence": "new_artifact.controls[1]: “原始下载文件保存为 data/raw/iris.data，且该文件设为只读或明确不得覆盖；任何清洗后数据写入 data/processed…”; new_artifact.data_collection_plan[3]: “将下载或导出的原始文件保存为 data/raw/iris.data，保持原始内容不变，并设置为只读或明确不得覆盖。”; new_artifact.quality_controls[1]: “原始文件固定保存为 data/raw/iris.data，且不得覆盖；所有后续分析从该只读原始文件派生。”; new_artifact.reproducibility_plan[1]: “data/raw/iris.data 为只读或不得覆盖…”",
+      "note": "Deterministic: Advisory semantic token check; independent verification is authoritative. Independent: 原始数据本地路径 data/raw/iris.data 和不可覆盖要求明确，且与远程获取入口配合形成等效获取方式。"
+    },
+    {
+      "criterion": "文件校验或次优版本控制信息已记录。",
+      "passed": true,
+      "evidence": "new_artifact.controls[2]: “优先记录 iris.data 的 SHA-256 校验和；若执行环境无法计算哈希，则必须记录文件大小、行数、字段名、记录数、访问日期和访问时间作为次优版本控制证据，并在审计日志中说明未获得哈希的原因。”; new_artifact.data_collection_plan[4]: “对 data/raw/iris.data 计算并保存 SHA-256 校验和；若无法计算，记录文件大小、行数、字段名、记录数和访问时间作为次优版本控制证据。”; new_artifact.quality_controls[2]: “优先记录 data/raw/iris.data 的 SHA-256；若不可行，必须记录文件大小、行数、字段名、记录数和访问时间作为次优版本控制证据…”",
+      "note": "Deterministic: Advisory semantic token check; independent verification is authoritative. Independent: 工件没有提供已实际计算出的哈希值，但规划层面已明确记录要求：优先 SHA-256，不可行时记录次优版本控制信息。该标准在规划工件中可按“信息记录要求已固定”满足。"
+    },
+    {
+      "criterion": "物种标签可用性已明确或已在限制中说明。",
+      "passed": true,
+      "evidence": "new_artifact.variables[2]: “分组变量：物种标签（species / class），类别型，对应原始文件第 5 列，取值为 Iris-setosa、Iris-versicolor、Iris-virginica…”; new_artifact.measurement_plan[5]: “本数据源包含物种标签，字段名记为 species 或 class，取值为 Iris-setosa、Iris-versicolor、Iris-virginica；执行时需记录每类样本量，并在审计日志中说明标签可用性。”; new_artifact.quality_controls[3]: “审计日志必须说明所选数据源包含物种标签，字段名为 species 或 class，并列出三类物种标签取值。”; new_artifact.reproducibility_plan[2]: “在审计日志中记录该数据源包含物种标签，字段名为 species 或 class…”",
+      "note": "Deterministic: Advisory semantic token check; independent verification is authoritative. Independent: 物种标签可用性、字段名和取值范围均已明确，并规定写入审计日志。"
+    }
+  ],
+  "overall_passed": true,
+  "verification_method": "deterministic+independent_qwen",
+  "verified_at": "2026-09-03T07:04:20.197559Z"
+}

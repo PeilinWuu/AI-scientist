@@ -1,0 +1,170 @@
+{
+  "claims": [
+    {
+      "claim_id": "claim_obs_001",
+      "statement": "observations.csv（asset_dcd2c33058f4486ba3f52e26ca21e878）包含360行数据，三列分别为time、displacement和clean_signal，无缺失值。",
+      "claim_type": "observation",
+      "importance": "high",
+      "status": "unsupported",
+      "dimension": "unspecified",
+      "supporting_evidence_ids": [],
+      "contradicting_evidence_ids": [],
+      "assumptions": [
+        "数据解析过程准确反映了文件内容"
+      ],
+      "limitations": [
+        "仅基于文件摘要，未进行完整数据验证",
+        "The model did not link this claim to a validated evidence record."
+      ]
+    },
+    {
+      "claim_id": "claim_obs_002",
+      "statement": "数据样本显示displacement值从0.970开始，随时间递减并呈现振荡特征，clean_signal与displacement数值接近但不完全相同。",
+      "claim_type": "observation",
+      "importance": "high",
+      "status": "unsupported",
+      "dimension": "unspecified",
+      "supporting_evidence_ids": [],
+      "contradicting_evidence_ids": [],
+      "assumptions": [
+        "样本行具有代表性"
+      ],
+      "limitations": [
+        "仅基于前10行样本，未分析全部数据分布",
+        "The model did not link this claim to a validated evidence record."
+      ]
+    },
+    {
+      "claim_id": "claim_inf_001",
+      "statement": "阻尼振子参数辨识问题需要在有界参数空间内进行搜索优化，damping∈[0.05, 0.35]，omega∈[2.0, 2.8]。",
+      "claim_type": "inference",
+      "importance": "high",
+      "status": "unsupported",
+      "dimension": "theoretical_concept",
+      "supporting_evidence_ids": [],
+      "contradicting_evidence_ids": [],
+      "assumptions": [
+        "建议范围足以包含真实参数值",
+        "有界搜索是满足约束的可接受方法"
+      ],
+      "limitations": [
+        "真实参数可能位于建议范围边界或之外",
+        "未考虑参数间的相关性",
+        "The model did not link this claim to a validated evidence record."
+      ]
+    },
+    {
+      "claim_id": "claim_inf_002",
+      "statement": "两阶段网格搜索策略可用于参数辨识：第一阶段粗网格定位低RMSE区域，第二阶段基于第一阶段结果细化搜索范围。",
+      "claim_type": "hypothesis",
+      "importance": "high",
+      "status": "partially_supported",
+      "dimension": "theoretical_concept",
+      "supporting_evidence_ids": [
+        "EVD-001"
+      ],
+      "contradicting_evidence_ids": [],
+      "assumptions": [
+        "参数空间存在局部最优区域",
+        "细化搜索能够进一步降低RMSE"
+      ],
+      "limitations": [
+        "未验证该策略对阻尼振子问题的具体效果",
+        "网格密度和细化规则需要实验确定"
+      ]
+    },
+    {
+      "claim_id": "claim_hyp_001",
+      "statement": "基于Peykarporsan等人(2026)的多阶段辨识框架理念，采用无导数优化方法可以避免噪声放大问题，提高参数辨识的鲁棒性。",
+      "claim_type": "hypothesis",
+      "importance": "medium",
+      "status": "partially_supported",
+      "dimension": "theoretical_concept",
+      "supporting_evidence_ids": [
+        "EVD-001"
+      ],
+      "contradicting_evidence_ids": [],
+      "assumptions": [
+        "网格搜索属于无导数方法",
+        "阻尼振子问题与同步发电机问题在噪声特性上具有可比性"
+      ],
+      "limitations": [
+        "两个问题的物理系统和参数类型差异较大",
+        "未直接验证该假设在当前问题中的适用性"
+      ]
+    },
+    {
+      "claim_id": "claim_con_001",
+      "statement": "在受控计算预算内，通过两阶段有界网格搜索可以降低阻尼振子参数辨识的拟合RMSE。",
+      "claim_type": "prediction",
+      "importance": "high",
+      "status": "unsupported",
+      "dimension": "theoretical_concept",
+      "supporting_evidence_ids": [],
+      "contradicting_evidence_ids": [],
+      "assumptions": [
+        "计算预算充足以覆盖关键参数区域",
+        "模型形式正确指定",
+        "噪声水平不会导致参数不可辨识"
+      ],
+      "limitations": [
+        "未经过实际实验验证",
+        "未考虑模型误设风险",
+        "未量化预期RMSE降低幅度"
+      ]
+    }
+  ],
+  "links": [
+    {
+      "claim_id": "claim_inf_002",
+      "evidence_id": "EVD-001",
+      "relation": "contextualizes",
+      "strength": 0.3,
+      "rationale": "EVD-001 提出了多阶段数据驱动参数辨识框架（三阶段），其思想与两阶段粗-细网格搜索策略在方法论层面具有概念上的相似性，但研究对象为同步发电机而非阻尼振子，且未涉及网格搜索或RMSE细化策略，因此仅能提供方法论背景而非直接支持。"
+    },
+    {
+      "claim_id": "claim_hyp_001",
+      "evidence_id": "EVD-001",
+      "relation": "contextualizes",
+      "strength": 0.35,
+      "rationale": "EVD-001 明确使用无导数状态一致性优化以解决噪声敏感性问题，这与'无导数方法可避免噪声放大'的假设方向一致；但该研究针对同步发电机的Port-Hamiltonian模型，与阻尼振子位移拟合问题在物理系统、模型结构和噪声特性上差异显著，故仅为弱语境化支持。"
+    },
+    {
+      "claim_id": "claim_obs_001",
+      "evidence_id": "EVD-001",
+      "relation": "insufficient",
+      "strength": null,
+      "rationale": "EVD-001 为同步发电机参数辨识研究，与 observations.csv 的数据结构和内容完全无关，无法为该数据观察提供任何支持或反驳。"
+    },
+    {
+      "claim_id": "claim_obs_002",
+      "evidence_id": "EVD-001",
+      "relation": "insufficient",
+      "strength": null,
+      "rationale": "EVD-001 不涉及阻尼振子位移时间序列的观测特征，无法对 displacement 的振荡衰减行为或 clean_signal 与 displacement 的关系提供任何证据。"
+    },
+    {
+      "claim_id": "claim_inf_001",
+      "evidence_id": "EVD-001",
+      "relation": "insufficient",
+      "strength": null,
+      "rationale": "EVD-001 讨论的是同步发电机参数辨识的有界优化与物理正则化，未涉及阻尼系数或角频率的有界搜索范围设定，无法直接支持本问题中 damping 和 omega 的有界范围推断。"
+    },
+    {
+      "claim_id": "claim_con_001",
+      "evidence_id": "EVD-001",
+      "relation": "insufficient",
+      "strength": null,
+      "rationale": "EVD-001 未研究两阶段网格搜索对拟合RMSE的影响，也未涉及受控计算预算下的优化效率问题，无法为'两阶段有界网格搜索可降低阻尼振子拟合RMSE'这一预测提供证据。"
+    }
+  ],
+  "unsupported_claim_ids": [
+    "claim_obs_001",
+    "claim_obs_002",
+    "claim_inf_001",
+    "claim_con_001"
+  ],
+  "disputed_claim_ids": [],
+  "evidence_coverage": 0.15,
+  "display_markdown": "## Claim-Evidence Mapping Summary\n\n### Evidence Pool\n- **EVD-001**: Peykarporsan et al. (2026) — 三阶段数据驱动同步发电机参数辨识框架，使用无导数优化与物理正则化。与目标问题（阻尼振子两阶段网格搜索）在物理系统和参数类型上差异显著，仅提供弱方法论语境化支持。\n\n### Claims Overview\n| Claim ID | Type | Status | Dimension |\n|---|---|---|---|\n| claim_obs_001 | observation | unsupported | unspecified |\n| claim_obs_002 | observation | unsupported | unspecified |\n| claim_inf_001 | inference | unsupported | theoretical_concept |\n| claim_inf_002 | hypothesis | partially_supported | theoretical_concept |\n| claim_hyp_001 | hypothesis | partially_supported | theoretical_concept |\n| claim_con_001 | prediction | unsupported | theoretical_concept |\n\n### Key Findings\n- **claim_obs_001 / claim_obs_002**: 关于 observations.csv 的数据结构与内容观察，当前证据集中无任何相关文献或数据验证记录，状态为 unsupported。\n- **claim_inf_001**: 有界参数范围的推断仅来自任务约束，无外部文献支持 damping∈[0.05, 0.35] 或 omega∈[2.0, 2.8] 的充分性。\n- **claim_inf_002**: 两阶段网格搜索策略可从 EVD-001 的多阶段框架理念中获得弱概念支持（contextualizes），但缺乏针对阻尼振子的直接验证。\n- **claim_hyp_001**: 无导数方法抗噪声的假设可从 EVD-001 的无导数状态一致性优化中获得弱语境化支持，但物理系统差异导致外推风险高。\n- **claim_con_001**: 关于受控预算下两阶段搜索降低RMSE的预测，当前无直接证据支持，状态为 unsupported。\n\n### Evidence Gaps\n- 缺乏阻尼振子两阶段网格搜索的直接文献证据。\n- 缺乏基于第一阶段结果确定第二阶段细化范围的方法论指导。\n- 缺乏噪声水平对阻尼振子参数可辨识性影响的定量研究。\n- 缺乏计算预算约束下网格搜索效率优化的相关研究。\n\n### Evidence Coverage: 15%"
+}

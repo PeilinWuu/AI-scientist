@@ -1,0 +1,37 @@
+{
+  "selection": {
+    "primary_domain": "physics",
+    "secondary_domains": [
+      "mathematics",
+      "computer_science"
+    ],
+    "confidence": 0.94,
+    "selected_domain_skills": [
+      "damped oscillator modeling",
+      "parameter identification",
+      "time-series fitting",
+      "bounded grid search",
+      "RMSE evaluation",
+      "numerical optimization",
+      "experimental reproducibility",
+      "noise-aware data analysis"
+    ],
+    "clarification_needed": false,
+    "clarification_questions": []
+  },
+  "domain_resolution": {
+    "reported_primary_domain": "physics",
+    "reported_secondary_domains": [
+      "mathematics",
+      "computer_science"
+    ],
+    "canonical_primary_domain": "physics",
+    "canonical_secondary_domains": [
+      "general",
+      "computer_science"
+    ],
+    "loaded_domain_skill": "physics",
+    "fallback_used": false,
+    "mapping_reason": "Domain 'physics' is a registered skill."
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "evidence_ids": [
+    "EVD-001",
+    "EVD-002"
+  ],
+  "claims": [
+    {
+      "claim_id": "CLM-001",
+      "statement": "Simpson's paradox can occur when a confounding variable (such as species in the Iris dataset) is overlooked, potentially leading to misleading or reversed conclusions about the association between two variables.",
+      "status": "supported",
+      "supporting_evidence_ids": [
+        "EVD-001"
+      ],
+      "contradicting_evidence_ids": []
+    },
+    {
+      "claim_id": "CLM-002",
+      "statement": "When analyzing the Iris dataset, distance-based or correlation-based methods may be sensitive to the scale and units of sepal length and petal length measurements, though both are typically measured in centimeters.",
+      "status": "partially_supported",
+      "supporting_evidence_ids": [
+        "EVD-002"
+      ],
+      "contradicting_evidence_ids": []
+    },
+    {
+      "claim_id": "CLM-003",
+      "statement": "To obtain unconfounded estimates of the association between sepal length and petal length in the Iris dataset, species should be incorporated as a stratification or grouping variable in the analysis.",
+      "status": "supported",
+      "supporting_evidence_ids": [
+        "EVD-001"
+      ],
+      "contradicting_evidence_ids": []
+    }
+  ],
+  "links": [
+    {
+      "claim_id": "CLM-001",
+      "evidence_id": "EVD-001",
+      "relation": "supports"
+    },
+    {
+      "claim_id": "CLM-002",
+      "evidence_id": "EVD-002",
+      "relation": "supports"
+    },
+    {
+      "claim_id": "CLM-003",
+      "evidence_id": "EVD-001",
+      "relation": "supports"
+    }
+  ]
+}

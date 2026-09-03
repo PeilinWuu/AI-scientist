@@ -1,0 +1,55 @@
+{
+  "evidence_quality_score": 4.5,
+  "methodological_validity_score": 8.5,
+  "feasibility_score": 5.5,
+  "reproducibility_score": 8.0,
+  "claim_support_score": 5.0,
+  "uncertainty_handling_score": 8.5,
+  "blocking_issues": [
+    "受控工具或人工执行尚未产生任何完整数据质检、Round 1 网格搜索、Round 2 范围推导、Round 2 网格搜索和预算审计的实际记录；在执行证据补齐前，不得批准任何关于阻尼系数、角频率或两轮 RMSE 比较的正式结论。",
+    "外部证据仅能作为一般背景支持，未提供本数据集会降低阻尼振子拟合 RMSE 的直接证据。",
+    "数据观察仍基于上传文件的解析摘要，未链接到完整执行的数据质检记录；解析摘要不能替代对完整文件的验证。"
+  ],
+  "non_blocking_issues": [
+    "analysis_plan 的 STAT-013 将固定系数诊断位置描述为代表性边界中心点，而 ROB-008 描述为 Round 1 最优网格点；两者均属于预算不超过 20 次、不得改变正式结果的诊断对照，但执行前应选定唯一文本规则以避免自由裁量。",
+    "study_design 中仍存在“默认每侧约一个 Round 1 网格步长，最大不超过 1.5 倍步长”的表述，与 analysis_plan STAT-006“每侧恰好一个 Round 1 网格步长、不得使用 1.5 倍或事后选择宽度”存在轻微不一致；该问题不应阻塞当前 analysis_plan 修订闭环，但后续应统一文本。"
+  ],
+  "recommendations": [
+    "在后续执行阶段仅当生成可追溯的数据质检记录、Round 1 网格级记录、Round 2 范围推导记录、Round 2 网格级记录和预算审计记录后，才可解除正式结论暂停状态。",
+    "在执行前将诊断对照的固定系数评估点统一为一个预登记位置，建议采用 Round 1 正式最优点，以保持与 ROB-008 一致；若保留 STAT-013 的代表性边界中心点，则应修订 ROB-008。",
+    "在后续同步 study_design 与 analysis_plan 时，删除“最大不超过 1.5 倍步长”的可选表述，统一为“每侧恰好一个 Round 1 网格步长并裁剪回原始边界”。",
+    "最终报告中应明确：当前审查仅确认 analysis_plan 的阈值、奇异矩阵处理、重复评估、诊断预算和成功/失败标准已预登记；不等同于实际执行已完成。"
+  ],
+  "decision": "revise_analysis",
+  "failed_quality_gates": [
+    "reviewer_score_below_6",
+    "blocking_issues_present"
+  ],
+  "required_revision_target": "analysis",
+  "revision_plan": [
+    {
+      "target": "analysis",
+      "priority": 1,
+      "reason": "分析计划已预登记，但缺少实际执行证据，不能批准正式结论；必须补齐可追溯执行记录。",
+      "required_changes": [
+        "生成完整数据质检记录，覆盖上传文件解析、字段可用性、缺失值和时间序列完整性检查。",
+        "执行 Round 1 81 点网格搜索并保留逐点 RMSE、参数、条件数与数值异常记录。",
+        "根据 Round 1 结果按预登记规则推导 Round 2 范围，并保留推导过程记录。",
+        "执行 Round 2 225 点网格搜索并保留逐点结果记录。",
+        "生成预算审计记录，确认正式评估总数不超过 306 次。",
+        "统一诊断对照固定系数评估位置的文本规则，避免 STAT-013 与 ROB-008 不一致。"
+      ],
+      "completion_criteria": [
+        "存在可追溯的数据质检记录。",
+        "存在 Round 1 和 Round 2 的网格级执行记录。",
+        "存在 Round 2 范围推导记录。",
+        "存在预算审计记录且正式评估不超过 306 次。",
+        "诊断对照预算不超过 20 次且明确标注为验证性诊断。",
+        "正式拟合与正式评价仅使用 time 与 displacement，clean_signal 仅用于诊断参考。"
+      ],
+      "action_id": "REV-ANALYSIS-001",
+      "status": "pending"
+    }
+  ],
+  "approval_conditions": []
+}

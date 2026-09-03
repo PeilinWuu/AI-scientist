@@ -17,6 +17,7 @@ from pydantic import BaseModel, ValidationError
 from src.ai_scientist.exceptions import StructuredOutputError
 from src.ai_scientist.model_registry import ModelRegistry
 from src.ai_scientist.schemas import utc_now
+from src.model_utils import model_max_retries
 
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
@@ -200,7 +201,7 @@ class StructuredQwenClient:
                 os.getenv("LLM_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
             ),
             http_client=self.http_client,
-            max_retries=0,
+            max_retries=model_max_retries(),
         )
         return self.client
 

@@ -1,0 +1,14 @@
+{
+  "rows": 360,
+  "columns": 3,
+  "column_names": [
+    "time",
+    "displacement",
+    "clean_signal"
+  ],
+  "dtypes": {
+    "time": "float64",
+    "displacement": "float64",
+    "clean_signal": "float64"
+  }
+}

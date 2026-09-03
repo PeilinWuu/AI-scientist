@@ -1,0 +1,49 @@
+{
+  "execution_id": "execution_1e61031326ec4f4ba183dbe6328d87d0",
+  "request_id": "request_62451c7f5c96436e8596598568c58342",
+  "operation": "inspect_dataset",
+  "status": "success",
+  "started_at": "2026-09-03T10:00:55.734762Z",
+  "finished_at": "2026-09-03T10:00:55.736852Z",
+  "duration_ms": 2,
+  "seed": 20260831,
+  "input_fingerprint": "352c1885daa6bcfd9b07c12fc6c9a36a57592af55b068d875f4a8157b2a15b87",
+  "input_checksums": {
+    "dataset_path": "28e63e8e1eca683b4e7254de8c4407032710eb3b81c14c506ab2ea1920f5e11d"
+  },
+  "actual_parameters": {},
+  "software_versions": {
+    "python": "3.10.12",
+    "numpy": "2.2.6",
+    "pandas": "2.3.3",
+    "platform": "linux"
+  },
+  "metrics": {
+    "rows": 360,
+    "columns": 3,
+    "column_names": [
+      "time",
+      "displacement",
+      "clean_signal"
+    ],
+    "dtypes": {
+      "time": "float64",
+      "displacement": "float64",
+      "clean_signal": "float64"
+    }
+  },
+  "artifacts": [
+    {
+      "artifact_id": "artifact_e431d99e10784b5db84611b806376be6",
+      "artifact_type": "dataset_inspection",
+      "relative_path": "input/inspection/dataset_inspection.json",
+      "media_type": "application/json",
+      "checksum_sha256": "084d6839113dfd5bbbb2e79a89696a4ccb99199b89aa51e184c421a4848c3cf6",
+      "size_bytes": 212
+    }
+  ],
+  "run_log": [
+    "Inspected 360 rows and 3 columns."
+  ],
+  "failure_reason": null
+}

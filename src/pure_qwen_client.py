@@ -9,6 +9,8 @@ import httpx
 from dotenv import load_dotenv
 from openai import OpenAI
 
+from src.model_utils import model_max_retries
+
 ROOT_DIR = Path(__file__).resolve().parents[1]
 load_dotenv(ROOT_DIR / ".env")
 
@@ -35,6 +37,7 @@ class PureQwenClient:
             api_key=api_key,
             base_url=self.base_url,
             http_client=self.http_client,
+            max_retries=model_max_retries(),
         )
 
     def chat(self, messages: list[dict[str, str]], model: str | None = None) -> str:

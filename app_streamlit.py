@@ -24,6 +24,9 @@ from src.ai_scientist.presentation import (
     research_mode_label,
     render_event_dict,
     render_project_overview,
+    model_service_error_message,
+    safe_error_debug_details,
+    research_step_action_state,
     status_label,
     user_error_message,
 )
@@ -705,6 +708,7 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
         if st.button("加载项目"):
             try:
                 st.session_state.research_project_id = existing_project_id.strip()
+                st.session_state.research_job_id = None
                 refresh_research_project(backend_url)
                 st.rerun()
             except BackendAPIError as exc:
@@ -810,6 +814,7 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
                     payload,
                 )
                 st.session_state.research_project_id = created["project_id"]
+                st.session_state.research_job_id = None
                 saved, upload_errors = _save_research_assets(
                     backend_url,
                     created["project_id"],
@@ -1101,7 +1106,16 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
     human_gate = project.get("phase") in {
         "SEARCH_PLAN_REVIEW", "HUMAN_SOURCE_REVIEW", "HUMAN_REVISION_REVIEW", "HUMAN_APPROVAL"
     }
-    if action_columns[0].button("运行下一阶段", type="primary", disabled=job_running or human_gate):
+    action = research_step_action_state(
+        str(project.get("phase") or ""),
+        str(active_job.get("status")) if active_job else None,
+        human_gate=human_gate,
+    )
+    if action_columns[0].button(
+        action["label"],
+        type="primary",
+        disabled=action["disabled"],
+    ):
         _start_research_step_job(backend_url, project["project_id"])
     if project.get("phase") == "HUMAN_REVISION_REVIEW":
         st.info("当前需要您审查独立审查员提出的修订建议。请先在上方逐项决定如何处理。")
@@ -1995,18 +2009,18 @@ def _render_research_job_status(backend_url: str, project: dict, show_debug: boo
             st.success("当前研究阶段已完成。")
         st.rerun()
     if status == "failed":
-        st.session_state.research_job_id = None
         error = job.get("error") or {}
-        message = str(error.get("error_message") or "")
         stage_substep = str(error.get("stage_substep") or "")
-        if "timeout" in message.lower():
-            st.error("Qwen 模型调用超时。已批准的修订计划会被保留，刷新后可直接重试，不消耗新的修订轮次。")
+        error_type = str(error.get("error_type") or "")
+        error_message = str(error.get("error_message") or "")
+        fingerprint = f"{error_type} {error_message}".lower()
+        st.error("本阶段执行失败，但项目数据和上一个完整阶段均已保留，可以直接重试。")
+        if any(marker in fingerprint for marker in ("timeout", "connection", "network", "ratelimit", "429")):
+            st.warning(model_service_error_message(error))
         elif stage_substep:
-            st.error(_research_failure_message(stage_substep))
-        else:
-            st.error("研究阶段执行失败，项目保留在上一个已完成阶段。")
-        if show_debug:
-            render_debug_object(job)
+            st.warning(_research_failure_message(stage_substep))
+        with st.expander("错误详情 / 调试信息", expanded=False):
+            st.json(safe_error_debug_details(error))
     elif show_debug:
         render_debug_object(job)
     return job

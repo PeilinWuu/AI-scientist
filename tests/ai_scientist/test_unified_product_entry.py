@@ -557,6 +557,77 @@ def test_rejected_source_card_does_not_nest_streamlit_expanders(
     assert any("AI 建议排除（1）" in item.value for item in app.markdown)
 
 
+def test_failed_job_ui_retries_the_same_project_without_showing_cancelled_state(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from streamlit.testing.v1 import AppTest
+
+    calls: list[str] = []
+
+    class SuccessfulResponse:
+        ok = True
+        status_code = 200
+        text = ""
+
+        def __init__(self, payload: object) -> None:
+            self.payload = payload
+
+        def json(self) -> object:
+            return self.payload
+
+    failed_job = {
+        "job_id": "job_failed",
+        "project_id": "project_retry",
+        "phase": "BACKGROUND_RESEARCH",
+        "status": "failed",
+        "error": {"error_type": "APITimeoutError", "error_message": "request timeout"},
+    }
+
+    def fake_get(url: str, **_: object) -> SuccessfulResponse:
+        if "/api/research/jobs/" in url:
+            return SuccessfulResponse(failed_job)
+        return SuccessfulResponse([] if url.endswith("/events") else {})
+
+    def fake_post(url: str, **_: object) -> SuccessfulResponse:
+        calls.append(url)
+        return SuccessfulResponse({
+            "job_id": "job_retry",
+            "project_id": "project_retry",
+            "phase": "BACKGROUND_RESEARCH",
+            "status": "queued",
+        })
+
+    monkeypatch.setattr("requests.get", fake_get)
+    monkeypatch.setattr("requests.post", fake_post)
+    app = AppTest.from_file(APP_STREAMLIT_PATH)
+    app.session_state["research_project_id"] = "project_retry"
+    app.session_state["research_job_id"] = "job_failed"
+    app.session_state["research_project"] = {
+        "project_id": "project_retry",
+        "phase": "BACKGROUND_RESEARCH",
+        "planning_only": True,
+        "iteration": 0,
+        "budget": {"used_model_calls": 1, "max_model_calls": 10},
+        "quality_metrics": {},
+        "research_assets": [],
+    }
+
+    app.run(timeout=20)
+
+    assert not app.exception
+    assert any(button.label == "🔄 重试本阶段" for button in app.button)
+    visible_text = "\n".join(
+        str(item.value) for collection in (app.error, app.warning, app.markdown) for item in collection
+    )
+    assert "本阶段执行失败" in visible_text
+    assert "项目已取消" not in visible_text
+
+    next(button for button in app.button if button.label == "🔄 重试本阶段").click().run(timeout=20)
+
+    assert calls == ["http://localhost:8000/api/research/project_retry/step_async"]
+    assert app.session_state["research_project_id"] == "project_retry"
+
+
 def test_openapi_retains_benchmark_verification_but_streamlit_has_no_demo_product() -> None:
     paths = set(main_api.app.openapi()["paths"])
     source = Path("app_streamlit.py").read_text(encoding="utf-8")

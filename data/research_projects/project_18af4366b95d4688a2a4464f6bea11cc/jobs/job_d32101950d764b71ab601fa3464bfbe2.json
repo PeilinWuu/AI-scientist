@@ -1,0 +1,30 @@
+{
+  "job_id": "job_d32101950d764b71ab601fa3464bfbe2",
+  "project_id": "project_18af4366b95d4688a2a4464f6bea11cc",
+  "phase": "QUESTION_FORMULATION",
+  "status": "completed",
+  "started_at": "2026-09-03T06:18:46.434416Z",
+  "finished_at": "2026-09-03T06:20:24.004113Z",
+  "error": null,
+  "result": {
+    "project_id": "project_18af4366b95d4688a2a4464f6bea11cc",
+    "previous_phase": "QUESTION_FORMULATION",
+    "current_phase": "RESEARCH_MODE_SELECTION",
+    "stage_status": "completed",
+    "produced_artifacts": [
+      "artifact_76385721f06f4c19adb0b6e4c2d4fd01"
+    ],
+    "human_actions_required": [
+      "请确认希望使用的公开 Iris 数据来源或镜像；若未指定，是否允许选择常见公开数据源并记录访问日期和版本？",
+      "是否需要按物种分别报告萼片长度与花瓣长度的关联，还是仅报告整体样本关联？",
+      "可复现材料是否必须包含可运行代码，还是接受分析方案、伪代码和流程说明？",
+      "是否需要在相关分析之外进行线性回归、稳健相关或模型诊断？",
+      "随机种子模式为 auto：是否允许在出现随机步骤时采用固定默认种子，并在审计记录中说明种子选择？"
+    ],
+    "review_decision": null,
+    "revision_required": false,
+    "blocking_issues": [],
+    "iteration": 0,
+    "max_revision_exhausted": false
+  }
+}

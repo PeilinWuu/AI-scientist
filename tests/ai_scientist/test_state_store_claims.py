@@ -244,3 +244,52 @@ def test_research_plan_report_declares_no_real_execution() -> None:
     report = build_research_plan_markdown(item)
     assert "No real experiment, simulation, or data analysis has been executed" in report
     assert "must not be treated as an experimental conclusion" in report
+
+
+def test_research_plan_report_renders_controlled_execution_results() -> None:
+    item = project(ResearchPhase.COMPLETED)
+    item.executor_binding = "damped_oscillator_v1"
+    item.internal_execution_summary = {
+        "executor_binding": "damped_oscillator_v1",
+        "run_id": "run-1",
+        "status": "complete",
+        "seed": 17,
+        "observation_asset_id": "asset-1",
+        "round_1": {
+            "execution_id": "exec-1",
+            "actual_parameters": {
+                "damping_min": 0.05,
+                "damping_max": 0.35,
+                "omega_min": 2.0,
+                "omega_max": 2.8,
+            },
+            "metrics": {"best_damping": 0.2, "best_omega": 2.4, "rmse": 0.057, "evaluations": 63},
+        },
+        "round_2": {
+            "execution_id": "exec-2",
+            "actual_parameters": {
+                "damping_min": 0.15,
+                "damping_max": 0.25,
+                "omega_min": 2.3,
+                "omega_max": 2.5,
+            },
+            "metrics": {"best_damping": 0.17, "best_omega": 2.36, "rmse": 0.033, "evaluations": 121},
+        },
+        "comparison": {
+            "iteration": {
+                "absolute_rmse_gain": 0.024,
+                "relative_rmse_gain_percent": 42.1,
+                "round_1_evaluations": 63,
+                "round_2_evaluations": 121,
+            }
+        },
+    }
+
+    report = build_research_plan_markdown(item)
+
+    assert "No real experiment, simulation, or data analysis has been executed" not in report
+    assert "## Controlled Execution Results" in report
+    assert "`run-1`" in report
+    assert "0.057" in report
+    assert "0.033" in report
+    assert "Total two-round evaluations: `184`" in report

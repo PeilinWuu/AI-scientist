@@ -113,6 +113,11 @@ LLM_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 RESPONSES_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 QWEN_SEARCH_ENABLE_WEB_EXTRACTOR=auto
 LLM_TIMEOUT=120
+AI_SCIENTIST_MODEL_TIMEOUT=1800
+AI_SCIENTIST_MODEL_MAX_RETRIES=1
+AI_SCIENTIST_SEARCH_QUERY_TIMEOUT=120
+AI_SCIENTIST_EXTRACTION_TIMEOUT=300
+AI_SCIENTIST_FRONTEND_STEP_TIMEOUT=1800
 ```
 
 Search tool compatibility depends on the API gateway. With `QWEN_SEARCH_ENABLE_WEB_EXTRACTOR=auto`, the official DashScope endpoint sends both `web_search` and `web_extractor`; other OpenAI-compatible gateways send only `web_search`. Set the value explicitly to `true` or `false` only when the gateway documentation confirms its supported Responses API tools.
@@ -137,6 +142,9 @@ AI_SCIENTIST_MAX_MODEL_CALLS=50
 AI_SCIENTIST_MAX_ITERATIONS=2
 AI_SCIENTIST_PROJECTS_DIR=data/research_projects
 AI_SCIENTIST_STRUCTURED_RETRY=1
+AI_SCIENTIST_MODEL_MAX_RETRIES=1
+AI_SCIENTIST_MODEL_TIMEOUT=1800
+AI_SCIENTIST_FRONTEND_STEP_TIMEOUT=1800
 AI_SCIENTIST_DEFAULT_PLANNING_ONLY=true
 AI_SCIENTIST_SEARCH_QUERY_TIMEOUT=120
 AI_SCIENTIST_EXTRACTION_TIMEOUT=300
@@ -197,6 +205,28 @@ Streamlit opens directly into the single `AI Scientist` product. Enter a scienti
 question, optionally upload research materials, choose advanced reproducibility
 settings, and create a persisted project. The damped-oscillator competition case is
 available only as an editable example loader and never runs automatically.
+
+For the verified Ubuntu deployment configuration, copy the committed template and
+fill only the Qwen API key. All non-secret model, timeout, search, parsing, and project
+storage defaults used by the completed frontend acceptance run are already present.
+
+```bash
+cp .env.example .env
+# Edit only DASHSCOPE_API_KEY= in .env, then start the backend and frontend.
+```
+
+Two completed execution projects are committed under `data/research_projects/` and
+can be loaded from the Streamlit field **加载已有项目 ID** immediately after checkout:
+
+- Iris controlled execution: `project_f9374def244c4829b4b8d8c52f4d56d2`
+- Damped-oscillator controlled execution: `project_ef11806974554b058250cde26681bd16`
+
+An earlier Iris planning-only acceptance snapshot is also retained as
+`project_18af4366b95d4688a2a4464f6bea11cc` for auditing the planning and approval path.
+
+These are acceptance snapshots, not universal scientific validation. The oscillator
+snapshot includes the input data, execution audit trail, two-round fit artifacts, and
+the final downloadable report.
 
 ### Project reference and data uploads
 

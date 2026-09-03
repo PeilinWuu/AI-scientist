@@ -1,0 +1,14 @@
+{
+  "plan_version": "baseline_one_shot_v1",
+  "task_id": "fit_damped_oscillator",
+  "damping_min": 0.05,
+  "damping_max": 0.35,
+  "damping_points": 14,
+  "omega_min": 2.0,
+  "omega_max": 2.8,
+  "omega_points": 13,
+  "success_rmse": 0.04,
+  "resource_budget_evaluations": 182,
+  "derived_from_execution_id": null,
+  "rationale": "One-shot uniform grid using approximately the same total evaluation budget without feedback."
+}

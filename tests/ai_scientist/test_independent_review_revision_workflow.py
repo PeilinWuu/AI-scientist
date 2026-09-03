@@ -474,6 +474,74 @@ def test_verified_revision_rereview_converges_new_method_suggestions_to_non_bloc
     assert "Add another optional sensitivity analysis." in converged.non_blocking_issues
 
 
+def test_verified_revision_does_not_require_execution_results_before_approval(
+    tmp_path: Path,
+) -> None:
+    orchestrator = ResearchOrchestrator(tmp_path)
+    project = _completed_verified_revision(orchestrator)
+    project.planning_only = False
+    project.execution_capability = "INTERNAL_EXECUTABLE"
+    project.executor_binding = "damped_oscillator_v1"
+    review = ReviewResult(
+        evidence_quality_score=4.5,
+        methodological_validity_score=8.5,
+        feasibility_score=5.5,
+        reproducibility_score=8,
+        claim_support_score=5,
+        uncertainty_handling_score=8.5,
+        blocking_issues=[
+            "Round 1 and Round 2 execution records do not exist yet, so execution cannot be approved."
+        ],
+        decision="revise_analysis",
+        failed_quality_gates=["reviewer_score_below_6", "blocking_issues_present"],
+        required_revision_target="analysis",
+    )
+
+    converged = orchestrator._converge_verified_revision_review(project, review)
+
+    assert converged.decision == "approve"
+    assert converged.blocking_issues == []
+    assert converged.failed_quality_gates == []
+    assert converged.evidence_quality_score == 6
+    assert converged.feasibility_score == 6
+    assert converged.claim_support_score == 6
+    assert review.blocking_issues[0] in converged.non_blocking_issues
+
+
+def test_verified_revision_project_recovers_from_existing_human_intervention(
+    tmp_path: Path,
+) -> None:
+    orchestrator = ResearchOrchestrator(tmp_path)
+    project = _completed_verified_revision(orchestrator)
+    project.phase = ResearchPhase.HUMAN_INTERVENTION_REQUIRED
+    project.planning_only = False
+    project.execution_capability = "INTERNAL_EXECUTABLE"
+    project.executor_binding = "damped_oscillator_v1"
+    project.reviews = [
+        ReviewResult(
+            evidence_quality_score=5,
+            methodological_validity_score=8,
+            feasibility_score=5,
+            reproducibility_score=8,
+            claim_support_score=5,
+            uncertainty_handling_score=8,
+            blocking_issues=["Execution results are missing before execution approval."],
+            decision="revise_analysis",
+            failed_quality_gates=["reviewer_score_below_6", "blocking_issues_present"],
+            required_revision_target="analysis",
+        )
+    ]
+    orchestrator.store.save(project)
+
+    result = orchestrator.run_next_step(project.project_id)
+    recovered = orchestrator.get_project(project.project_id)
+
+    assert result["current_phase"] == ResearchPhase.HUMAN_APPROVAL.value
+    assert result["stage_status"] == "verified_revision_review_recovered"
+    assert recovered.reviews[-1].decision == "approve"
+    assert recovered.approval_status == "pending"
+
+
 def test_verified_revision_does_not_override_integrity_blocker(tmp_path: Path) -> None:
     orchestrator = ResearchOrchestrator(tmp_path)
     project = _completed_verified_revision(orchestrator)

@@ -1,0 +1,56 @@
+{
+  "project_id": "project_ef11806974554b058250cde26681bd16",
+  "question_hash": "e02e10128d488739564a03c3f5ccdb9c345f44ed235b867551d4c1d377241ad2",
+  "search_plan_id": "sp_ef11806974554b058250cde26681bd16_v1",
+  "search_artifact_id": null,
+  "search_completed": false,
+  "normalization_completed": false,
+  "search_payload": null,
+  "search_plan": {
+    "search_plan_id": "sp_ef11806974554b058250cde26681bd16_v1",
+    "project_id": "project_ef11806974554b058250cde26681bd16",
+    "research_question_version": 1,
+    "question_hash": "e02e10128d488739564a03c3f5ccdb9c345f44ed235b867551d4c1d377241ad2",
+    "version": 1,
+    "generated_at": "2025-07-15T10:30:00Z",
+    "planner_model": "qwen3.7-plus",
+    "queries": [
+      "damped oscillator parameter identification bounded search grid refinement RMSE",
+      "two-stage parameter estimation noisy displacement observations damping coefficient angular frequency",
+      "coarse-to-fine grid search optimization under computational budget constraints",
+      "damped harmonic oscillator model fitting with bounded parameter ranges"
+    ],
+    "target_source_types": [
+      "peer_reviewed_papers",
+      "conference_proceedings",
+      "technical_reports"
+    ],
+    "preferred_databases": [
+      "arXiv",
+      "IEEE Xplore",
+      "ScienceDirect",
+      "SpringerLink"
+    ],
+    "date_constraints": [
+      "2015-01-01 to 2025-12-31"
+    ],
+    "maximum_queries": 4,
+    "rationale": "Queries target discrimination between bounded grid search methodologies for damped oscillator parameter identification, focusing on two-stage refinement strategies and RMSE minimization under computational constraints.",
+    "relevance_status": "relevant",
+    "relevance_note": "检索式覆盖核心概念：damped, damping, observations, oscillator。 The four queries collectively cover all core aspects of the research question: damped oscillator parameter identification, two-stage bounded grid search with refinement, handling of noisy displacement observations, and computational budget constraints for reducing RMSE. Each query aligns with the operational definitions and measurable success criteria specified in the research question.",
+    "approved_at": null,
+    "approved_by": null
+  },
+  "query_records": [],
+  "candidates": [],
+  "selected_candidates": [],
+  "source_selection_completed": false,
+  "awaiting_search_plan_review": true,
+  "search_plan_approved": false,
+  "awaiting_source_review": false,
+  "source_selection_id": null,
+  "extraction_completed": false,
+  "started_at": "2026-09-03T08:21:16.752203Z",
+  "last_activity_at": null,
+  "elapsed_seconds": 0.0
+}

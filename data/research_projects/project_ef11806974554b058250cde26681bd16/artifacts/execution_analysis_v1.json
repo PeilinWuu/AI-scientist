@@ -1,0 +1,102 @@
+{
+  "analysis_source": "internal_deterministic_executor",
+  "executor_binding": "damped_oscillator_v1",
+  "comparison": {
+    "iteration": {
+      "round_1_rmse": 0.05768367179165266,
+      "round_2_rmse": 0.03308926031835558,
+      "absolute_rmse_gain": 0.02459441147329708,
+      "relative_rmse_gain_percent": 42.636695462330316,
+      "round_1_parameter_l1_error": 0.05699999999999983,
+      "round_2_parameter_l1_error": 0.013000000000000206,
+      "round_1_evaluations": 63,
+      "round_2_evaluations": 121,
+      "limitation": "Round 2 adds execution cost and remains sensitive to the assumed oscillator model."
+    },
+    "baseline": {
+      "iterative_final_rmse": 0.03308926031835558,
+      "one_shot_baseline_rmse": 0.0504827477065955,
+      "iterative_advantage_rmse": 0.01739348738823992,
+      "iterative_parameter_l1_error": 0.013000000000000206,
+      "baseline_parameter_l1_error": 0.03761538461538441,
+      "iterative_total_evaluations": 184,
+      "baseline_total_evaluations": 182,
+      "constraint_satisfied": true
+    },
+    "provenance": {
+      "observation_execution_id": "execution_1e61031326ec4f4ba183dbe6328d87d0",
+      "round_1_execution_id": "execution_a6a224b7ebfa4135b68e438f9fd50576",
+      "round_2_execution_id": "execution_e1cf1311986a4e9f9c3b9c4aa46e3a9f",
+      "baseline_execution_id": "execution_b8b1bebb71f543fca89b9d34da8b0a9b"
+    }
+  },
+  "feedback_signals": [
+    {
+      "signal_id": "feedback_8f2d8416601a474cb04b52329a74d052",
+      "source_artifact_ids": [
+        "artifact_3cc087b25c744078afd93c7860b78b60",
+        "artifact_b64f97dfe4c64646ad5551a9b6127b7c",
+        "artifact_466edf6651e84f84962227e6a467a5f1"
+      ],
+      "observed_result": {
+        "rmse": 0.05768367179165266,
+        "best_damping": 0.2,
+        "best_omega": 2.4,
+        "evaluations": 63
+      },
+      "expected_result": {
+        "rmse_lte": 0.04
+      },
+      "quality_flags": [
+        "rmse_above_success_threshold"
+      ],
+      "trigger": "round_1_deterministic_fit_evaluation",
+      "confidence": 1.0
+    }
+  ],
+  "plan_adjustments": [
+    {
+      "adjustment_id": "adjustment_12f6a20aad264cf096c89332bd995019",
+      "target_task_id": "fit_damped_oscillator",
+      "field": "search_bounds_and_resolution",
+      "old_value": {
+        "damping": [
+          0.05,
+          0.35
+        ],
+        "omega": [
+          2.0,
+          2.8
+        ],
+        "points": [
+          7,
+          9
+        ]
+      },
+      "new_value": {
+        "damping": [
+          0.15000000000000002,
+          0.25
+        ],
+        "omega": [
+          2.3,
+          2.5
+        ],
+        "points": [
+          11,
+          11
+        ]
+      },
+      "reason": "Round 1 located an interior optimum; refine one coarse step around the observed best fit.",
+      "evidence_refs": [
+        "artifact_3cc087b25c744078afd93c7860b78b60",
+        "artifact_b64f97dfe4c64646ad5551a9b6127b7c",
+        "artifact_466edf6651e84f84962227e6a467a5f1"
+      ],
+      "decision": "modify"
+    }
+  ],
+  "dataset_asset_id": null,
+  "dataset_content_sha256": null,
+  "operations": []
+}

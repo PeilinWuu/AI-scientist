@@ -1,0 +1,17 @@
+{
+  "request_id": "request_62451c7f5c96436e8596598568c58342",
+  "operation": "inspect_dataset",
+  "inputs": {
+    "dataset_path": "input/observations.csv"
+  },
+  "parameters": {},
+  "expected_outputs": [
+    "dataset_profile.json"
+  ],
+  "provenance": {
+    "case": "damped_oscillator_parameter_identification",
+    "role": "project_observation_asset"
+  },
+  "seed": 20260831,
+  "output_directory": "input/inspection"
+}

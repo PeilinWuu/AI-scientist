@@ -1,0 +1,173 @@
+{
+  "evidence": [
+    {
+      "evidence_id": "EVD-001",
+      "title": "Simpson's paradox and experimental research",
+      "source_type": "unknown",
+      "source_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC2880329",
+      "source_asset_id": null,
+      "citation": "Ameringer, S., Serlin, R. C., & Ward, S. (2009). Simpson's paradox and experimental research. Nursing Research, 58(2), 123–127.",
+      "authors": [
+        "Suzanne Ameringer",
+        "Ronald C. Serlin",
+        "Sandra Ward"
+      ],
+      "doi": "10.1097/nnr.0b013e318199b517",
+      "pmid": "19289933",
+      "arxiv_id": null,
+      "official_record_url": null,
+      "journal_or_publisher": "Nursing Research",
+      "summary": "A methodological review describing Simpson's paradox as a case of extreme confounding caused by an overlooked confounding variable that is disproportionately allocated among groups. The paper discusses how this can lead to inferences that are the opposite of the correct conclusion and recommends incorporating confounding variables into analysis to obtain unconfounded estimates.",
+      "extracted_claims": [
+        "Simpson's paradox is a case of extreme confounding caused by an overlooked confounding variable.",
+        "Simpson's paradox can lead to an inference about an effect that is the exact opposite of the correct conclusion.",
+        "The paradox can be avoided by incorporating the confounding variable into analysis to obtain unconfounded estimates."
+      ],
+      "reliability": "high",
+      "relevance": "high",
+      "limitations": [
+        "The paper relies on hypothetical examples and theoretical discussion rather than empirical data analysis.",
+        "The paper focuses on experimental research in nursing rather than observational data analysis."
+      ],
+      "publication_date": "2009-03-01",
+      "publication_year": "2009",
+      "status": "verified",
+      "source_level": "A",
+      "is_primary_source": true,
+      "verified": true,
+      "verification_status": "verified",
+      "verification_method": "doi",
+      "verification_note": "DOI is present and normalized; source can be independently checked.",
+      "duplicate_of": null,
+      "retrieval_date": "2026-09-03T06:30:54.876450Z",
+      "reliability_score": 1.0,
+      "relevance_score": 1.0,
+      "selection_provenance": {
+        "selected_by": "human",
+        "selection_id": "source_selection_f54ce1988a354868a22432ef30e5c24d",
+        "candidate_id": "candidate_680dc684ac454eff9011518e1b01e01f",
+        "verification_method": "doi"
+      }
+    },
+    {
+      "evidence_id": "EVD-002",
+      "title": "Length-sepal (ScienceDirect Topics)",
+      "source_type": "unknown",
+      "source_url": "https://www.sciencedirect.com/topics/mathematics/length-sepal",
+      "source_asset_id": null,
+      "citation": "ScienceDirect Topics. Length-sepal. Mathematics section.",
+      "authors": [],
+      "doi": null,
+      "pmid": null,
+      "arxiv_id": null,
+      "official_record_url": "https://www.sciencedirect.com/topics/mathematics/length-sepal",
+      "journal_or_publisher": "Elsevier ScienceDirect",
+      "summary": "A conceptual overview explaining data science and mathematical concepts, using the Iris dataset as a reference to explain distance metrics. The entry highlights that distance measures like Euclidean distance can be misleading when attributes have heterogeneous scales and units, and that normalization or adjustment may be necessary.",
+      "extracted_claims": [
+        "Distance measures like Euclidean distance can be misleading when attributes have heterogeneous scales and units.",
+        "A small change in an attribute with a large scale might dominate distance calculation compared to a large change in an attribute with a small scale.",
+        "Distance-based mathematical methods are inherently sensitive to the scale and units of input features."
+      ],
+      "reliability": "medium",
+      "relevance": "medium",
+      "limitations": [
+        "Not a primary research study; it is a conceptual overview.",
+        "Does not provide empirical analysis of the Iris dataset."
+      ],
+      "publication_date": null,
+      "publication_year": null,
+      "status": "verified",
+      "source_level": "C",
+      "is_primary_source": false,
+      "verified": true,
+      "verification_status": "verified",
+      "verification_method": "official_url",
+      "verification_note": "Official or publisher-like URL is present.",
+      "duplicate_of": null,
+      "retrieval_date": "2026-09-03T06:28:40.023210Z",
+      "reliability_score": 0.7,
+      "relevance_score": 0.65,
+      "selection_provenance": {
+        "selected_by": "human",
+        "selection_id": "source_selection_f54ce1988a354868a22432ef30e5c24d",
+        "candidate_id": "candidate_b3fea28da38a4df68aad1494ca4fc9f1",
+        "verification_method": "official_url"
+      }
+    }
+  ],
+  "claims": [
+    {
+      "claim_id": "CLM-001",
+      "statement": "Simpson's paradox can occur when a confounding variable (such as species in the Iris dataset) is overlooked, potentially leading to misleading or reversed conclusions about the association between two variables.",
+      "claim_type": "inference",
+      "supporting_evidence_ids": [
+        "EVD-001"
+      ],
+      "contradicting_evidence_ids": [],
+      "confidence": 0.85,
+      "assumptions": [
+        "The Iris dataset contains species labels that may act as a confounding variable.",
+        "The association between sepal length and petal length may differ across species."
+      ],
+      "limitations": [
+        "This is a methodological inference, not an empirical finding from the Iris dataset itself.",
+        "The actual presence and magnitude of Simpson's paradox in the Iris dataset requires empirical verification."
+      ],
+      "status": "supported",
+      "dimension": "theoretical_concept"
+    },
+    {
+      "claim_id": "CLM-002",
+      "statement": "When analyzing the Iris dataset, distance-based or correlation-based methods may be sensitive to the scale and units of sepal length and petal length measurements, though both are typically measured in centimeters.",
+      "claim_type": "observation",
+      "supporting_evidence_ids": [
+        "EVD-002"
+      ],
+      "contradicting_evidence_ids": [],
+      "confidence": 0.7,
+      "assumptions": [
+        "Both sepal length and petal length are measured in the same units (centimeters) in the standard Iris dataset."
+      ],
+      "limitations": [
+        "The ScienceDirect entry discusses heterogeneous scales in general, not specifically the Iris dataset.",
+        "If both variables are in the same units, scale sensitivity may be less of a concern for correlation analysis."
+      ],
+      "status": "partially_supported",
+      "dimension": "theoretical_concept"
+    },
+    {
+      "claim_id": "CLM-003",
+      "statement": "To obtain unconfounded estimates of the association between sepal length and petal length in the Iris dataset, species should be incorporated as a stratification or grouping variable in the analysis.",
+      "claim_type": "hypothesis",
+      "supporting_evidence_ids": [
+        "EVD-001"
+      ],
+      "contradicting_evidence_ids": [],
+      "confidence": 0.8,
+      "assumptions": [
+        "Species is a potential confounding variable that affects both sepal length and petal length.",
+        "The association between sepal length and petal length may vary by species."
+      ],
+      "limitations": [
+        "This is a methodological recommendation based on theoretical principles, not empirical verification.",
+        "The actual need for stratification depends on the data structure and analysis goals."
+      ],
+      "status": "supported",
+      "dimension": "theoretical_concept"
+    }
+  ],
+  "evidence_gaps": [
+    "No direct empirical evidence from the Iris dataset itself is available in the selected sources.",
+    "The actual correlation coefficient between sepal length and petal length in the Iris dataset is not reported in the selected sources.",
+    "The magnitude and direction of species-specific associations are not documented in the selected sources.",
+    "No information is available about the specific data version, access date, or file checksum for reproducibility."
+  ],
+  "conflicting_evidence": [
+    "No direct conflicts were identified in the selected sources. However, the sources do not provide empirical data to confirm or refute the actual association between sepal length and petal length in the Iris dataset."
+  ],
+  "unsupported_claims": [
+    "The actual statistical association (correlation coefficient, regression slope) between sepal length and petal length in the Iris dataset cannot be supported by the selected sources.",
+    "The claim that Simpson's paradox actually occurs in the Iris dataset is not empirically verified by the selected sources."
+  ],
+  "confidence_summary": "The selected sources provide strong methodological guidance on the importance of accounting for confounding variables (such as species) when analyzing associations in the Iris dataset. However, the sources do not contain empirical data about the actual association between sepal length and petal length. Confidence is high (0.8-0.85) for methodological claims about confounding and stratification, but the actual statistical results require direct data analysis. The research plan should incorporate species stratification as a key analytical step to avoid potential confounding."
+}

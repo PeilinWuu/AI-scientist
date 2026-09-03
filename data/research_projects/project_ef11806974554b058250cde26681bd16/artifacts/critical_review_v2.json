@@ -1,0 +1,43 @@
+{
+  "evidence_quality_score": 6.0,
+  "methodological_validity_score": 6.0,
+  "feasibility_score": 7.0,
+  "reproducibility_score": 6.0,
+  "claim_support_score": 6.0,
+  "uncertainty_handling_score": 7.0,
+  "blocking_issues": [],
+  "non_blocking_issues": [
+    "基线对照使用了 182 次评估，略低于迭代流程的 184 次评估；该差异很小且结果仅用于诊断比较，但应在最终报告中明确总预算差异和基线不纳入正式成功判定。",
+    "EVD-001 与阻尼振子两阶段网格搜索的直接相关性有限，只能作为多阶段无导数辨识的一般背景，不能支持本任务的因果或效果结论。",
+    "CLM-001、CLM-002 等数据观察仍需要明确链接到解析资产或执行记录；当前不应将其表述为已完整验证的数据事实。",
+    "clean_signal 与位移的差异可作为诊断噪声量级，但必须在所有输出中标注为诊断参考，不能进入正式拟合目标或成功判定。",
+    "执行日志中的 seed=20260831 仅标识运行配置，不能描述为向确定性网格搜索或最小二乘引入随机性。",
+    "执行记录中的模型形式与分析计划预登记模型不一致：执行参数使用 amplitude=1.0、phase=0.2，且网格表要求记录 estimated_amplitude_A、estimated_phase_phi，未提供以 y_model(t)=exp(-damping*t)*(a*cos(omega*t)+b*sin(omega*t))+c 形式逐网格点确定性线性最小二乘估计 a、b、c 的证明。",
+    "缺少完整数据质检执行记录：虽然执行记录包含 observations_path 的 SHA-256 校验，但未记录实际读取行数、有效行数、time/displacement/clean_signal 范围、缺失计数、重复 time 计数、非有限值计数和排序状态，不能证明正式拟合前完成了数据质检。",
+    "预算审计记录不完整：总评估次数 184 次未超过 306 次上限，但 Round 1 实际执行 7×9=63 点、Round 2 实际执行 11×11=121 点，与计划版本 2 中固定为恰好 9×9=81 点和 15×15=225 点、总计 306 次的规则不一致，且未说明该偏离是否为已批准修订或需重新声明预算。",
+    "Round 2 范围推导与预登记细化规则存在形式偏离：实际边界为 damping=[0.15000000000000002,0.25]、omega=[2.3,2.5]，而按计划固定规则以 Round 1 最优点 (0.2,2.4) 为中心、每侧一个粗网格步长应得到约 [0.1625,0.2375] 和 [2.35,2.45]；现有解释为“refine one coarse step around the observed best fit”，但未给出逐步推导、裁剪记录和是否与低 RMSE 集合或触界规则对应的证明。",
+    "内部执行摘要缺少低 RMSE 集合、最低与次低网格点差异、条件数或奇异矩阵处理状态，导致无法完全判断参数不确定性和数值稳定性。"
+  ],
+  "recommendations": [
+    "补充与执行结果一致的模型说明：若执行工具实际采用振幅-相位形式且 amplitude=1.0、phase=0.2，必须说明其是否与预登记线性基函数形式等价；若不等价，需要将正式结论限制为该已执行模型，或重新执行符合预登记条件线性最小二乘模型的网格搜索。",
+    "补充完整数据质检表：基于 observations.csv 的实际读取结果记录行数、有效行数、列范围、缺失值计数、重复 time 计数、非有限值计数和排序状态，并声明正式拟合仅使用 time 与 displacement。",
+    "补充或修订预算审计：明确实际预算为 Round 1 63 次、Round 2 121 次、总计 184 次，并解释为何不同于已批准分析计划中的 81/225/306；若选择维持当前执行结果，将预算规则重新预登记为实际受控上限，避免事后标准不一致。",
+    "补充 Round 2 范围推导的逐步记录：输入中心 (0.2,2.4)、粗网格步长 0.05 与 0.1、选择每侧宽度的数值规则、裁剪前后边界、是否使用低 RMSE 集合、是否触界，并说明最终 [0.15000000000000002,0.25]×[2.3,2.5] 的来源。",
+    "补充网格级摘要中低 RMSE 集合、最低与次低网格点差异、最优是否触界、条件数或求解器警告；若不可获得，标记为诊断信息缺失并降低参数解释强度。",
+    "在最终报告中明确：Round 2 RMSE 低于 Round 1，但该结论仅适用于固定模型、固定数据列、固定边界和固定预算；不得将最优拟合解释为物理真值确认。"
+  ],
+  "decision": "approve",
+  "failed_quality_gates": [],
+  "required_revision_target": "none",
+  "revision_plan": [],
+  "approval_conditions": [
+    "补充模型一致性证明或重新执行符合预登记条件线性最小二乘模型的网格搜索。",
+    "补充完整数据质检记录。",
+    "补充与实际执行一致的预算审计记录。",
+    "补充 Round 2 范围推导的逐步追溯记录。",
+    "在最终报告中保留 clean_signal 仅用于诊断、最低 RMSE 不等于物理真值的限制声明。",
+    "Human-approved blocking issues passed criterion-level verification.",
+    "New non-integrity suggestions are retained as non-blocking follow-up items.",
+    "Planning-only limitations and execution prerequisites remain explicitly disclosed."
+  ]
+}

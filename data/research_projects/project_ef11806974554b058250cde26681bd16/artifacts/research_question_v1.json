@@ -1,0 +1,129 @@
+{
+  "research_question": {
+    "original_question": "研究如何从带噪位移观测中辨识阻尼振子的阻尼系数与角频率，并根据第一轮拟合结果调整第二轮参数搜索范围，在受控计算预算内降低拟合 RMSE。",
+    "normalized_question": "在给定含噪位移观测数据 observations.csv（asset_dcd2c33058f4486ba3f52e26ca21e878）的前提下，如何仅使用有界参数搜索，在 damping∈[0.05, 0.35]、omega∈[2.0, 2.8] 的建议初始范围内完成 Round 1 宽范围粗网格拟合，再依据 Round 1 实际拟合结果确定 Round 2 的细化搜索范围，从而在受控计算预算内降低阻尼振子模型对观测位移的拟合 RMSE？",
+    "question_type": "参数辨识与两阶段有界搜索优化",
+    "objective": "建立一个可复现的两阶段参数辨识流程：第一轮在宽范围内粗网格搜索阻尼系数与角频率，第二轮基于第一轮实际最优区域缩小并细化搜索范围，最终降低带噪位移观测下的拟合 RMSE。",
+    "scope": "仅处理 competition_1b_damped_oscillator 示例中的单自由度阻尼振子参数辨识；输入为已提供的 tabular 观测数据；方法限于有界参数搜索与拟合误差评估；输出为两轮搜索范围、候选参数、拟合 RMSE 及第二轮相对第一轮的提升证据。",
+    "operational_definitions": [
+      "阻尼振子模型：候选模型形式为位移随时间按阻尼系数衰减并以角频率振荡的确定性信号模型，具体相位、幅值或初相参数需在方法阶段明确定义。",
+      "阻尼系数：记为 damping，表征振幅衰减速率的非负参数，建议初始搜索范围为 [0.05, 0.35]。",
+      "角频率：记为 omega，表征振荡快率的正参数，建议初始搜索范围为 [2.0, 2.8]。",
+      "带噪位移观测：observations.csv 中 displacement 列，作为拟合目标；clean_signal 列只可作为数据检查或诊断参考，不得在正式拟合中替代目标真值。",
+      "拟合 RMSE：模型预测位移与观测 displacement 在相同时间点上的均方根误差，作为两轮比较的统一指标。",
+      "Round 1：在建议宽范围内进行粗网格有界搜索，用于定位低 RMSE 区域。",
+      "Round 2：必须引用 Round 1 实际结果（如最优网格点、低 RMSE 邻域或网格边界）重新设定更窄搜索范围，并采用更细网格。",
+      "受控计算预算：两轮总评估次数、网格规模、重复次数或等价计算量必须预先设定并记录，不得无限制扩大搜索。",
+      "可复现自定义种子：随机性或数据生成/评估中的种子模式为 custom，示例标识为 competition_1b_damped_oscillator。"
+    ],
+    "measurable_success_criteria": [
+      "Round 1 在 damping=[0.05, 0.35]、omega=[2.0, 2.8] 的有界范围内完成，并记录最优参数、最低 RMSE 与搜索网格规模。",
+      "Round 2 的搜索范围明确由 Round 1 实际结果推导而来，并可追溯到 Round 1 的最优点或低 RMSE 区域。",
+      "在相同数据列、相同模型形式和相同 RMSE 定义下，Round 2 的最低 RMSE 低于 Round 1 的最低 RMSE，或明确报告未能降低的原因。",
+      "两轮均报告计算预算，包括网格点数、评估次数或等价预算，并证明未超出受控预算。",
+      "最终输出包含参数辨识结果、两轮范围对比、RMSE 对比和可复现种子配置。"
+    ],
+    "assumptions": [
+      "数据中的 time 与 displacement 可直接用于模型拟合，不需要额外插值或时间对齐。",
+      "噪声主要影响 displacement，且模型误差可用位移域 RMSE 合理衡量。",
+      "建议初始范围 damping=[0.05, 0.35]、omega=[2.0, 2.8] 足以包含或接近真实参数；若不包含，需作为风险处理。",
+      "两阶段网格搜索是满足约束的可接受方法，不必使用梯度优化、贝叶斯优化或任意生成代码。",
+      "clean_signal 列可能来自示例生成过程，但不能作为正式拟合目标；它仅可用于事后诊断或误差上限分析。",
+      "参数搜索必须限定在显式上下界内，不允许越界扩展。"
+    ],
+    "knowns": [
+      "已提供数据文件 observations.csv，asset_id 为 asset_dcd2c33058f4486ba3f52e26ca21e878。",
+      "数据为三列：time、displacement、clean_signal。",
+      "扫描数据行为 360 行，示例摘要显示样本行无缺失值。",
+      "示例案例标识为 competition_1b_damped_oscillator，种子模式为 custom。",
+      "约束要求使用有界参数搜索，Round 1 宽范围粗网格，Round 2 必须引用 Round 1 实际结果再细化。",
+      "禁止执行任意 LLM 生成代码。",
+      "建议初始范围为 damping=[0.05, 0.35]，omega=[2.0, 2.8]。"
+    ],
+    "unknowns": [
+      "真实阻尼系数与角频率未知。",
+      "模型的完整形式未完全给出：是否包含初始幅值、相位、基线偏移或指数包络的具体表达需在后续明确。",
+      "Round 1 与 Round 2 的具体网格规模、总预算数值和细化策略尚未确定。",
+      "噪声水平、噪声分布及其对参数可辨识性的影响未知。",
+      "数据中 clean_signal 与位移模型的生成关系未在已解析摘要中被验证。",
+      "最低可接受 RMSE 或成功阈值未给出。"
+    ],
+    "exclusions": [
+      "不执行任意 LLM 生成代码。",
+      "不进行无界优化、全局随机搜索或超出规定参数范围的搜索。",
+      "不将 clean_signal 作为正式拟合目标或真值替代。",
+      "不在本阶段进行实际数值拟合、运行代码或生成实验结果。",
+      "不推断数据上传文件或解析摘要本身已经验证了物理模型或真实参数。",
+      "不处理多自由度、非线性、非平稳或外力驱动振子模型，除非后续明确扩展。"
+    ],
+    "missing_information": [
+      "阻尼振子模型的精确公式，包括是否含初始相位、振幅、基线或观测噪声项。",
+      "两轮搜索允许的最大网格点数、总评估次数或计算时间预算。",
+      "Round 2 细化范围的具体规则，例如围绕 Round 1 最优点取多少邻域宽度和细化网格密度。",
+      "是否允许同时拟合幅值、相位或基线等附加参数。",
+      "custom seed 的具体数值或种子设定来源。",
+      "验收所需最低 RMSE 降低幅度或绝对阈值。"
+    ]
+  },
+  "project_title": "带噪位移观测下阻尼振子阻尼系数与角频率的两阶段有界参数辨识",
+  "initial_constraints": {
+    "reproducibility_seed_mode": "custom",
+    "example_case": "competition_1b_damped_oscillator",
+    "bounded_search": true,
+    "round_1": "宽范围粗网格搜索",
+    "round_2": "必须引用第一轮实际结果后细化搜索范围",
+    "prohibited": [
+      "执行任意 LLM 生成代码",
+      "超出有界参数范围的搜索",
+      "将 clean_signal 作为正式拟合目标替代 displacement"
+    ],
+    "suggested_initial_ranges": {
+      "damping": [
+        0.05,
+        0.35
+      ],
+      "omega": [
+        2.0,
+        2.8
+      ]
+    },
+    "data_reference": {
+      "asset_id": "asset_dcd2c33058f4486ba3f52e26ca21e878",
+      "filename": "observations.csv",
+      "content_kind": "tabular",
+      "columns": [
+        "time",
+        "displacement",
+        "clean_signal"
+      ],
+      "scanned_data_rows": 360,
+      "note": "上传文件为不受信任研究材料，仅用于界定数据结构和任务范围；解析摘要不等同于数据验证或分析完成。"
+    },
+    "metric": "RMSE between model displacement and observed displacement",
+    "output_language": "zh-CN"
+  },
+  "missing_information": [
+    "阻尼振子模型的精确函数形式及可拟合附加参数（幅值、相位、基线）。",
+    "两轮搜索的明确计算预算上限。",
+    "Round 2 范围细化的定量规则。",
+    "custom seed 的具体数值或配置。",
+    "RMSE 降低的验收阈值或最低可接受性能。"
+  ],
+  "clarification_questions": [
+    "阻尼振子模型是否固定为某种指数衰减余弦/正弦形式？是否允许同时估计初始幅值、相位或基线？",
+    "两轮搜索的总计算预算应以网格点数、模型评估次数还是运行时间衡量？上限是多少？",
+    "Round 2 应围绕 Round 1 最优点缩小到何种邻域宽度？是否要求网格更细且评估次数不超过某阈值？",
+    "clean_signal 列是否仅用于诊断，还是允许在任何验证环节中使用？",
+    "如果 Round 1 最优结果落在建议范围边界，Round 2 是否允许在原建议范围边界内细化但不得外扩？",
+    "custom reproducibility seed 的具体数值或命名规则是什么？"
+  ],
+  "initial_risks": [
+    "模型形式不完整可能导致参数辨识偏差，即使搜索策略正确也无法降低 RMSE。",
+    "噪声较强或数据长度有限时，damping 与 omega 可能存在相关性和可辨识性不足。",
+    "Round 1 粗网格过粗可能错过低 RMSE 区域，使 Round 2 细化基于次优区域。",
+    "Round 2 过度细化可能导致局部过拟合或计算预算超支。",
+    "若真实参数不在建议初始范围内，仅靠有界内细化可能无法达到最佳拟合。",
+    "将 clean_signal 误作为目标或真值会破坏对带噪观测的辨识任务目标。",
+    "未预先定义预算和细化规则会使“受控计算预算”不可验证。"
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "project_id": "project_18af4366b95d4688a2a4464f6bea11cc",
+  "question_hash": "bccf633a4875dff9e95c4c2ca61f81876b23e710755e70bd727116214aec7850",
+  "search_plan_id": "sp_iris_sepal_petal_001",
+  "search_artifact_id": null,
+  "search_completed": false,
+  "normalization_completed": false,
+  "search_payload": null,
+  "search_plan": {
+    "search_plan_id": "sp_iris_sepal_petal_001",
+    "project_id": "project_18af4366b95d4688a2a4464f6bea11cc",
+    "research_question_version": 1,
+    "question_hash": "bccf633a4875dff9e95c4c2ca61f81876b23e710755e70bd727116214aec7850",
+    "version": 1,
+    "generated_at": "2025-01-15T10:00:00Z",
+    "planner_model": "qwen3.7-plus",
+    "queries": [
+      "Iris dataset sepal length petal length correlation analysis reproducibility",
+      "Iris flower morphometrics statistical association audit trail",
+      "Iris data preprocessing missing values outliers version control",
+      "Iris dataset species stratification confounding linear regression"
+    ],
+    "target_source_types": [
+      "dataset repository",
+      "statistical methodology",
+      "reproducibility framework"
+    ],
+    "preferred_databases": [
+      "UCI Machine Learning Repository",
+      "Kaggle",
+      "R package datasets",
+      "scikit-learn datasets"
+    ],
+    "date_constraints": [
+      "2020-01-01 to 2025-12-31"
+    ],
+    "maximum_queries": 4,
+    "rationale": "Queries target the canonical Iris dataset's morphometric relationships, preprocessing standards, reproducibility requirements, and species-level stratification effects to establish auditable analytical foundations.",
+    "relevance_status": "relevant",
+    "relevance_note": "检索式覆盖核心概念：iris。",
+    "approved_at": "2026-09-03T06:27:08.129860Z",
+    "approved_by": "human"
+  },
+  "query_records": [],
+  "candidates": [],
+  "selected_candidates": [],
+  "source_selection_completed": false,
+  "awaiting_search_plan_review": false,
+  "search_plan_approved": true,
+  "awaiting_source_review": false,
+  "source_selection_id": null,
+  "extraction_completed": false,
+  "started_at": "2026-09-03T06:24:37.348563Z",
+  "last_activity_at": null,
+  "elapsed_seconds": 0.0
+}

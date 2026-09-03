@@ -59,6 +59,25 @@ def test_approval_requires_acknowledgment_and_frozen_versions(tmp_path: Path) ->
     assert approved.phase == ResearchPhase.SYNTHESIS
 
 
+def test_post_execution_approval_goes_to_synthesis_without_rerunning(tmp_path: Path) -> None:
+    orchestrator = ResearchOrchestrator(tmp_path)
+    project = _approval_project(orchestrator)
+    project.planning_only = False
+    project.execution_capability = "INTERNAL_EXECUTABLE"
+    project.executor_binding = "damped_oscillator_v1"
+    project.internal_execution_summary = {"status": "complete", "run_id": "completed-run"}
+    orchestrator.store.save(project)
+    package = orchestrator.get_review_package(project.project_id)
+
+    approved = orchestrator.approve_project(
+        project.project_id, acknowledged=True, expected_versions=package.artifact_versions
+    )
+
+    assert approved.phase == ResearchPhase.SYNTHESIS
+    assert approved.internal_execution_summary["run_id"] == "completed-run"
+    assert len(approved.human_approval_history) == 1
+
+
 def test_changed_artifact_version_invalidates_review_package(tmp_path: Path) -> None:
     orchestrator = ResearchOrchestrator(tmp_path)
     project = _approval_project(orchestrator)

@@ -1,0 +1,145 @@
+{
+  "selection_id": "source_selection_0d067bf6154f4150b17813dd609e286b",
+  "project_id": "project_ef11806974554b058250cde26681bd16",
+  "iteration": 0,
+  "research_question_version": 1,
+  "search_plan_version": 1,
+  "kept_candidate_ids": [
+    "candidate_c66fe8e5f513446d9dbdca39513277c8"
+  ],
+  "rejected_candidate_ids": [
+    "candidate_3ed84a8cc0b947088366425d32c8337f",
+    "candidate_347b0841090e4a5eb7193aec8966560a",
+    "candidate_3a5916062f6c48b8bf277eb8bcff1ac0",
+    "candidate_c223f1a9db464d7ca5b98c2875454368",
+    "candidate_803a59913d294e4db87a168dead28ccc"
+  ],
+  "deferred_candidate_ids": [
+    "candidate_7aa4b27acf15453fad3ff2e4c5aca300",
+    "candidate_cd7dcd75be24457290f778c77fdd875d",
+    "candidate_3f4d1ecfba82432b80abfa29e0da34d5",
+    "candidate_15e556e189c241328430ea871521d161",
+    "candidate_ed89e1d227a142b18d9257d909468784",
+    "candidate_2518be89edd34d90af74491ed63d0122",
+    "candidate_9f1e555e023b4ecc82548b4254e1ea34",
+    "candidate_98838c0b1d47450d9850e13ad025b165"
+  ],
+  "human_added_source_ids": [],
+  "decisions": [
+    {
+      "candidate_id": "candidate_c66fe8e5f513446d9dbdca39513277c8",
+      "decision": "keep",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "",
+      "decided_at": "2026-09-03T08:31:16.415942Z"
+    },
+    {
+      "candidate_id": "candidate_7aa4b27acf15453fad3ff2e4c5aca300",
+      "decision": "defer",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "",
+      "decided_at": "2026-09-03T08:31:16.415951Z"
+    },
+    {
+      "candidate_id": "candidate_cd7dcd75be24457290f778c77fdd875d",
+      "decision": "defer",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "",
+      "decided_at": "2026-09-03T08:31:16.415954Z"
+    },
+    {
+      "candidate_id": "candidate_3f4d1ecfba82432b80abfa29e0da34d5",
+      "decision": "defer",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "",
+      "decided_at": "2026-09-03T08:31:16.415957Z"
+    },
+    {
+      "candidate_id": "candidate_15e556e189c241328430ea871521d161",
+      "decision": "defer",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "",
+      "decided_at": "2026-09-03T08:31:16.415960Z"
+    },
+    {
+      "candidate_id": "candidate_ed89e1d227a142b18d9257d909468784",
+      "decision": "defer",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "",
+      "decided_at": "2026-09-03T08:31:16.415962Z"
+    },
+    {
+      "candidate_id": "candidate_2518be89edd34d90af74491ed63d0122",
+      "decision": "defer",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "",
+      "decided_at": "2026-09-03T08:31:16.415965Z"
+    },
+    {
+      "candidate_id": "candidate_9f1e555e023b4ecc82548b4254e1ea34",
+      "decision": "defer",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "",
+      "decided_at": "2026-09-03T08:31:16.415968Z"
+    },
+    {
+      "candidate_id": "candidate_98838c0b1d47450d9850e13ad025b165",
+      "decision": "defer",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "",
+      "decided_at": "2026-09-03T08:31:16.415970Z"
+    },
+    {
+      "candidate_id": "candidate_3ed84a8cc0b947088366425d32c8337f",
+      "decision": "reject",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "主题无关",
+      "decided_at": "2026-09-03T08:31:16.415973Z"
+    },
+    {
+      "candidate_id": "candidate_347b0841090e4a5eb7193aec8966560a",
+      "decision": "reject",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "主题无关",
+      "decided_at": "2026-09-03T08:31:16.415975Z"
+    },
+    {
+      "candidate_id": "candidate_3a5916062f6c48b8bf277eb8bcff1ac0",
+      "decision": "reject",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "主题无关",
+      "decided_at": "2026-09-03T08:31:16.415978Z"
+    },
+    {
+      "candidate_id": "candidate_c223f1a9db464d7ca5b98c2875454368",
+      "decision": "reject",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "主题无关",
+      "decided_at": "2026-09-03T08:31:16.415981Z"
+    },
+    {
+      "candidate_id": "candidate_803a59913d294e4db87a168dead28ccc",
+      "decision": "reject",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "主题无关",
+      "decided_at": "2026-09-03T08:31:16.415983Z"
+    }
+  ],
+  "created_at": "2026-09-03T08:31:16.416024Z",
+  "created_by": "human",
+  "selection_note": ""
+}

@@ -1,0 +1,56 @@
+{
+  "selected_research_mode": "data_analysis",
+  "methodological_rationale": "本版本为执行阶段方法修订：只使用已批准人工修订批次中的完成标准与人工指令；未提供可写入正式结论的实际数值结果，且系统规则禁止把未来执行任务宣称为已完成。因此，本版本将四项完成标准全部实现为方法中的具体执行记录模板、字段、阻塞门控与能力缺失记录，而不是作一般性承诺。任务输入为已提供的 observations.csv（asset_dcd2c33058f4486ba3f52e26ca21e878），数据三列 time、displacement、clean_signal，示例标识 competition_1b_damped_oscillator，种子模式 custom。正式拟合与正式评价仅使用 time 与 displacement；clean_signal 仅允许用于事后诊断，不得作为拟合目标、真值替代或正式评价依据。模型固定为 y_model(t)=A*exp(-damping*t)*cos(omega*t+phi)。damping 与 omega 为有界网格搜索参数；A 与 phi 为条件参数，每个网格点必须通过确定性线性最小二乘或等价解析最小二乘估计。Round 1 固定使用 damping∈[0.05,0.35]、omega∈[2.0,2.8] 的 9×9 等距粗网格，最多 81 次正式评估；Round 2 必须从 Round 1 实际最低 RMSE 网格点或已记录的低 RMSE 集合推导，范围宽度每侧不超过 1.5 个 Round 1 网格步长，裁剪回原始边界后使用 15×15 等距细网格，最多 225 次正式评估；两轮合计正式评估上限 306 次。为使完成标准 1 成为可追溯记录，本方法定义数据质检执行记录字段：data_quality_check_status、input_file、asset_id、read_row_count、valid_row_count、time_range、displacement_range、clean_signal_range、missing_time_count、missing_displacement_count、missing_clean_signal_count、duplicate_time_count、non_finite_count、time_sort_state、analysis_columns、excluded_columns。当前该记录的状态为 missing；状态只能从 missing 变更为 complete，且必须填入实际数值。为使完成标准 2 成为网格级执行记录，本方法定义 Round 1 执行记录字段：round_id=Round 1、model_formula、analysis_columns=[time,displacement]、conditional_estimation_rule、rmse_definition=sqrt(mean((displacement-y_model)^2))、grid_shape=9x9、damping_min=0.05、damping_max=0.35、omega_min=2.0、omega_max=2.8、evaluation_count_limit=81、grid_record_status、round_1_grid_table，其中每条网格点记录包含 evaluation_order、damping、omega、estimated_amplitude_A、estimated_phase_phi、rmse、boundary_flag。Round 2 范围推导记录字段包括：round_2_range_derivation_status、round_1_best_damping、round_1_best_omega、round_1_best_rmse、derivation_center_type、step_multiplier、left_width、right_width、lower_bound_before_clipping、upper_bound_before_clipping、lower_bound_after_clipping、upper_bound_after_clipping、boundary_contact、used_low_rmse_set、derivation_reason。Round 2 执行记录字段包括：round_id=Round 2、model_formula、analysis_columns=[time,displacement]、conditional_estimation_rule、rmse_definition=sqrt(mean((displacement-y_model)^2))、grid_shape=15x15、round_2_damping_min、round_2_damping_max、round_2_omega_min、round_2_omega_max、evaluation_count_limit=225、grid_record_status、round_2_grid_table，其中每条网格点记录包含 evaluation_order、damping、omega、estimated_amplitude_A、estimated_phase_phi、rmse、boundary_flag。当前 grid_record_status 均为 missing；状态只能从 missing 变更为 complete，且必须包含实际网格记录。为使完成标准 3 成为预算审计记录，本方法定义预算审计字段：budget_audit_status、round_1_evaluations、round_2_evaluations、total_formal_evaluations、budget_limit=306、within_budget、repeat_evaluation_count、diagnostic_evaluation_count、diagnostic_label。当前 budget_audit_status 为 missing；只有当 total_formal_evaluations<=306、within_budget=true、所有重复或诊断评估被单独标记时，才可变更为 complete。为使完成标准 4 成为能力缺失检查记录，本方法定义 capability_gap_register 字段：missing_data_quality_record、missing_round_1_grid_record、missing_round_2_range_derivation_record、missing_round_2_grid_record、missing_budget_audit_record、formal_conclusion_status。当前五项能力缺失均为 true，formal_conclusion_status=suspended；在全部对应执行证据补齐前，不得恢复正式参数辨识结论。",
+  "validity_threats": [
+    "当前批次未提供实际执行数值，因此所有执行记录状态保持 missing，正式参数辨识结论必须暂停；不得以方法规划替代执行记录。",
+    "若实际数据质检记录未填写实际读取行数、有效行数、三列范围、缺失值计数、重复 time 计数、非有限值计数和排序状态，正式拟合的数据基础不可追溯。",
+    "若 Round 1 或 Round 2 网格表未记录每个网格点的参数、条件估计、RMSE、评估顺序和触界标记，则两轮结果不可复核，也不满足网格级执行记录要求。",
+    "若两轮使用不同模型公式、不同数据列、不同条件最小二乘规则或不同 RMSE 定义，Round 2 与 Round 1 的最低 RMSE 不可公平比较。",
+    "若 Round 2 搜索范围不能追溯到 Round 1 实际最低点或低 RMSE 集合，或未记录步长倍数、裁剪前后边界和触界情况，则细化范围缺乏依据。",
+    "若正式评估总次数超过 306，或重复评估与诊断评估未被单独标记，则违反受控计算预算约束。",
+    "若 clean_signal 被用于正式拟合或正式评价，会低估观测噪声并违背任务约束。",
+    "若真实阻尼系数或角频率位于初始边界之外，Round 1 最低点可能触界，Round 2 继续内侧细化可能产生约束伪影而非真实改进。",
+    "噪声与有限时间窗可能导致 damping 与 omega 的误差面局部平坦或相关，使网格最优点不稳定，最低 RMSE 只能解释为固定模型下的拟合最优，不能等同物理真值。",
+    "若 A 与 phi 的条件估计规则不固定，同一 damping 与 omega 可能得到不同系数和不同 RMSE，破坏辨识一致性。"
+  ],
+  "required_controls": [
+    "执行阻塞门控：data_quality_check_status、round_1_grid_record_status、round_2_range_derivation_status、round_2_grid_record_status、budget_audit_status 均初始为 missing；formal_conclusion_status=suspended。只有五项状态全部为 complete，且 capability_gap_register 五项缺失均为 false 后，才可恢复正式结论。",
+    "数据质检记录控制：必须填写 data_quality_check_status、input_file=observations.csv、asset_id=asset_dcd2c33058f4486ba3f52e26ca21e878、read_row_count、valid_row_count、time_range、displacement_range、clean_signal_range、missing_time_count、missing_displacement_count、missing_clean_signal_count、duplicate_time_count、non_finite_count、time_sort_state、analysis_columns=[time,displacement]、excluded_columns=[clean_signal]。",
+    "正式拟合列控制：正式拟合与正式评价只能使用 time 与 displacement；clean_signal 只能标记为 diagnostic_only，不得进入 RMSE 计算、模型拟合或正式比较。",
+    "模型一致性控制：Round 1 与 Round 2 均使用 y_model(t)=A*exp(-damping*t)*cos(omega*t+phi)；damping 与 omega 为搜索参数；A 与 phi 在每个网格点通过确定性线性最小二乘或等价解析最小二乘估计；估计规则在两轮中不得变更。",
+    "评价一致性控制：RMSE 定义为 sqrt(mean((displacement-y_model)^2))，仅基于 time 与 displacement；两轮评价样本集合一致，缺失行处理方式一致。",
+    "Round 1 范围与预算控制：damping∈[0.05,0.35]，omega∈[2.0,2.8]，9×9 等距粗网格，round_1_evaluation_count_limit=81；不得越界扩展。",
+    "Round 1 网格记录控制：round_1_grid_table 必须覆盖所有正式评估点；每条记录包含 evaluation_order、damping、omega、estimated_amplitude_A、estimated_phase_phi、rmse、boundary_flag。低 RMSE 集合至少包含最低 RMSE 网格点及按固定阈值或固定数量选取的邻近低值点。",
+    "Round 2 推导控制：以 Round 1 最低 RMSE 网格点为默认推导中心；若最低点触界且低 RMSE 集合显示存在更优内侧邻域，可改用低 RMSE 集合中心，但必须在 derivation_reason 中记录理由。每侧宽度不超过 1.5 个 Round 1 网格步长；推导边界必须裁剪回 [0.05,0.35] 与 [2.0,2.8]，并记录裁剪前后边界、是否触界和是否使用低 RMSE 集合。",
+    "Round 2 网格记录控制：在推导并裁剪后的范围内使用 15×15 等距细网格，round_2_evaluation_count_limit=225；round_2_grid_table 每条记录包含 evaluation_order、damping、omega、estimated_amplitude_A、estimated_phase_phi、rmse、boundary_flag。",
+    "预算审计控制：必须填写 budget_audit_status、round_1_evaluations、round_2_evaluations、total_formal_evaluations、budget_limit=306、within_budget、repeat_evaluation_count、diagnostic_evaluation_count、diagnostic_label；只有 total_formal_evaluations<=306 且 within_budget=true 时，预算审计才可为 complete。",
+    "诊断与重复评估隔离控制：任何基于 clean_signal 的辅助检查、重复评估或数据探查必须标记为 diagnostic，不计入正式比较结论，也不得占用正式评估预算。",
+    "能力缺失登记控制：在正式执行证据补齐前，capability_gap_register 必须保持 missing_data_quality_record=true、missing_round_1_grid_record=true、missing_round_2_range_derivation_record=true、missing_round_2_grid_record=true、missing_budget_audit_record=true，并保持 formal_conclusion_status=suspended。"
+  ],
+  "required_quality_checks": [
+    "检查 data_quality_check_status 是否为 complete，并包含实际读取行数、有效行数、time/displacement/clean_signal 范围、缺失值计数、重复 time 计数、非有限值计数和 time 排序状态。",
+    "检查正式拟合与正式评价是否仅使用 time 与 displacement；检查 clean_signal 是否仅作为 diagnostic_only 出现且未进入正式 RMSE。",
+    "检查 Round 1 网格表是否覆盖不超过 81 个正式评估点，并逐点记录 evaluation_order、damping、omega、estimated_amplitude_A、estimated_phase_phi、rmse、boundary_flag。",
+    "检查 Round 2 范围推导记录是否包含 round_1_best_damping、round_1_best_omega、round_1_best_rmse、derivation_center_type、step_multiplier、left_width、right_width、lower_bound_before_clipping、upper_bound_before_clipping、lower_bound_after_clipping、upper_bound_after_clipping、boundary_contact、used_low_rmse_set、derivation_reason。",
+    "检查 Round 2 网格表是否覆盖不超过 225 个正式评估点，并逐点记录 evaluation_order、damping、omega、estimated_amplitude_A、estimated_phase_phi、rmse、boundary_flag。",
+    "检查两轮记录中的 model_formula、analysis_columns、conditional_estimation_rule、rmse_definition 是否完全一致。",
+    "检查预算审计记录是否包含 round_1_evaluations、round_2_evaluations、total_formal_evaluations、budget_limit=306、within_budget、repeat_evaluation_count、diagnostic_evaluation_count、diagnostic_label，并证明 total_formal_evaluations<=306。",
+    "检查 capability_gap_register 中五项能力缺失是否全部转为 false，且 formal_conclusion_status 是否仍为 suspended；若任一缺失为 true，不得输出正式参数辨识结论。"
+  ],
+  "required_tools": [
+    "能够读取 observations.csv（asset_dcd2c33058f4486ba3f52e26ca21e878）并输出行数、列范围、缺失值计数、重复 time 计数、非有限值计数和排序状态的数据质检工具。",
+    "能够生成 9×9 与 15×15 等距网格并逐点执行确定性评估的有界网格搜索工具。",
+    "能够对每个网格点执行确定性线性最小二乘或等价解析最小二乘估计 A 与 phi 的条件拟合工具。",
+    "能够基于 time 与 displacement 计算 sqrt(mean((displacement-y_model)^2)) 的 RMSE 评价工具。",
+    "能够记录评估顺序、参数、系数、RMSE、触界标记、低 RMSE 集合、范围推导字段和预算审计字段的执行记录归档工具。",
+    "能够在执行记录中隔离并标记诊断评估与重复评估的预算审计工具。"
+  ],
+  "human_actions_required": [
+    "向执行记录中提供实际数据质检结果：read_row_count、valid_row_count、time_range、displacement_range、clean_signal_range、missing_time_count、missing_displacement_count、missing_clean_signal_count、duplicate_time_count、non_finite_count、time_sort_state。",
+    "提供 Round 1 实际网格搜索记录：覆盖不超过 9×9=81 个正式评估点，并逐点包含 evaluation_order、damping、omega、estimated_amplitude_A、estimated_phase_phi、rmse、boundary_flag。",
+    "提供 Round 2 范围推导记录：round_1_best_damping、round_1_best_omega、round_1_best_rmse、derivation_center_type、step_multiplier、left_width、right_width、lower_bound_before_clipping、upper_bound_before_clipping、lower_bound_after_clipping、upper_bound_after_clipping、boundary_contact、used_low_rmse_set、derivation_reason。",
+    "提供 Round 2 实际网格搜索记录：覆盖不超过 15×15=225 个正式评估点，并逐点包含 evaluation_order、damping、omega、estimated_amplitude_A、estimated_phase_phi、rmse、boundary_flag。",
+    "提供预算审计记录：round_1_evaluations、round_2_evaluations、total_formal_evaluations、budget_limit=306、within_budget、repeat_evaluation_count、diagnostic_evaluation_count、diagnostic_label，证明未超过 306 次正式评估上限。",
+    "若上述任何记录仍缺失，保持 capability_gap_register 对应项为 true，并保持 formal_conclusion_status=suspended；不得将规划文本当作执行证据。"
+  ]
+}

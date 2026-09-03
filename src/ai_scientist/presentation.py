@@ -214,6 +214,68 @@ def user_error_message(error: Any) -> str:
     return text[:500]
 
 
+def model_service_error_message(error: Any) -> str:
+    """Map provider failures to a stable recovery message without leaking details."""
+
+    detail = getattr(error, "detail", error)
+    if isinstance(detail, dict):
+        error_type = str(detail.get("error_type") or detail.get("type") or "")
+        message = str(detail.get("error_message") or detail.get("message") or "")
+        status_code = detail.get("status_code")
+    else:
+        error_type, message, status_code = type(error).__name__, str(detail or ""), None
+    fingerprint = f"{error_type} {message}".lower()
+    if "timeout" in fingerprint:
+        return "模型服务本次响应超时。项目数据没有丢失，可以直接重试当前阶段。"
+    if any(marker in fingerprint for marker in ("apiconnectionerror", "connection", "network")):
+        return "模型服务连接暂时失败。项目数据没有丢失，可以稍后重试当前阶段。"
+    if status_code == 429 or any(marker in fingerprint for marker in ("ratelimiterror", "rate limit", "429")):
+        return "模型服务当前繁忙或达到速率限制，请稍后重试。"
+    return "模型服务暂时未能完成本阶段。项目数据没有丢失，可以稍后重试当前阶段。"
+
+
+def safe_error_debug_details(error: dict[str, Any]) -> dict[str, Any]:
+    """Keep useful failure audit fields while redacting secrets and absolute paths."""
+
+    allowed = (
+        "error_type", "error_message", "stage", "stage_substep",
+        "failing_component", "failure_category", "cause_type",
+    )
+    result: dict[str, Any] = {}
+    for key in allowed:
+        value = error.get(key)
+        if value in (None, ""):
+            continue
+        text = str(value)
+        text = re.sub(r"(?i)(authorization\s*[:=]\s*bearer\s+)[^\s,;}]+", r"\1[REDACTED]", text)
+        text = re.sub(r"(?i)(api[_ -]?key\s*[:=]\s*)[^\s,;}]+", r"\1[REDACTED]", text)
+        text = re.sub(r"(?:[A-Za-z]:\\|/)(?:[^\s:]+[/\\])+[^\s:]*", "[REDACTED_PATH]", text)
+        result[key] = text[:1000]
+    return result
+
+
+def research_step_action_state(
+    project_phase: str,
+    job_status: str | None,
+    *,
+    human_gate: bool = False,
+) -> dict[str, Any]:
+    """Return the explicit UI action for a project's current job state."""
+
+    terminal_labels = {
+        "COMPLETED": "✅ 研究流程已完成",
+        "FAILED": "研究项目已失败",
+        "CANCELLED": "研究项目已取消",
+    }
+    if project_phase in terminal_labels:
+        return {"label": terminal_labels[project_phase], "disabled": True}
+    if job_status in {"queued", "running"}:
+        return {"label": "⏳ 当前阶段正在运行", "disabled": True}
+    if job_status == "failed":
+        return {"label": "🔄 重试本阶段", "disabled": human_gate}
+    return {"label": "▶ 运行下一阶段", "disabled": human_gate}
+
+
 def render_research_question(question: ResearchQuestion | None) -> str:
     if question is None:
         return "研究总监还没有完成问题整理。"

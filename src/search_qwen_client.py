@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 from openai import BadRequestError
 from openai import OpenAI
 
-from src.model_utils import normalize_model_name
+from src.model_utils import model_max_retries, normalize_model_name
 
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
@@ -78,6 +78,7 @@ class SearchQwenClient:
             api_key=api_key,
             base_url=self.base_url,
             http_client=self.http_client,
+            max_retries=model_max_retries(),
         )
 
     def search(

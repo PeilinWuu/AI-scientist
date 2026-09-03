@@ -1,0 +1,9 @@
+{
+  "rmse": 0.03308926031835558,
+  "best_damping": 0.17,
+  "best_omega": 2.36,
+  "evaluations": 121,
+  "damping_step": 0.010000000000000009,
+  "omega_step": 0.020000000000000018,
+  "best_on_boundary": false
+}

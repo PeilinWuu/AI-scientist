@@ -1,0 +1,34 @@
+{
+  "selection": {
+    "primary_domain": "biology",
+    "secondary_domains": [
+      "computer_science"
+    ],
+    "confidence": 0.86,
+    "selected_domain_skills": [
+      "生物学形态测量数据分析",
+      "公开数据集版本固定与溯源",
+      "数据清洗与预处理",
+      "探索性数据分析",
+      "相关性与线性回归分析",
+      "分层分析与混杂因素说明",
+      "可复现研究流程设计",
+      "审计记录与证据链整理"
+    ],
+    "clarification_needed": false,
+    "clarification_questions": []
+  },
+  "domain_resolution": {
+    "reported_primary_domain": "biology",
+    "reported_secondary_domains": [
+      "computer_science"
+    ],
+    "canonical_primary_domain": "biology",
+    "canonical_secondary_domains": [
+      "computer_science"
+    ],
+    "loaded_domain_skill": "biology",
+    "fallback_used": false,
+    "mapping_reason": "Domain 'biology' is a registered skill."
+  }
+}

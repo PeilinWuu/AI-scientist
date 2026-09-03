@@ -1,0 +1,32 @@
+{
+  "job_id": "job_dd3f8b04216544f3aa9f890f38cb737f",
+  "project_id": "project_ef11806974554b058250cde26681bd16",
+  "phase": "DOMAIN_SELECTION",
+  "status": "completed",
+  "started_at": "2026-09-03T08:20:51.543171Z",
+  "finished_at": "2026-09-03T08:21:03.800579Z",
+  "error": null,
+  "result": {
+    "project_id": "project_ef11806974554b058250cde26681bd16",
+    "previous_phase": "DOMAIN_SELECTION",
+    "current_phase": "BACKGROUND_RESEARCH",
+    "stage_status": "completed",
+    "produced_artifacts": [
+      "artifact_119114fba82c4d52b603cc49b0557e0a"
+    ],
+    "human_actions_required": [
+      "确认阻尼振子的精确模型形式，尤其是是否包含初始振幅、相位、基线偏移以及这些附加参数是固定、估计还是由模型工具隐含处理。",
+      "确认允许的总计算预算，包括 Round 1 粗网格点数、Round 2 细网格点数和总评估次数上限。",
+      "确认 Round 2 邻域细化规则，例如围绕 Round 1 最优点取多少邻域宽度、是否在边界处截断、以及 Round 2 网格密度。",
+      "若 Round 1 最优位于搜索边界，人工确认是否接受受限最优，或仅在任务允许范围内修订初始边界；不得通过越界搜索解决。",
+      "批准在正式拟合中仅使用 displacement 作为目标，并确认 clean_signal 仅用于诊断。",
+      "在最终报告中确认 RMSE 降低或未降低的解释，包括噪声下限、模型误设、网格分辨率或边界效应等可能原因。",
+      "确认 custom seed 的记录方式：至少包含 seed_mode=custom 与 example_case=competition_1b_damped_oscillator；若存在具体数值种子，需记录来源并保持固定。"
+    ],
+    "review_decision": null,
+    "revision_required": false,
+    "blocking_issues": [],
+    "iteration": 0,
+    "max_revision_exhausted": false
+  }
+}

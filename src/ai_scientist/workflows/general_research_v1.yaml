@@ -54,13 +54,14 @@ transitions:
   EXECUTION_WAITING:
     data_provided: DATA_ANALYSIS
     execution_tool_available: EXECUTION
+    execution_complete: SYNTHESIS
     planning_only: SYNTHESIS
   EXECUTION:
     success: DATA_ANALYSIS
     failure: CRITICAL_REVIEW
   DATA_ANALYSIS: {next: CRITICAL_REVIEW}
   CRITICAL_REVIEW:
-    approve: SYNTHESIS
+    approve: HUMAN_APPROVAL
     revision_required: HUMAN_REVISION_REVIEW
     human_intervention_required: HUMAN_INTERVENTION_REQUIRED
     revise_question: QUESTION_FORMULATION

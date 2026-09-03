@@ -1,0 +1,22 @@
+{
+  "job_id": "job_ca7011361fa54e2ab32a473478f66536",
+  "project_id": "project_ef11806974554b058250cde26681bd16",
+  "phase": "INTAKE",
+  "status": "completed",
+  "started_at": "2026-09-03T08:14:03.114598Z",
+  "finished_at": "2026-09-03T08:14:03.135942Z",
+  "error": null,
+  "result": {
+    "project_id": "project_ef11806974554b058250cde26681bd16",
+    "previous_phase": "INTAKE",
+    "current_phase": "QUESTION_FORMULATION",
+    "stage_status": "completed",
+    "produced_artifacts": [],
+    "human_actions_required": [],
+    "review_decision": null,
+    "revision_required": false,
+    "blocking_issues": [],
+    "iteration": 0,
+    "max_revision_exhausted": false
+  }
+}

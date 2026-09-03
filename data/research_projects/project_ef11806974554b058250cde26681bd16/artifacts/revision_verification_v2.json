@@ -1,0 +1,35 @@
+{
+  "verification_id": "revision_verification_ef851266c6204e92afff35979ad2e397",
+  "action_id": "revision_batch_1b3f4904145c4fedbf72c92bb1a80cf1",
+  "target_artifact": "methodology",
+  "artifact_version": 3,
+  "criteria_results": [
+    {
+      "criterion": "存在可追溯的完整数据质检记录，且正式拟合仅使用 time 与 displacement。",
+      "passed": false,
+      "evidence": "methodological_rationale states: \"本版本不能声称已完成实际数据质检、实际网格搜索或实际预算审计\" and \"缺少实际数据质检数值记录\"; required_controls only specifies future records to be created.",
+      "note": "Deterministic: Advisory semantic token check; independent verification is authoritative. Independent: The new artifact declares that actual data-quality check values are missing and does not contain a traceable executed data-quality record. It only restates control requirements."
+    },
+    {
+      "criterion": "存在 Round 1 与 Round 2 的网格级执行记录，且两轮模型、数据列、最小二乘规则和 RMSE 定义一致。",
+      "passed": false,
+      "evidence": "methodological_rationale states: \"缺少 Round 1 网格级运行记录、缺少 Round 2 范围推导与网格级运行记录\" and \"本版本不能声称已完成实际数据质检、实际网格搜索或实际预算审计\".",
+      "note": "Deterministic: Advisory semantic token check; independent verification is authoritative. Independent: The artifact describes intended model, columns, least-squares rule, and RMSE consistency controls, but it does not include actual Round 1 or Round 2 grid-level execution records."
+    },
+    {
+      "criterion": "存在预算审计记录，证明未超过 306 次正式评估上限。",
+      "passed": false,
+      "evidence": "methodological_rationale states: \"缺少预算审计数值记录\" and \"本版本不能声称已完成实际数据质检、实际网格搜索或实际预算审计\".",
+      "note": "Deterministic: Advisory semantic token check; independent verification is authoritative. Independent: The artifact contains a budget cap control of 306 evaluations but does not provide an executed budget-audit record proving actual usage within the limit."
+    },
+    {
+      "criterion": "若任何执行能力缺失，必须记录能力缺失并暂停正式结论，而不是以规划替代执行。",
+      "passed": true,
+      "evidence": "methodological_rationale states: \"当前记录的执行能力缺失包括：缺少实际数据质检数值记录、缺少 Round 1 网格级运行记录、缺少 Round 2 范围推导与网格级运行记录、缺少预算审计数值记录。因上述执行证据缺失，正式参数辨识结论暂停\"; required_controls includes \"执行状态控制：本版本正式结论暂停\" and \"能力缺失控制：当前已记录能力缺失...正式结论暂停，不得以方法规划替代执行记录\".",
+      "note": "Deterministic: Advisory semantic token check; independent verification is authoritative. Independent: The artifact explicitly records missing execution capabilities and suspends formal conclusions rather than presenting planning as execution."
+    }
+  ],
+  "overall_passed": false,
+  "verification_method": "deterministic+independent_qwen",
+  "verified_at": "2026-09-03T09:24:22.739096Z"
+}

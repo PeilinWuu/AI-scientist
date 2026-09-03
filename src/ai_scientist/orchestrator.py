@@ -396,7 +396,25 @@ class ResearchOrchestrator:
             elif project.phase == ResearchPhase.HUMAN_REVISION_REVIEW:
                 stage_status = "awaiting_human_revision_review"
             elif project.phase == ResearchPhase.HUMAN_INTERVENTION_REQUIRED:
-                stage_status = "waiting_for_human_intervention"
+                # Projects created before the bounded re-review convergence fix
+                # may already be parked here after a verified revision.  Make
+                # the normal "run next stage" action recover those projects
+                # without editing persisted state by hand or spending another
+                # model call.  Integrity, safety, ethics, and hard-reject cases
+                # are deliberately left at the human-intervention gate.
+                latest_review = project.reviews[-1] if project.reviews else None
+                converged_review = (
+                    self._converge_verified_revision_review(project, latest_review)
+                    if latest_review is not None
+                    else None
+                )
+                if converged_review is not None and converged_review.decision == "approve":
+                    project.reviews[-1] = converged_review
+                    project.phase = ResearchPhase.CRITICAL_REVIEW
+                    self._apply_review_decision(project, converged_review)
+                    stage_status = "verified_revision_review_recovered"
+                else:
+                    stage_status = "waiting_for_human_intervention"
             elif project.phase == ResearchPhase.REVISION:
                 if not job_id:
                     raise InvalidTransitionError("Approved revision batches must run through the asynchronous job endpoint.")
@@ -947,8 +965,14 @@ class ResearchOrchestrator:
         project.approval_valid_for_versions = dict(package.artifact_versions)
         project.approval_status = "valid"
         self._refresh_internal_data_executor_binding(project)
+        execution_already_analyzed = (
+            project.internal_execution_summary.get("status") == "complete"
+            or any(item.artifact_type == "execution_analysis" for item in project.artifacts)
+        )
         approval_next_step = (
-            "项目将进入内部确定性执行阶段。"
+            "项目将进入科学综合阶段。"
+            if execution_already_analyzed
+            else "项目将进入内部确定性执行阶段。"
             if project.execution_capability == "INTERNAL_EXECUTABLE"
             else "项目将等待外部实验结果。"
             if project.execution_capability == "EXTERNAL_EXECUTION_REQUIRED"
@@ -967,8 +991,11 @@ class ResearchOrchestrator:
             ),
         )
         self._transition_event(project, "approve")
-        if project.planning_only and project.phase == ResearchPhase.EXECUTION_WAITING:
-            self._transition_event(project, "planning_only")
+        if project.phase == ResearchPhase.EXECUTION_WAITING:
+            if execution_already_analyzed:
+                self._transition_event(project, "execution_complete")
+            elif project.planning_only:
+                self._transition_event(project, "planning_only")
         self.store.save(project)
         return project
 
@@ -2002,7 +2029,25 @@ class ResearchOrchestrator:
         if integrity_blockers or review.decision == "reject":
             return review.model_copy(update={"blocking_issues": integrity_blockers or review.blocking_issues})
 
-        score_updates: dict[str, float] = {}
+        # A verified revision re-review is intentionally bounded to the scope the
+        # human approved.  The reviewer may still score an unrelated dimension
+        # below six (for example evidence quality) while proposing a brand-new
+        # execution prerequisite.  Letting that score reopen the cycle would
+        # defeat the bounded-review rule and can create the circular condition
+        # "produce execution results before execution is approved".  Preserve
+        # the review text as non-blocking follow-up, but normalize every quality
+        # score to the approval floor once the approved batch is verified.
+        score_updates: dict[str, float] = {
+            field: max(6.0, float(getattr(review, field)))
+            for field in (
+                "evidence_quality_score",
+                "methodological_validity_score",
+                "feasibility_score",
+                "reproducibility_score",
+                "claim_support_score",
+                "uncertainty_handling_score",
+            )
+        }
         targets = {batch.target for batch in plan.target_batches}
         target_score_fields = {
             "question": ["feasibility_score", "uncertainty_handling_score"],
@@ -2021,17 +2066,6 @@ class ResearchOrchestrator:
         for target in targets:
             for field in target_score_fields.get(target, []):
                 score_updates[field] = max(6.0, float(getattr(review, field)))
-        resulting_scores = [
-            score_updates.get("evidence_quality_score", review.evidence_quality_score),
-            score_updates.get("methodological_validity_score", review.methodological_validity_score),
-            score_updates.get("feasibility_score", review.feasibility_score),
-            score_updates.get("reproducibility_score", review.reproducibility_score),
-            score_updates.get("claim_support_score", review.claim_support_score),
-            score_updates.get("uncertainty_handling_score", review.uncertainty_handling_score),
-        ]
-        if min(resulting_scores) < 6:
-            return review
-
         deferred_suggestions = list(
             dict.fromkeys(review.non_blocking_issues + review.blocking_issues)
         )

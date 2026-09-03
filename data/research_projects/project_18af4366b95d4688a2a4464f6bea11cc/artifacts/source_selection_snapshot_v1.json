@@ -1,0 +1,198 @@
+{
+  "selection_id": "source_selection_f54ce1988a354868a22432ef30e5c24d",
+  "project_id": "project_18af4366b95d4688a2a4464f6bea11cc",
+  "iteration": 0,
+  "research_question_version": 1,
+  "search_plan_version": 1,
+  "kept_candidate_ids": [
+    "candidate_680dc684ac454eff9011518e1b01e01f",
+    "candidate_b3fea28da38a4df68aad1494ca4fc9f1"
+  ],
+  "rejected_candidate_ids": [],
+  "deferred_candidate_ids": [
+    "candidate_2b96ab47657f4b1c987faf424cc238cb",
+    "candidate_7d61bb80d98342b591a8b313302b01d0",
+    "candidate_74847eac231c48bfb8cd8003555d5bc3",
+    "candidate_701bbbeacd1741959731940e4f1d92f2",
+    "candidate_a9b6d710e8ef4cc6b7a7cac83a97e690",
+    "candidate_56192acaebb644359c2f96a6293b7a9f",
+    "candidate_9a53e14a48b1416da78756c4f9b72594",
+    "candidate_4a17af974d794abb8b7303df995962d3",
+    "candidate_bcadc483e26e4038ab5c9b2f0a20bd93",
+    "candidate_79e3b749ca004c1b9b38157bdb157466",
+    "candidate_2bf12eabcad4489591f002ab259aa282",
+    "candidate_519d385fe85c4677971ea75ad3303125",
+    "candidate_8890d60cd52a43fb9e768ebad5bc2593",
+    "candidate_eeec4855354947fa83ba6dc10e9c7662",
+    "candidate_19086f16540240d8aeb2fce494286770",
+    "candidate_88b8335c9df746cc89d788e35a53b229",
+    "candidate_1c7084ce9f894bb3b36e5eab1212a2be",
+    "candidate_89b9241724dc4b3da03180b9d1e064ef"
+  ],
+  "human_added_source_ids": [],
+  "decisions": [
+    {
+      "candidate_id": "candidate_680dc684ac454eff9011518e1b01e01f",
+      "decision": "keep",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "",
+      "decided_at": "2026-09-03T06:32:18.712181Z"
+    },
+    {
+      "candidate_id": "candidate_b3fea28da38a4df68aad1494ca4fc9f1",
+      "decision": "keep",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "",
+      "decided_at": "2026-09-03T06:32:18.712190Z"
+    },
+    {
+      "candidate_id": "candidate_2b96ab47657f4b1c987faf424cc238cb",
+      "decision": "defer",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "",
+      "decided_at": "2026-09-03T06:32:18.712194Z"
+    },
+    {
+      "candidate_id": "candidate_7d61bb80d98342b591a8b313302b01d0",
+      "decision": "defer",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "",
+      "decided_at": "2026-09-03T06:32:18.712197Z"
+    },
+    {
+      "candidate_id": "candidate_74847eac231c48bfb8cd8003555d5bc3",
+      "decision": "defer",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "",
+      "decided_at": "2026-09-03T06:32:18.712199Z"
+    },
+    {
+      "candidate_id": "candidate_701bbbeacd1741959731940e4f1d92f2",
+      "decision": "defer",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "",
+      "decided_at": "2026-09-03T06:32:18.712202Z"
+    },
+    {
+      "candidate_id": "candidate_a9b6d710e8ef4cc6b7a7cac83a97e690",
+      "decision": "defer",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "",
+      "decided_at": "2026-09-03T06:32:18.712205Z"
+    },
+    {
+      "candidate_id": "candidate_56192acaebb644359c2f96a6293b7a9f",
+      "decision": "defer",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "",
+      "decided_at": "2026-09-03T06:32:18.712208Z"
+    },
+    {
+      "candidate_id": "candidate_9a53e14a48b1416da78756c4f9b72594",
+      "decision": "defer",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "",
+      "decided_at": "2026-09-03T06:32:18.712211Z"
+    },
+    {
+      "candidate_id": "candidate_4a17af974d794abb8b7303df995962d3",
+      "decision": "defer",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "",
+      "decided_at": "2026-09-03T06:32:18.712214Z"
+    },
+    {
+      "candidate_id": "candidate_bcadc483e26e4038ab5c9b2f0a20bd93",
+      "decision": "defer",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "",
+      "decided_at": "2026-09-03T06:32:18.712217Z"
+    },
+    {
+      "candidate_id": "candidate_79e3b749ca004c1b9b38157bdb157466",
+      "decision": "defer",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "",
+      "decided_at": "2026-09-03T06:32:18.712219Z"
+    },
+    {
+      "candidate_id": "candidate_2bf12eabcad4489591f002ab259aa282",
+      "decision": "defer",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "",
+      "decided_at": "2026-09-03T06:32:18.712222Z"
+    },
+    {
+      "candidate_id": "candidate_519d385fe85c4677971ea75ad3303125",
+      "decision": "defer",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "",
+      "decided_at": "2026-09-03T06:32:18.712225Z"
+    },
+    {
+      "candidate_id": "candidate_8890d60cd52a43fb9e768ebad5bc2593",
+      "decision": "defer",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "",
+      "decided_at": "2026-09-03T06:32:18.712227Z"
+    },
+    {
+      "candidate_id": "candidate_eeec4855354947fa83ba6dc10e9c7662",
+      "decision": "defer",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "",
+      "decided_at": "2026-09-03T06:32:18.712230Z"
+    },
+    {
+      "candidate_id": "candidate_19086f16540240d8aeb2fce494286770",
+      "decision": "defer",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "",
+      "decided_at": "2026-09-03T06:32:18.712233Z"
+    },
+    {
+      "candidate_id": "candidate_88b8335c9df746cc89d788e35a53b229",
+      "decision": "defer",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "",
+      "decided_at": "2026-09-03T06:32:18.712236Z"
+    },
+    {
+      "candidate_id": "candidate_1c7084ce9f894bb3b36e5eab1212a2be",
+      "decision": "defer",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "",
+      "decided_at": "2026-09-03T06:32:18.712238Z"
+    },
+    {
+      "candidate_id": "candidate_89b9241724dc4b3da03180b9d1e064ef",
+      "decision": "defer",
+      "decided_by": "human",
+      "human_note": "",
+      "rejection_reason": "",
+      "decided_at": "2026-09-03T06:32:18.712241Z"
+    }
+  ],
+  "created_at": "2026-09-03T06:32:18.712287Z",
+  "created_by": "human",
+  "selection_note": ""
+}

@@ -1,0 +1,90 @@
+{
+  "claims": [
+    {
+      "claim_id": "CLM-001",
+      "statement": "Simpson's paradox can occur when a confounding variable (such as species in the Iris dataset) is overlooked, potentially leading to misleading or reversed conclusions about the association between two variables.",
+      "claim_type": "inference",
+      "importance": "high",
+      "status": "supported",
+      "dimension": "theoretical_concept",
+      "supporting_evidence_ids": [
+        "EVD-001"
+      ],
+      "contradicting_evidence_ids": [],
+      "assumptions": [
+        "The Iris dataset contains species labels that may act as a confounding variable.",
+        "The association between sepal length and petal length may differ across species."
+      ],
+      "limitations": [
+        "This is a methodological inference, not an empirical finding from the Iris dataset itself.",
+        "The actual presence and magnitude of Simpson's paradox in the Iris dataset requires empirical verification."
+      ]
+    },
+    {
+      "claim_id": "CLM-002",
+      "statement": "When analyzing the Iris dataset, distance-based or correlation-based methods may be sensitive to the scale and units of sepal length and petal length measurements, though both are typically measured in centimeters.",
+      "claim_type": "observation",
+      "importance": "medium",
+      "status": "partially_supported",
+      "dimension": "theoretical_concept",
+      "supporting_evidence_ids": [
+        "EVD-002"
+      ],
+      "contradicting_evidence_ids": [],
+      "assumptions": [
+        "Both sepal length and petal length are measured in the same units (centimeters) in the standard Iris dataset."
+      ],
+      "limitations": [
+        "The ScienceDirect entry discusses heterogeneous scales in general, not specifically the Iris dataset.",
+        "If both variables are in the same units, scale sensitivity may be less of a concern for correlation analysis."
+      ]
+    },
+    {
+      "claim_id": "CLM-003",
+      "statement": "To obtain unconfounded estimates of the association between sepal length and petal length in the Iris dataset, species should be incorporated as a stratification or grouping variable in the analysis.",
+      "claim_type": "hypothesis",
+      "importance": "high",
+      "status": "supported",
+      "dimension": "theoretical_concept",
+      "supporting_evidence_ids": [
+        "EVD-001"
+      ],
+      "contradicting_evidence_ids": [],
+      "assumptions": [
+        "Species is a potential confounding variable that affects both sepal length and petal length.",
+        "The association between sepal length and petal length may vary by species."
+      ],
+      "limitations": [
+        "This is a methodological recommendation based on theoretical principles, not empirical verification.",
+        "The actual need for stratification depends on the data structure and analysis goals."
+      ]
+    }
+  ],
+  "links": [
+    {
+      "claim_id": "CLM-001",
+      "evidence_id": "EVD-001",
+      "relation": "supports",
+      "strength": 0.9,
+      "rationale": "EVD-001 explicitly defines Simpson's paradox as extreme confounding from an overlooked variable that can reverse inferences, directly supporting the claim that overlooking species in Iris could mislead sepal–petal association conclusions."
+    },
+    {
+      "claim_id": "CLM-002",
+      "evidence_id": "EVD-002",
+      "relation": "contextualizes",
+      "strength": 0.6,
+      "rationale": "EVD-002 discusses scale/unit sensitivity of distance measures using Iris as a reference example, contextualizing the claim about sensitivity but not empirically confirming it for sepal/petal length correlation specifically."
+    },
+    {
+      "claim_id": "CLM-003",
+      "evidence_id": "EVD-001",
+      "relation": "supports",
+      "strength": 0.85,
+      "rationale": "EVD-001 recommends incorporating confounding variables into analysis to obtain unconfounded estimates, directly supporting the methodological recommendation to stratify by species in Iris analysis."
+    }
+  ],
+  "unsupported_claim_ids": [],
+  "disputed_claim_ids": [],
+  "evidence_coverage": 1.0,
+  "display_markdown": "### Claim-Evidence Mapping Summary\n\n- **CLM-001** (Simpson's paradox risk): **Supported** by EVD-001 (methodological review on Simpson's paradox and confounding).\n- **CLM-002** (Scale/unit sensitivity): **Partially supported / contextualized** by EVD-002 (conceptual overview using Iris for distance metrics).\n- **CLM-003** (Stratification by species): **Supported** by EVD-001 (recommendation to incorporate confounders).\n\n**Evidence gaps**: No direct empirical Iris results (correlation coefficients, species-stratified associations, data version/checksum) are present in the current evidence collection."
+}

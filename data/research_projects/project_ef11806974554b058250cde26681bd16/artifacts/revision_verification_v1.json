@@ -1,0 +1,35 @@
+{
+  "verification_id": "revision_verification_1e12b2c35a5a4eb98fbb9c66244395be",
+  "action_id": "revision_batch_1b3f4904145c4fedbf72c92bb1a80cf1",
+  "target_artifact": "methodology",
+  "artifact_version": 2,
+  "criteria_results": [
+    {
+      "criterion": "存在可追溯的完整数据质检记录，且正式拟合仅使用 time 与 displacement。",
+      "passed": false,
+      "evidence": "required_controls[0] says: “读取 observations.csv 后必须记录实际读取行数、有效行数、time 范围、displacement 范围、clean_signal 范围、time/displacement/clean_signal 缺失值计数、重复 time 计数、非有限值计数和 time 排序状态；正式拟合仅使用 time 与 displacement。”",
+      "note": "Deterministic: Advisory semantic token check; independent verification is authoritative. Independent: This is a methodological requirement, not an actual traceable data quality inspection record. The new artifact contains no actual values such as row counts, ranges, missing counts, duplicate time counts, non-finite counts, or sort status. It promises future recording rather than providing execution evidence."
+    },
+    {
+      "criterion": "存在 Round 1 与 Round 2 的网格级执行记录，且两轮模型、数据列、最小二乘规则和 RMSE 定义一致。",
+      "passed": false,
+      "evidence": "required_controls include “Round 1 记录控制：必须记录每个网格点的评估顺序、damping、omega、线性系数或等价条件参数估计、RMSE、是否触界和低 RMSE 集合” and “Round 2 网格控制：在推导并裁剪后的范围内进行 15×15 等距细网格搜索，总评估点数不超过 225；模型、数据列、条件最小二乘规则和 RMSE 定义与 Round 1 完全一致。”",
+      "note": "Deterministic: Advisory semantic token check; independent verification is authoritative. Independent: The artifact states that grid-level records must be kept and that the two rounds must use consistent model, columns, least-squares rule, and RMSE. However, it does not contain actual Round 1 or Round 2 grid-level execution records: no point-by-point parameters, coefficients, RMSE values, evaluation order, boundary flags, low-RMSE set, or Round 2 range derivation record."
+    },
+    {
+      "criterion": "存在预算审计记录，证明未超过 306 次正式评估上限。",
+      "passed": false,
+      "evidence": "required_controls include “预算控制：正式评估总次数上限为 306 次，其中 Round 1 最多 81 次、Round 2 最多 225 次；任何重复评估、诊断评估或基于 clean_signal 的辅助评估必须单独标记，不计入正式比较结论。”",
+      "note": "Deterministic: Advisory semantic token check; independent verification is authoritative. Independent: This is a budget rule and future audit requirement. The artifact does not provide an actual budget audit record showing executed formal evaluation counts, cumulative total, duplicate/diagnostic evaluations separately marked, or a verified total not exceeding 306."
+    },
+    {
+      "criterion": "若任何执行能力缺失，必须记录能力缺失并暂停正式结论，而不是以规划替代执行。",
+      "passed": false,
+      "evidence": "methodological_rationale says: “若执行系统缺少数据读取、网格搜索、条件最小二乘、预算审计或归档能力，必须在执行记录中明确记录能力缺失并暂停正式结论，不能以规划文本替代实际执行结果。” required_controls include “能力缺失控制：若缺少完整数据质检、确定性网格搜索、条件线性最小二乘、预算审计或执行归档能力，必须记录能力缺失、暂停正式结论，并说明需要补充的执行步骤，不得以方法规划替代执行记录。”",
+      "note": "Deterministic: Advisory semantic token check; independent verification is authoritative. Independent: The artifact states the fallback rule but does not itself record whether any execution capability is missing, nor does it record an explicit suspension of formal conclusions. Given the absence of actual data quality, grid-search, and budget-audit records, execution capability or execution evidence is missing, but this missing state is not recorded as a capability-missing execution finding."
+    }
+  ],
+  "overall_passed": false,
+  "verification_method": "deterministic+independent_qwen",
+  "verified_at": "2026-09-03T09:17:41.701060Z"
+}

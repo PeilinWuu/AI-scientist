@@ -24,6 +24,11 @@ NO_EXECUTION_STATEMENT = (
     "as an experimental conclusion."
 )
 
+EXECUTION_STATEMENT = (
+    "This report includes project-internal controlled execution results. Input hashes, parameters, "
+    "software versions, execution identifiers, and output checksums were saved for audit."
+)
+
 
 def build_research_plan_json(project: ResearchProject) -> dict[str, Any]:
     """Return a display-safe, auditable research-plan object."""
@@ -35,7 +40,7 @@ def build_research_plan_json(project: ResearchProject) -> dict[str, Any]:
         "status": project.phase.value,
         "workflow_version": project.workflow_version,
         "reproducibility_seed": project.reproducibility_seed,
-        "statement": NO_EXECUTION_STATEMENT,
+        "statement": _research_status_statement(project),
         "uploaded_assets": [
             {
                 "asset_id": asset.asset_id,
@@ -82,6 +87,8 @@ def build_research_plan_json(project: ResearchProject) -> dict[str, Any]:
         "study_design": project.study_design.model_dump(mode="json") if project.study_design else None,
         "analysis_plan": project.analysis_plan.model_dump(mode="json") if project.analysis_plan else None,
         "reproducibility_plan": project.reproducibility_plan,
+        "internal_execution_summary": project.internal_execution_summary,
+        "controlled_python_runs": project.controlled_python_runs,
         "reviewer": review,
         "revision_workflow": {
             "issues": [item.model_dump(mode="json") for item in project.revision_issues],
@@ -107,7 +114,7 @@ def build_research_plan_markdown(project: ResearchProject) -> str:
         f"# {project.title}",
         "",
         "## 1. Project Summary",
-        NO_EXECUTION_STATEMENT,
+        data["statement"],
         "",
         f"- Project ID: `{project.project_id}`",
         f"- Status: `{project.phase.value}`",
@@ -117,6 +124,9 @@ def build_research_plan_markdown(project: ResearchProject) -> str:
         "",
         "## Uploaded Research Materials and Data",
         _uploaded_assets(project),
+        "",
+        "## Controlled Execution Results",
+        _execution_summary_markdown(project),
         "",
         "## 2. Research Question",
         _question_text(project),
@@ -180,7 +190,7 @@ def build_research_plan_markdown(project: ResearchProject) -> str:
         render_todos_markdown(project),
         "",
         "## 19. Research Status Statement",
-        NO_EXECUTION_STATEMENT,
+        data["statement"],
         "",
         "## Quality Summary",
         "\n".join(
@@ -194,6 +204,82 @@ def build_research_plan_markdown(project: ResearchProject) -> str:
         "",
     ]
     return "\n".join(lines)
+
+
+def _research_status_statement(project: ResearchProject) -> str:
+    if _execution_completed(project):
+        if project.conclusion and project.conclusion.planning_status_statement:
+            return project.conclusion.planning_status_statement
+        return EXECUTION_STATEMENT
+    return NO_EXECUTION_STATEMENT
+
+
+def _execution_completed(project: ResearchProject) -> bool:
+    return project.internal_execution_summary.get("status") == "complete" or any(
+        item.get("status") == "success" for item in project.controlled_python_runs
+    )
+
+
+def _execution_summary_markdown(project: ResearchProject) -> str:
+    if not _execution_completed(project):
+        return "No controlled execution result is registered for this project."
+    summary = project.internal_execution_summary
+    lines = [
+        f"- Executor: `{summary.get('executor_binding') or project.executor_binding or 'controlled_python'}`",
+    ]
+    if summary.get("run_id"):
+        lines.append(f"- Run ID: `{summary['run_id']}`")
+    if summary.get("seed") is not None:
+        lines.append(f"- Seed: `{summary['seed']}`")
+    if summary.get("observation_asset_id") or summary.get("dataset_asset_id"):
+        lines.append(
+            f"- Input asset: `{summary.get('observation_asset_id') or summary.get('dataset_asset_id')}`"
+        )
+
+    round_1 = summary.get("round_1") or {}
+    round_2 = summary.get("round_2") or {}
+    if round_1 and round_2:
+        lines.extend(
+            [
+                "",
+                "| Round | Damping range | Omega range | Best damping | Best omega | RMSE | Evaluations | Execution ID |",
+                "|---|---|---|---:|---:|---:|---:|---|",
+                _execution_round_row("1", round_1),
+                _execution_round_row("2", round_2),
+            ]
+        )
+        iteration = (summary.get("comparison") or {}).get("iteration") or {}
+        if iteration:
+            lines.extend(
+                [
+                    "",
+                    f"- Absolute RMSE gain: `{iteration.get('absolute_rmse_gain')}`",
+                    f"- Relative RMSE gain: `{iteration.get('relative_rmse_gain_percent')}%`",
+                    f"- Total two-round evaluations: `{int(iteration.get('round_1_evaluations', 0)) + int(iteration.get('round_2_evaluations', 0))}`",
+                ]
+            )
+        adjustments = summary.get("plan_adjustments") or []
+        if adjustments:
+            lines.append(f"- Round 2 adjustment: {adjustments[0].get('reason', 'Recorded in execution provenance.')}")
+    elif summary.get("operations"):
+        lines.append(f"- Completed allowlisted operations: `{len(summary['operations'])}`")
+        lines.append(f"- Arbitrary code execution: `{summary.get('arbitrary_code_execution', False)}`")
+    if project.controlled_python_runs:
+        successful = len([item for item in project.controlled_python_runs if item.get("status") == "success"])
+        lines.append(f"- Successful controlled Python runs: `{successful}`")
+    return "\n".join(lines)
+
+
+def _execution_round_row(label: str, round_result: dict[str, Any]) -> str:
+    parameters = round_result.get("actual_parameters") or {}
+    metrics = round_result.get("metrics") or {}
+    damping_range = f"[{parameters.get('damping_min')}, {parameters.get('damping_max')}]"
+    omega_range = f"[{parameters.get('omega_min')}, {parameters.get('omega_max')}]"
+    return (
+        f"| {label} | `{damping_range}` | `{omega_range}` | {metrics.get('best_damping')} | "
+        f"{metrics.get('best_omega')} | {metrics.get('rmse')} | {metrics.get('evaluations')} | "
+        f"`{round_result.get('execution_id', '')}` |"
+    )
 
 
 def _uploaded_assets(project: ResearchProject) -> str:

@@ -1,0 +1,65 @@
+{
+  "evidence_ids": [
+    "EVD-001"
+  ],
+  "claims": [
+    {
+      "claim_id": "CLM-001",
+      "statement": "observations.csv（asset_dcd2c33058f4486ba3f52e26ca21e878）包含360行数据，三列分别为time、displacement和clean_signal，无缺失值。",
+      "status": "unsupported",
+      "supporting_evidence_ids": [],
+      "contradicting_evidence_ids": []
+    },
+    {
+      "claim_id": "CLM-002",
+      "statement": "数据样本显示displacement值从0.970开始，随时间递减并呈现振荡特征，clean_signal与displacement数值接近但不完全相同。",
+      "status": "unsupported",
+      "supporting_evidence_ids": [],
+      "contradicting_evidence_ids": []
+    },
+    {
+      "claim_id": "CLM-003",
+      "statement": "阻尼振子参数辨识问题需要在有界参数空间内进行搜索优化，damping∈[0.05, 0.35]，omega∈[2.0, 2.8]。",
+      "status": "unsupported",
+      "supporting_evidence_ids": [],
+      "contradicting_evidence_ids": []
+    },
+    {
+      "claim_id": "CLM-004",
+      "statement": "两阶段网格搜索策略可用于参数辨识：第一阶段粗网格定位低RMSE区域，第二阶段基于第一阶段结果细化搜索范围。",
+      "status": "partially_supported",
+      "supporting_evidence_ids": [
+        "EVD-001"
+      ],
+      "contradicting_evidence_ids": []
+    },
+    {
+      "claim_id": "CLM-005",
+      "statement": "基于Peykarporsan等人(2026)的多阶段辨识框架理念，采用无导数优化方法可以避免噪声放大问题，提高参数辨识的鲁棒性。",
+      "status": "partially_supported",
+      "supporting_evidence_ids": [
+        "EVD-001"
+      ],
+      "contradicting_evidence_ids": []
+    },
+    {
+      "claim_id": "CLM-006",
+      "statement": "在受控计算预算内，通过两阶段有界网格搜索可以降低阻尼振子参数辨识的拟合RMSE。",
+      "status": "unsupported",
+      "supporting_evidence_ids": [],
+      "contradicting_evidence_ids": []
+    }
+  ],
+  "links": [
+    {
+      "claim_id": "CLM-004",
+      "evidence_id": "EVD-001",
+      "relation": "supports"
+    },
+    {
+      "claim_id": "CLM-005",
+      "evidence_id": "EVD-001",
+      "relation": "supports"
+    }
+  ]
+}

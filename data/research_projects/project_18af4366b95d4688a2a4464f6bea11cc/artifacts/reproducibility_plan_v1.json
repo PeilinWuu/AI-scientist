@@ -1,0 +1,48 @@
+{
+  "reproducibility_plan": [
+    "数据版本固定：必须保留并核对公开 Iris 数据来源名称、访问路径或 URL、访问日期、版本/快照标识、本地原始文件路径以及文件 SHA-256 哈希；若来源为软件库内置数据集，需记录库名称、版本号、加载函数和导出文件路径。",
+    "目录结构固定：采用稳定输出目录，包括 data/raw（只读原始数据）、data/processed（预处理后数据）、results/tables（统计结果表）、results/figures（图表）、logs（预处理与审计日志）、scripts（代码或伪代码）和 manifest（输出文件清单）。",
+    "预处理规则预注册：缺失值处理、完全重复记录处理、数值类型转换、单位一致性检查、疑似异常值标记规则必须在运行前写入方案或配置；实际执行后需生成预处理日志，记录原始行数、缺失数、删除数、保留数、重复处理数、异常标记数和字段映射。",
+    "分析链路固定：主分析必须按既定顺序执行：结构检查、质量检查、描述性统计、可视化、全样本 Pearson/Spearman 相关、简单线性模型、物种分层分析、物种感知模型、残差诊断、敏感性分析和证据链映射；不得在观察结果后临时更改主要统计方法。",
+    "统计不确定性记录：所有主要关联估计，包括相关系数、回归斜率、物种分层估计，必须保存点估计、标准误或等效不确定性、置信区间、样本量和对应输出文件路径。",
+    "模型诊断留痕：必须保存残差图、拟合值图、影响点或高杠杆点摘要、模型拟合摘要和模型比较结果，并将异常诊断作为负面或不确定证据记录，而不是隐藏。",
+    "随机性控制：若使用 bootstrap、交叉验证或任何随机抽样，需固定随机种子、记录种子值和重抽样次数；若全流程为确定性计算，则必须在审计日志中显式记录“无随机算法步骤”。当前输入中 reproducibility_seed 为 null，若启用随机算法需先补充种子。",
+    "环境与软件记录：必须记录分析语言、统计软件或库版本、依赖清单、运行环境标识和生成时间；建议输出 requirements、environment.yml、Dockerfile 或等效环境说明。",
+    "输出清单与哈希：最终需生成输出文件清单，覆盖数据文件、日志、结果表、图表、代码和审计报告，并对关键输入与最终分析数据集计算校验和，以便复核一致性。",
+    "重复运行验收：重复运行后需比较记录数、文件哈希、相关系数、回归系数、置信区间、图表数量和关键日志；任何差异必须可解释，否则进入复现差异审计并暂停结论确认。",
+    "人工确认事项：需人工确认数据来源或镜像、预处理规则、统计方法深度、交付形式、运行环境依赖和输出路径命名规范；在无代码执行器时，由人工复核输出结果与审计记录的一致性。"
+  ],
+  "required_artifacts": [
+    "input/raw/iris_raw_versioned_file：原始 Iris 数据文件，保存于只读原始目录，不得覆盖。",
+    "manifest/source_metadata.json：数据源元信息，包含来源名称、URL 或访问路径、访问日期、版本/快照标识、许可或使用说明。",
+    "manifest/file_checksums.json：原始数据、预处理数据及关键输出文件的 SHA-256 或其他校验和记录。",
+    "logs/preprocessing_log.json：预处理日志，包含字段映射、记录数变化、缺失值处理、重复记录处理、异常值标记和类型转换规则。",
+    "data/processed/iris_analysis_dataset：经过清洗并包含记录标识、sepal_length、petal_length、species 的分析数据集。",
+    "results/tables/descriptive_statistics.csv：全样本及按物种分层的描述性统计表。",
+    "results/tables/correlation_results.csv：全样本及物种分层的 Pearson 与 Spearman 相关系数、置信区间、样本量和不确定性方法记录。",
+    "results/tables/regression_results.csv：简单线性模型、物种主效应模型、交互模型或分层模型的系数、标准误、置信区间和拟合摘要。",
+    "results/tables/model_diagnostics.csv：残差摘要、拟合值摘要、高杠杆点和影响点摘要。",
+    "results/tables/sensitivity_results.csv：缺失值处理、异常值包含/排除、Pearson 与 Spearman、全局模型与分层模型的敏感性对照结果。",
+    "results/figures/scatter_all.png：全样本萼片长度与花瓣长度散点图。",
+    "results/figures/scatter_by_species.png：按物种着色的散点图。",
+    "results/figures/distributions.png：两变量直方图或密度图。",
+    "results/figures/fit_global.png：全样本线性拟合图。",
+    "results/figures/fit_by_species.png：分物种拟合图。",
+    "results/figures/residual_diagnostics.png：残差图、拟合值图或影响点诊断图。",
+    "scripts/analysis_code_or_pseudocode：覆盖数据读取、预处理、统计估计、模型拟合、图表输出和审计记录的脚本或分步伪代码。",
+    "logs/analysis_run_log.json：分析运行日志，包含运行时间、软件版本、命令或函数调用、随机种子状态和输出文件列表。",
+    "manifest/evidence_chain_mapping.csv：证据链映射表，将每个结论或假设映射到数据版本、预处理步骤、统计结果、图表和审计日志。",
+    "manifest/artifact_reference_list.json：既有研究工件引用列表，包括 research_question、methodology、study_design、analysis_plan 及其 checksum 与版本号。"
+  ],
+  "missing_reproducibility_information": [
+    "尚未确定最终可接受的 Iris 数据来源或镜像，因此缺少实际来源名称、URL、访问日期、版本/快照标识和文件哈希。",
+    "reproducibility_seed 为 null；若后续使用 bootstrap、交叉验证或随机抽样，需要补充固定随机种子，否则只能限定为确定性计算并显式记录。",
+    "尚未提供实际运行环境信息，包括语言版本、统计库版本、依赖清单或容器说明。",
+    "尚未生成实际原始数据文件、预处理日志、统计结果表、图表和审计日志，因此当前阶段只能生成可执行方案而非已验证运行结果。",
+    "尚未确认最终交付形式是方案文档、代码/伪代码、审计报告或三者兼备。",
+    "尚未确认人工审核责任人以及复核无代码执行环境下的输出一致性的具体方式。",
+    "尚未确认输出文件命名规范中的具体文件名、时间戳格式或版本号格式。",
+    "若所选数据源的物种标签不可用或不可靠，需要人工确认是否放弃物种分层假设检验并在限制中记录；当前尚未实际检查该字段。"
+  ],
+  "execution_readiness": "有条件可执行。研究目标、变量、预处理规则、统计方法、诊断、敏感性分析、复现目录和审计要求已完整，且所需工具在可用工具列表中；但仍需先人工确认数据源或镜像、补齐数据版本元信息与文件哈希、明确随机种子策略或声明无随机步骤，并确定运行环境与交付形式。完成上述确认后，可进入实际数据获取、预处理、统计分析和审计打包。"
+}

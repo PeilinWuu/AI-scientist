@@ -1,0 +1,45 @@
+{
+  "job_id": "job_13c731642e734ec1965aaf266701168d",
+  "project_id": "project_ef11806974554b058250cde26681bd16",
+  "phase": "STUDY_DESIGN",
+  "status": "completed",
+  "started_at": "2026-09-03T08:51:19.387711Z",
+  "finished_at": "2026-09-03T08:57:57.300432Z",
+  "error": null,
+  "result": {
+    "project_id": "project_ef11806974554b058250cde26681bd16",
+    "previous_phase": "STUDY_DESIGN",
+    "current_phase": "ANALYSIS_PLANNING",
+    "stage_status": "completed",
+    "produced_artifacts": [
+      "artifact_046454ec574a4bb4934d310ecb534424"
+    ],
+    "human_actions_required": [
+      "确认阻尼振子的精确模型形式，尤其是是否包含初始振幅、相位、基线偏移以及这些附加参数是固定、估计还是由模型工具隐含处理。",
+      "确认允许的总计算预算，包括 Round 1 粗网格点数、Round 2 细网格点数和总评估次数上限。",
+      "确认 Round 2 邻域细化规则，例如围绕 Round 1 最优点取多少邻域宽度、是否在边界处截断、以及 Round 2 网格密度。",
+      "若 Round 1 最优位于搜索边界，人工确认是否接受受限最优，或仅在任务允许范围内修订初始边界；不得通过越界搜索解决。",
+      "批准在正式拟合中仅使用 displacement 作为目标，并确认 clean_signal 仅用于诊断。",
+      "在最终报告中确认 RMSE 降低或未降低的解释，包括噪声下限、模型误设、网格分辨率或边界效应等可能原因。",
+      "确认 custom seed 的记录方式：至少包含 seed_mode=custom 与 example_case=competition_1b_damped_oscillator；若存在具体数值种子，需记录来源并保持固定。",
+      "批准或确认阻尼振子模型公式，包括是否包含振幅、相位、基线或初始条件。",
+      "批准或确认两轮计算预算，例如 Round 1 网格规模、Round 2 网格规模和总评估次数上限。",
+      "批准或确认 Round 2 范围推导规则，包括邻域宽度、是否取一个网格步长、边界处理方式。",
+      "在缺少代码执行器的情况下，确认使用受信任工具或人工计算完成网格评估，而非执行任意生成代码。",
+      "确认 clean_signal 仅用于诊断，不作为拟合目标或评价真值。",
+      "审核最终结果中 Round 1 到 Round 2 的可追溯证据，包括最优点、低误差邻域和范围截断记录。",
+      "若 Round 2 未降低 RMSE，确认负结果和原因分析应保留并纳入最终报告。",
+      "确认正式模型是否接受含基线 c 的条件线性最小二乘形式，或明确改用不含基线的等价形式。",
+      "确认 Round 1 采用 9×9=81 点、Round 2 采用 15×15=225 点、总正式评估上限 306 次的预算设定。",
+      "确认 Round 2 邻域宽度规则：默认每侧一个 Round 1 网格步长，最大不超过 1.5 倍步长，并裁剪回原始边界。",
+      "若缺少可执行代码环境，人工在受控工具中执行或授权非任意代码生成工具完成网格搜索。",
+      "若 Round 1 最优点触界，人工确认采用边界内侧窄带搜索而非扩展边界。",
+      "审阅并签署最终两轮比较报告，包括负结果与失败原因。"
+    ],
+    "review_decision": null,
+    "revision_required": false,
+    "blocking_issues": [],
+    "iteration": 0,
+    "max_revision_exhausted": false
+  }
+}

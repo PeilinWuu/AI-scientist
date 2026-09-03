@@ -1,0 +1,31 @@
+{
+  "job_id": "job_152835c3eabf46c7ac375abaa99e3863",
+  "project_id": "project_ef11806974554b058250cde26681bd16",
+  "phase": "QUESTION_FORMULATION",
+  "status": "completed",
+  "started_at": "2026-09-03T08:14:13.750628Z",
+  "finished_at": "2026-09-03T08:16:51.967460Z",
+  "error": null,
+  "result": {
+    "project_id": "project_ef11806974554b058250cde26681bd16",
+    "previous_phase": "QUESTION_FORMULATION",
+    "current_phase": "RESEARCH_MODE_SELECTION",
+    "stage_status": "completed",
+    "produced_artifacts": [
+      "artifact_3a99d41705254b9796f7443b042fa9a2"
+    ],
+    "human_actions_required": [
+      "阻尼振子模型是否固定为某种指数衰减余弦/正弦形式？是否允许同时估计初始幅值、相位或基线？",
+      "两轮搜索的总计算预算应以网格点数、模型评估次数还是运行时间衡量？上限是多少？",
+      "Round 2 应围绕 Round 1 最优点缩小到何种邻域宽度？是否要求网格更细且评估次数不超过某阈值？",
+      "clean_signal 列是否仅用于诊断，还是允许在任何验证环节中使用？",
+      "如果 Round 1 最优结果落在建议范围边界，Round 2 是否允许在原建议范围边界内细化但不得外扩？",
+      "custom reproducibility seed 的具体数值或命名规则是什么？"
+    ],
+    "review_decision": null,
+    "revision_required": false,
+    "blocking_issues": [],
+    "iteration": 0,
+    "max_revision_exhausted": false
+  }
+}

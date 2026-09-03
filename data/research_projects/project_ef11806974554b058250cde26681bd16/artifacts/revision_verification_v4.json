@@ -1,0 +1,29 @@
+{
+  "verification_id": "revision_verification_2685e9aab81b4420ac44574b9a319410",
+  "action_id": "revision_batch_2d34ec369b1f4f8382fb69124b1cd12b",
+  "target_artifact": "analysis_plan",
+  "artifact_version": 2,
+  "criteria_results": [
+    {
+      "criterion": "所有涉及选择、阈值、重复评估和诊断预算的规则均有具体数值或固定文本规则。",
+      "passed": true,
+      "evidence": "MET-009 fixes the low-RMSE set threshold as RMSE - round minimum ≤ 1e-6; MET-010 fixes numerical indistinguishability at ≤ 1e-6 RMSE units. STAT-003 fixes the singularity rule: condition number ≤ 1e8 uses deterministic OLS/equivalent pseudoinverse, > 1e8 uses deterministic truncated-SVD pseudoinverse with cutoff 1e-12 of largest singular value, applied uniformly. STAT-008 fixes the multi-low-RMSE center rule by lexicographic choice: damping minimum, then omega minimum. STAT-011 fixes the tie-breaking rule: lowest RMSE, then damping minimum, then omega minimum when differences ≤ 1e-6. STAT-012 fixes the repeat evaluation as one deterministic repeat of the final formal optimum, marked validation diagnostic, excluded from the 306 formal evaluations, and not participating in formal optimum selection. STAT-013 fixes diagnostic budget at ≤ 20 model evaluations and specifies either two fixed diagnostic evaluations or recording '未执行诊断对照'. ROB-006 fixes the repeat-evaluation consistency threshold at RMSE difference > 1e-12.",
+      "note": "Deterministic: Advisory semantic token check; independent verification is authoritative. Independent: Reviewer recommendations are satisfied with explicit numerical thresholds and fixed textual rules. ROB-008 says the fixed-coefficient diagnostic is at the Round 1 optimum while STAT-013 says a representative boundary center point; this is an internal wording inconsistency, but the diagnostic budget and non-interference rule remain fixed, so the criterion is still satisfied."
+    },
+    {
+      "criterion": "分析计划中不存在只能在结果出现后决定的未指定参数。",
+      "passed": true,
+      "evidence": "STAT-004 fixes Round 1 as exactly 9×9=81 grid points; STAT-009 fixes Round 2 as exactly 15×15=225 grid points and formal total 81+225=306. STAT-006 fixes Round 2 width to exactly one Round 1 grid step on each side and forbids later choosing 1.5 times step width or post-result width. STAT-007 fixes boundary behavior to expand only inward and preserve original boundaries. STAT-008 fixes multi-low-RMSE center selection by deterministic lexicographic order. STAT-011 fixes tie-breaking without post-result discretion. STAT-012 fixes repeat-evaluation handling. STAT-013 fixes the diagnostic budget and the option to not execute diagnostics as a recorded fixed state. FAILURE-003 uses the fixed 1e-6 threshold for flat-surface failure.",
+      "note": "Deterministic: Advisory semantic token check; independent verification is authoritative. Independent: The only result-dependent quantities are the observed Round 1 optimum location and computed condition numbers/RMSEs, but the artifact supplies fixed rules for how those observed results are processed. No unspecified parameter is left for post-result discretion."
+    },
+    {
+      "criterion": "失败原因分类与成功判定标准保持预先固定，不得事后调整。",
+      "passed": true,
+      "evidence": "OBJ-003 states all success judgments and failure classifications are fixed in the plan. OBJ-005 predefines failure categories: boundary truncation, model misspecification, irreducible noise, parameter unidentifiability, numerical instability, and insufficient discretization benefit, and states classification rules must not be adjusted after results appear. SUCCESS-004 fixes the success comparison: Round 2 RMSE lower than Round 1; absolute difference ≤ 1e-6 is reported as numerically indistinguishable. SUCCESS-005 requires reporting predefined failure categories without modifying evaluation criteria. FAILURE-001 through FAILURE-009 are fixed failure definitions; FAILURE-002 requires causes to enter predefined categories, and FAILURE-003 uses the fixed 1e-6 indistinguishability threshold.",
+      "note": "Deterministic: Advisory semantic token check; independent verification is authoritative. Independent: Success and failure standards are explicit and pre-registered in the new artifact."
+    }
+  ],
+  "overall_passed": true,
+  "verification_method": "deterministic+independent_qwen",
+  "verified_at": "2026-09-03T09:48:58.385447Z"
+}

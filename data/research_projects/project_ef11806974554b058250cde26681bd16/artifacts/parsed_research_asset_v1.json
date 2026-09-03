@@ -1,0 +1,87 @@
+{
+  "asset_id": "asset_dcd2c33058f4486ba3f52e26ca21e878",
+  "filename": "observations.csv",
+  "purpose": "data",
+  "asset_role": "research_material",
+  "research_round": null,
+  "source": "bundled_example",
+  "description": "Competition 1B damped-oscillator example observations (seed 20260831).",
+  "parsed_content": {
+    "parser_name": "local_delimited_v1",
+    "content_kind": "tabular",
+    "summary": "Tabular data with 3 columns and 360 scanned data rows.",
+    "extracted_text": "{\n  \"encoding\": \"utf-8-sig\",\n  \"delimiter\": \",\",\n  \"column_names\": [\n    \"time\",\n    \"displacement\",\n    \"clean_signal\"\n  ],\n  \"scanned_data_rows\": 360,\n  \"row_count_is_partial\": false,\n  \"missing_values_in_scanned_rows\": {\n    \"time\": 0,\n    \"displacement\": 0,\n    \"clean_signal\": 0\n  },\n  \"sample_rows\": [\n    {\n      \"time\": \"0.0\",\n      \"displacement\": \"0.970477930375676\",\n      \"clean_signal\": \"0.9800665778412416\"\n    },\n    {\n      \"time\": \"0.033426183844011144\",\n      \"displacement\": \"0.947898288172327\",\n      \"clean_signal\": \"0.9557279608220371\"\n    },\n    {\n      \"time\": \"0.06685236768802229\",\n      \"displacement\": \"0.9323183701134891\",\n      \"clean_signal\": \"0.925677162948798\"\n    },\n    {\n      \"time\": \"0.10027855153203344\",\n      \"displacement\": \"0.9372204858239875\",\n      \"clean_signal\": \"0.8901682745986581\"\n    },\n    {\n      \"time\": \"0.13370473537604458\",\n      \"displacement\": \"0.8247500138459959\",\n      \"clean_signal\": \"0.8494866845325003\"\n    },\n    {\n      \"time\": \"0.1671309192200557\",\n      \"displacement\": \"0.7484839055501278\",\n      \"clean_signal\": \"0.80394693072221\"\n    },\n    {\n      \"time\": \"0.20055710306406688\",\n      \"displacement\": \"0.7359649285646818\",\n      \"clean_signal\": \"0.7538903931365788\"\n    },\n    {\n      \"time\": \"0.23398328690807801\",\n      \"displacement\": \"0.6884636837994951\",\n      \"clean_signal\": \"0.6996828447684895\"\n    },\n    {\n      \"time\": \"0.26740947075208915\",\n      \"displacement\": \"0.6078787828469046\",\n      \"clean_signal\": \"0.6417118778875643\"\n    },\n    {\n      \"time\": \"0.3008356545961003\",\n      \"displacement\": \"0.5726697546859612\",\n      \"clean_signal\": \"0.5803842230894427\"\n    }\n  ]\n}",
+    "structured_summary": {
+      "encoding": "utf-8-sig",
+      "delimiter": ",",
+      "column_names": [
+        "time",
+        "displacement",
+        "clean_signal"
+      ],
+      "scanned_data_rows": 360,
+      "row_count_is_partial": false,
+      "missing_values_in_scanned_rows": {
+        "time": 0,
+        "displacement": 0,
+        "clean_signal": 0
+      },
+      "sample_rows": [
+        {
+          "time": "0.0",
+          "displacement": "0.970477930375676",
+          "clean_signal": "0.9800665778412416"
+        },
+        {
+          "time": "0.033426183844011144",
+          "displacement": "0.947898288172327",
+          "clean_signal": "0.9557279608220371"
+        },
+        {
+          "time": "0.06685236768802229",
+          "displacement": "0.9323183701134891",
+          "clean_signal": "0.925677162948798"
+        },
+        {
+          "time": "0.10027855153203344",
+          "displacement": "0.9372204858239875",
+          "clean_signal": "0.8901682745986581"
+        },
+        {
+          "time": "0.13370473537604458",
+          "displacement": "0.8247500138459959",
+          "clean_signal": "0.8494866845325003"
+        },
+        {
+          "time": "0.1671309192200557",
+          "displacement": "0.7484839055501278",
+          "clean_signal": "0.80394693072221"
+        },
+        {
+          "time": "0.20055710306406688",
+          "displacement": "0.7359649285646818",
+          "clean_signal": "0.7538903931365788"
+        },
+        {
+          "time": "0.23398328690807801",
+          "displacement": "0.6884636837994951",
+          "clean_signal": "0.6996828447684895"
+        },
+        {
+          "time": "0.26740947075208915",
+          "displacement": "0.6078787828469046",
+          "clean_signal": "0.6417118778875643"
+        },
+        {
+          "time": "0.3008356545961003",
+          "displacement": "0.5726697546859612",
+          "clean_signal": "0.5803842230894427"
+        }
+      ]
+    },
+    "warnings": [],
+    "content_sha256": "28e63e8e1eca683b4e7254de8c4407032710eb3b81c14c506ab2ea1920f5e11d",
+    "truncated": false,
+    "parsed_at": "2026-09-03T08:13:16.578065Z"
+  }
+}

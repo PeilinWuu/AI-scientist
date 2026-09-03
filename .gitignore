@@ -10,6 +10,10 @@ runs/*
 !runs/.gitkeep
 data/research_projects/*
 !data/research_projects/.gitkeep
+!data/research_projects/project_18af4366b95d4688a2a4464f6bea11cc/
+!data/research_projects/project_18af4366b95d4688a2a4464f6bea11cc/**
+!data/research_projects/project_ef11806974554b058250cde26681bd16/
+!data/research_projects/project_ef11806974554b058250cde26681bd16/**
 !data/research_projects/README.md
 !data/research_projects/project_f9374def244c4829b4b8d8c52f4d56d2/
 !data/research_projects/project_f9374def244c4829b4b8d8c52f4d56d2/**

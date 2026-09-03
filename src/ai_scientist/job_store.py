@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import tempfile
 from datetime import datetime
 from pathlib import Path
@@ -92,6 +93,37 @@ class ResearchJobStore:
                 return job
         return None
 
+    def recover_orphaned_jobs(self) -> list[ResearchJob]:
+        """Fail jobs whose in-process worker disappeared during an API restart.
+
+        This is called once while the application module starts, before the new
+        process can accept requests or create worker threads. It must not be
+        called as a periodic sweep because that could interrupt current jobs.
+        """
+
+        recovered: list[ResearchJob] = []
+        for path in sorted(self.projects_root.glob("*/jobs/*.json")):
+            try:
+                job = ResearchJob.model_validate_json(path.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, ValueError, OSError):
+                continue
+            if job.status not in {"queued", "running"}:
+                continue
+            job.status = "failed"
+            job.finished_at = utc_now()
+            job.error = {
+                "error_type": "worker_restarted",
+                "error_message": (
+                    "The API worker restarted before this stage job completed; "
+                    "the project remains at its last persisted phase and can be retried."
+                ),
+                "failure_category": "interrupted",
+                "stage": job.phase,
+            }
+            self.save(job)
+            recovered.append(job)
+        return recovered
+
 
 def fail_job(job: ResearchJob, exc: Exception) -> ResearchJob:
     job.status = "failed"
@@ -113,4 +145,15 @@ def fail_job(job: ResearchJob, exc: Exception) -> ResearchJob:
 
 def _sanitize_text(text: str) -> str:
     api_key = os.getenv("DASHSCOPE_API_KEY", "")
-    return text.replace(api_key, "[REDACTED_API_KEY]") if api_key else text
+    sanitized = text.replace(api_key, "[REDACTED_API_KEY]") if api_key else text
+    sanitized = re.sub(
+        r"(?i)(authorization\s*[:=]\s*bearer\s+)[^\s,;}]+",
+        r"\1[REDACTED]",
+        sanitized,
+    )
+    sanitized = re.sub(
+        r"(?i)(api[_ -]?key\s*[:=]\s*)[^\s,;}]+",
+        r"\1[REDACTED]",
+        sanitized,
+    )
+    return sanitized

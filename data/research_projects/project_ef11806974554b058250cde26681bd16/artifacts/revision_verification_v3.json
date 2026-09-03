@@ -1,0 +1,35 @@
+{
+  "verification_id": "revision_verification_bc858b7e2dc84f4189e4ffa7cdc42979",
+  "action_id": "revision_batch_1b3f4904145c4fedbf72c92bb1a80cf1",
+  "target_artifact": "methodology",
+  "artifact_version": 4,
+  "criteria_results": [
+    {
+      "criterion": "存在可追溯的完整数据质检记录，且正式拟合仅使用 time 与 displacement。",
+      "passed": false,
+      "evidence": "methodological_rationale: 'data_quality_check_status ... 当前该记录的状态为 missing；状态只能从 missing 变更为 complete，且必须填入实际数值。' required_controls: '必须填写 data_quality_check_status ... read_row_count、valid_row_count、time_range、displacement_range、clean_signal_range、missing_time_count、missing_displacement_count、missing_clean_signal_count、duplicate_time_count、non_finite_count、time_sort_state、analysis_columns=[time,displacement]、excluded_columns=[clean_signal]。'",
+      "note": "Deterministic: Advisory semantic token check; independent verification is authoritative. Independent: 新文本只定义了数据质检记录字段和状态门控，并声明当前状态为 missing；没有实际读取行数、有效行数、范围、缺失值计数、重复 time 计数、非有限值计数或排序状态的可追溯执行数值。正式拟合列约束存在，但不构成已完成的数据质检记录。"
+    },
+    {
+      "criterion": "存在 Round 1 与 Round 2 的网格级执行记录，且两轮模型、数据列、最小二乘规则和 RMSE 定义一致。",
+      "passed": false,
+      "evidence": "methodological_rationale: 'round_1_grid_table ... 当前 grid_record_status 均为 missing；状态只能从 missing 变更为 complete，且必须包含实际网格记录。' required_controls: 'round_1_grid_table 必须覆盖所有正式评估点；每条记录包含 evaluation_order、damping、omega、estimated_amplitude_A、estimated_phase_phi、rmse、boundary_flag。' 'round_2_grid_table 每条记录包含 evaluation_order、damping、omega、estimated_amplitude_A、estimated_phase_phi、rmse、boundary_flag。'",
+      "note": "Deterministic: Advisory semantic token check; independent verification is authoritative. Independent: 新文本定义了 Round 1 与 Round 2 的网格记录字段、模型一致性、数据列、估计规则和 RMSE 定义，但明确说明网格记录状态为 missing，没有逐点评估数值、参数、RMSE、评估顺序、触界标记或低 RMSE 集合，因此不是实际执行记录。"
+    },
+    {
+      "criterion": "存在预算审计记录，证明未超过 306 次正式评估上限。",
+      "passed": false,
+      "evidence": "methodological_rationale: 'budget_audit_status ... 当前 budget_audit_status 为 missing；只有当 total_formal_evaluations<=306、within_budget=true、所有重复或诊断评估被单独标记时，才可变更为 complete。' required_controls: '必须填写 budget_audit_status、round_1_evaluations、round_2_evaluations、total_formal_evaluations、budget_limit=306、within_budget、repeat_evaluation_count、diagnostic_evaluation_count、diagnostic_label'",
+      "note": "Deterministic: Advisory semantic token check; independent verification is authoritative. Independent: 新文本设置了预算审计字段和 306 次上限规则，但没有提供 total_formal_evaluations、round_1_evaluations、round_2_evaluations 的实际数值，也没有将 budget_audit_status 标记为 complete；不能证明实际预算未超过 306。"
+    },
+    {
+      "criterion": "若任何执行能力缺失，必须记录能力缺失并暂停正式结论，而不是以规划替代执行。",
+      "passed": true,
+      "evidence": "methodological_rationale: '当前五项能力缺失均为 true，formal_conclusion_status=suspended；在全部对应执行证据补齐前，不得恢复正式参数辨识结论。' required_controls: '执行阻塞门控：data_quality_check_status、round_1_grid_record_status、round_2_range_derivation_status、round_2_grid_record_status、budget_audit_status 均初始为 missing；formal_conclusion_status=suspended。' '能力缺失登记控制：在正式执行证据补齐前，capability_gap_register 必须保持 missing_data_quality_record=true、missing_round_1_grid_record=true、missing_round_2_range_derivation_record=true、missing_round_2_grid_record=true、missing_budget_audit_record=true，并保持 formal_conclusion_status=suspended。'",
+      "note": "Deterministic: Advisory semantic token check; independent verification is authoritative. Independent: 新文本明确记录了五项能力缺失均为 true，并暂停正式结论；没有以规划替代执行。此项满足，但不弥补前三项缺少实际执行证据的问题。"
+    }
+  ],
+  "overall_passed": false,
+  "verification_method": "deterministic+independent_qwen",
+  "verified_at": "2026-09-03T09:30:10.865052Z"
+}

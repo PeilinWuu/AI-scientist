@@ -46,11 +46,19 @@ RUNS_DIR=/var/lib/ai-scientist/runs
 AI_SCIENTIST_COMPETITION_DIR=/var/lib/ai-scientist/competition
 AI_SCIENTIST_DEFAULT_PLANNING_ONLY=true
 AI_SCIENTIST_MAX_MODEL_CALLS=50
+LLM_TIMEOUT=1800
+AI_SCIENTIST_MODEL_TIMEOUT=1800
+AI_SCIENTIST_MODEL_MAX_RETRIES=1
+AI_SCIENTIST_SEARCH_QUERY_TIMEOUT=1200
+AI_SCIENTIST_EXTRACTION_TIMEOUT=1800
+AI_SCIENTIST_FRONTEND_STEP_TIMEOUT=1800
 AI_SCIENTIST_ENABLE_CONTROLLED_PYTHON=0
 UI_TIMEZONE=Asia/Shanghai
 ```
 
 `AI_SCIENTIST_ENABLE_CONTROLLED_PYTHON=0` 是默认安全值；只有明确需要实验性沙箱时才改为 `1`。环境文件权限建议 `chmod 640`，属主为 root、组为 `aiscientist`。
+
+上述长 timeout 仅用于模型、搜索、抽取和研究阶段调用；健康检查、普通 GET 和静态资源继续使用短 timeout。`AI_SCIENTIST_MODEL_MAX_RETRIES=1` 仅允许 SDK 对瞬时网络错误、timeout、429 和 5xx 做一次有限重试，不重试认证、权限、model-not-found 或无效请求等不可恢复 4xx。
 
 ## 启动命令
 

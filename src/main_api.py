@@ -59,6 +59,7 @@ INLINE_ASSET_MEDIA_TYPES = {
 
 research_orchestrator = ResearchOrchestrator()
 research_job_store = ResearchJobStore(research_orchestrator.store.root)
+research_job_store.recover_orphaned_jobs()
 research_orchestrator.recover_revision_projects()
 
 

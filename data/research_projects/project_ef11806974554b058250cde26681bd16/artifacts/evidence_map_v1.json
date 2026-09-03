@@ -1,0 +1,188 @@
+{
+  "evidence": [
+    {
+      "evidence_id": "EVD-001",
+      "title": "Data-Driven Parameter Identification of Synchronous Generators: A Three-Stage Framework with State Consistency and Grid Decoupling",
+      "source_type": "unknown",
+      "source_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC13075048",
+      "source_asset_id": null,
+      "citation": "Peykarporsan, R., Waduge, T. G., Lie, T. T., & Stommel, M. (2026). Data-Driven Parameter Identification of Synchronous Generators: A Three-Stage Framework with State Consistency and Grid Decoupling. Sensors, 26(7), 2024.",
+      "authors": [
+        "Rasool Peykarporsan",
+        "Tharuka Govinda Waduge",
+        "Tek Tjing Lie",
+        "Martin Stommel"
+      ],
+      "doi": "10.3390/s26072024",
+      "pmid": null,
+      "arxiv_id": null,
+      "official_record_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC13075048",
+      "journal_or_publisher": "Sensors",
+      "summary": "该研究提出并验证了一个三阶段数据驱动辨识框架，用于同步发电机的Port-Hamiltonian（PH）建模。该框架利用传感器采集的电压和电流信号捕捉系统动态，同时保持与PH模型结构的兼容性。研究通过多场景激励、无导数状态一致性优化和基于物理的正则化等方法，实现了对同步发电机八个关键参数的完整辨识。",
+      "extracted_claims": [
+        "提出了三阶段数据驱动参数辨识框架",
+        "使用无导数状态一致性优化解决传统基于导数公式中的噪声敏感性问题",
+        "应用基于物理的正则化确保物理意义和可靠性",
+        "实现了八个关键参数的完整辨识，误差范围在1.26%到9.10%之间",
+        "验证指标显示RMS转子角误差低于1.2°，速度误差低于0.15%",
+        "成功解决了IEEE标准115的根本局限性，包括单场景可辨识性约束、噪声敏感的基于导数公式以及无法解耦发电机内部阻尼与电网贡献"
+      ],
+      "reliability": "peer_reviewed",
+      "relevance": "moderately_relevant",
+      "limitations": [
+        "当前Stage 3流程还不是连续滑动窗口估计器，需要未来工作来适应在线参数跟踪",
+        "研究对象是同步发电机而非阻尼振子，物理系统和参数类型不同",
+        "未直接涉及两阶段网格搜索或RMSE优化策略"
+      ],
+      "publication_date": "2026",
+      "publication_year": "2026",
+      "status": "verified",
+      "source_level": "A",
+      "is_primary_source": true,
+      "verified": true,
+      "verification_status": "verified",
+      "verification_method": "doi",
+      "verification_note": "DOI is present and normalized; source can be independently checked.",
+      "duplicate_of": null,
+      "retrieval_date": "2026-09-03T08:24:13.475354Z",
+      "reliability_score": 1.0,
+      "relevance_score": 0.25,
+      "selection_provenance": {
+        "selected_by": "human",
+        "selection_id": "source_selection_0d067bf6154f4150b17813dd609e286b",
+        "candidate_id": "candidate_c66fe8e5f513446d9dbdca39513277c8",
+        "verification_method": "doi"
+      }
+    }
+  ],
+  "claims": [
+    {
+      "claim_id": "claim_obs_001",
+      "statement": "observations.csv（asset_dcd2c33058f4486ba3f52e26ca21e878）包含360行数据，三列分别为time、displacement和clean_signal，无缺失值。",
+      "claim_type": "observation",
+      "supporting_evidence_ids": [],
+      "contradicting_evidence_ids": [],
+      "confidence": 1.0,
+      "assumptions": [
+        "数据解析过程准确反映了文件内容"
+      ],
+      "limitations": [
+        "仅基于文件摘要，未进行完整数据验证",
+        "The model did not link this claim to a validated evidence record."
+      ],
+      "status": "unknown",
+      "dimension": "unspecified"
+    },
+    {
+      "claim_id": "claim_obs_002",
+      "statement": "数据样本显示displacement值从0.970开始，随时间递减并呈现振荡特征，clean_signal与displacement数值接近但不完全相同。",
+      "claim_type": "observation",
+      "supporting_evidence_ids": [],
+      "contradicting_evidence_ids": [],
+      "confidence": 0.95,
+      "assumptions": [
+        "样本行具有代表性"
+      ],
+      "limitations": [
+        "仅基于前10行样本，未分析全部数据分布",
+        "The model did not link this claim to a validated evidence record."
+      ],
+      "status": "unknown",
+      "dimension": "unspecified"
+    },
+    {
+      "claim_id": "claim_inf_001",
+      "statement": "阻尼振子参数辨识问题需要在有界参数空间内进行搜索优化，damping∈[0.05, 0.35]，omega∈[2.0, 2.8]。",
+      "claim_type": "inference",
+      "supporting_evidence_ids": [],
+      "contradicting_evidence_ids": [],
+      "confidence": 0.9,
+      "assumptions": [
+        "建议范围足以包含真实参数值",
+        "有界搜索是满足约束的可接受方法"
+      ],
+      "limitations": [
+        "真实参数可能位于建议范围边界或之外",
+        "未考虑参数间的相关性",
+        "The model did not link this claim to a validated evidence record."
+      ],
+      "status": "unknown",
+      "dimension": "theoretical_concept"
+    },
+    {
+      "claim_id": "claim_inf_002",
+      "statement": "两阶段网格搜索策略可用于参数辨识：第一阶段粗网格定位低RMSE区域，第二阶段基于第一阶段结果细化搜索范围。",
+      "claim_type": "hypothesis",
+      "supporting_evidence_ids": [
+        "evidence_001"
+      ],
+      "contradicting_evidence_ids": [],
+      "confidence": 0.7,
+      "assumptions": [
+        "参数空间存在局部最优区域",
+        "细化搜索能够进一步降低RMSE"
+      ],
+      "limitations": [
+        "未验证该策略对阻尼振子问题的具体效果",
+        "网格密度和细化规则需要实验确定"
+      ],
+      "status": "partially_supported",
+      "dimension": "theoretical_concept"
+    },
+    {
+      "claim_id": "claim_hyp_001",
+      "statement": "基于Peykarporsan等人(2026)的多阶段辨识框架理念，采用无导数优化方法可以避免噪声放大问题，提高参数辨识的鲁棒性。",
+      "claim_type": "hypothesis",
+      "supporting_evidence_ids": [
+        "evidence_001"
+      ],
+      "contradicting_evidence_ids": [],
+      "confidence": 0.6,
+      "assumptions": [
+        "网格搜索属于无导数方法",
+        "阻尼振子问题与同步发电机问题在噪声特性上具有可比性"
+      ],
+      "limitations": [
+        "两个问题的物理系统和参数类型差异较大",
+        "未直接验证该假设在当前问题中的适用性"
+      ],
+      "status": "partially_supported",
+      "dimension": "theoretical_concept"
+    },
+    {
+      "claim_id": "claim_con_001",
+      "statement": "在受控计算预算内，通过两阶段有界网格搜索可以降低阻尼振子参数辨识的拟合RMSE。",
+      "claim_type": "prediction",
+      "supporting_evidence_ids": [],
+      "contradicting_evidence_ids": [],
+      "confidence": 0.5,
+      "assumptions": [
+        "计算预算充足以覆盖关键参数区域",
+        "模型形式正确指定",
+        "噪声水平不会导致参数不可辨识"
+      ],
+      "limitations": [
+        "未经过实际实验验证",
+        "未考虑模型误设风险",
+        "未量化预期RMSE降低幅度"
+      ],
+      "status": "unsupported",
+      "dimension": "theoretical_concept"
+    }
+  ],
+  "evidence_gaps": [
+    "缺乏针对阻尼振子参数辨识的两阶段网格搜索策略的直接文献证据",
+    "未找到关于如何基于第一阶段结果确定第二阶段细化范围的具体方法论指导",
+    "缺少阻尼振子问题中噪声水平对参数可辨识性影响的定量研究",
+    "未找到关于计算预算约束下网格搜索效率优化的相关研究",
+    "缺乏阻尼振子模型完整形式（包括初始幅值、相位、基线等）的标准定义"
+  ],
+  "conflicting_evidence": [
+    "无直接冲突证据，但现有文献（同步发电机参数辨识）与目标问题（阻尼振子参数辨识）在物理系统和参数类型上存在显著差异，直接外推存在不确定性"
+  ],
+  "unsupported_claims": [
+    "claim_con_001：两阶段网格搜索能够降低RMSE的预测尚未经过实验验证",
+    "claim_hyp_001：无导数方法在阻尼振子问题中的鲁棒性优势尚未得到直接证实"
+  ],
+  "confidence_summary": "基于现有证据，对数据结构和参数辨识问题定义具有较高置信度（0.9-1.0），对两阶段搜索策略的理论合理性具有中等置信度（0.6-0.7），但对实际效果预测的置信度较低（0.5）。主要不确定性来源于缺乏针对阻尼振子问题的直接文献证据，以及模型形式和噪声特性的不完全已知。"
+}

@@ -1,0 +1,35 @@
+{
+  "verification_id": "revision_verification_47a33fbcddf94f8d8ebd6678a16e6ecf",
+  "action_id": "revision_batch_05862b5702c34f46bb1e26bf2e7ab52e",
+  "target_artifact": "analysis_plan",
+  "artifact_version": 2,
+  "criteria_results": [
+    {
+      "criterion": "随机算法使用状态已明确。",
+      "passed": true,
+      "evidence": "objectives[6]：\"在主分析中优先采用确定性统计计算；显式声明本方案不包含 bootstrap、交叉验证或随机抽样，若后续需引入随机不确定性估计，必须先经人工确认并记录随机种子与次数。\"",
+      "note": "Deterministic: Advisory semantic token check; independent verification is authoritative. Independent: 目标章节明确了当前方案不使用随机算法，并将任何后续随机步骤限制在人工确认后。"
+    },
+    {
+      "criterion": "若使用随机算法，种子和次数已记录。",
+      "passed": true,
+      "evidence": "sensitivity_analysis[6]：\"若人工确认后引入随机不确定性估计，必须固定随机种子、记录重抽样次数，并比较不同种子或固定种子下的稳定性。\"",
+      "note": "Deterministic: Advisory semantic token check; independent verification is authoritative. Independent: 新方案默认未使用随机算法；条件性要求若引入随机算法必须记录种子和次数，满足该条件分支。"
+    },
+    {
+      "criterion": "若未使用随机算法，已有显式声明。",
+      "passed": true,
+      "evidence": "metrics[9]：\"复现审计指标：数据哈希、记录数、输出文件清单、运行时间、软件版本和随机算法使用状态；本方案默认状态为“无随机算法步骤”。\"",
+      "note": "Deterministic: Advisory semantic token check; independent verification is authoritative. Independent: 在指标和成功标准中均显式记录了“无随机算法步骤”的默认状态。"
+    },
+    {
+      "criterion": "分析计划中的不确定性估计方法与随机性状态一致。",
+      "passed": true,
+      "evidence": "uncertainty_quantification[8]：\"不确定性估计方法与随机性状态保持一致：当前方案为确定性主分析，因此所有主要不确定性度量优先采用解析方法或预定义非随机规则。\"",
+      "note": "Deterministic: Advisory semantic token check; independent verification is authoritative. Independent: 不确定性方法使用 Fisher z、回归标准误和确定性公式，与“无随机算法步骤”的声明一致。"
+    }
+  ],
+  "overall_passed": true,
+  "verification_method": "deterministic+independent_qwen",
+  "verified_at": "2026-09-03T07:07:59.837642Z"
+}
