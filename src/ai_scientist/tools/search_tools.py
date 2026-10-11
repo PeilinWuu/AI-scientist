@@ -12,6 +12,7 @@ from src.search_qwen_client import (
     SearchQwenClient,
     extract_final_text,
     extract_request_id,
+    extract_tool_usage,
     extract_sources as extract_response_sources,
 )
 
@@ -19,22 +20,72 @@ from src.search_qwen_client import (
 class QwenEvidenceSearchTool:
     name = "web_search"
 
+    def search_papers(self, query: str) -> dict[str, object]:
+        from src.ai_scientist.tools.research_web import search_papers
+        result = search_papers(query)
+        candidates = []
+        for rank, paper in enumerate(result['papers'], 1):
+            dates = (paper.get('published') or {}).get('date-parts') or []
+            candidate = SearchCandidate(
+                title=paper.get('title') or '', url=paper.get('url') or '', query=query, rank=rank,
+                doi=paper.get('doi'), source_domain=urlparse(paper.get('url') or '').netloc,
+                authors=[' '.join(str(a.get(k) or '') for k in ('given', 'family')).strip()
+                         for a in paper.get('authors') or []],
+                publication_year=str(dates[0][0]) if dates and dates[0] else None,
+                journal_or_publisher=paper.get('publisher'), source_type=paper.get('type') or 'unknown',
+                snippet=paper.get('abstract') or '',
+                verification_note='Crossref metadata only; original source not yet read.',
+            )
+            candidates.append(candidate.model_dump(mode='json'))
+        return {'candidates': candidates, 'provider': 'Crossref', 'model_calls': 0}
+
+    def read_sources(self, candidates, progress_callback=None):
+        """Keep each actual public response separate; never attribute a batch summary to a page."""
+        from src.ai_scientist.tools.research_web import read_source
+        results = {}
+        for candidate in candidates:
+            try:
+                snapshot = read_source(candidate.url)
+                snapshot['retrieved_at'] = utc_now().isoformat()
+                results[candidate.candidate_id] = {
+                    'status': 'completed', 'text': snapshot['text'], 'snapshot': snapshot, 'error': '',
+                }
+            except Exception as exc:
+                results[candidate.candidate_id] = {
+                    'status': 'failed', 'text': '', 'error': str(exc)[:1000],
+                    'snapshot': {'url': candidate.url, 'retrieval_status': 'failed'},
+                }
+            if progress_callback:
+                progress_callback('source_read_completed')
+        return {'source_results': results, 'model_calls': 0}
+
     def search_query(self, query: str, model: str) -> dict[str, object]:
         """Run one independent query with web_search as the only tool."""
 
         client = SearchQwenClient(timeout_env="AI_SCIENTIST_SEARCH_QUERY_TIMEOUT")
         try:
-            response = client.client.responses.create(
+            response = client.client.with_options(max_retries=0).responses.create(
                 model=model,
                 input=query,
                 tools=[{"type": "web_search"}],
+                tool_choice="required",
+                # The stage model has already chosen this search. DashScope does not
+                # allow required tool_choice in thinking mode for this adapter request.
+                extra_body={"enable_thinking": False},
+                instructions="Search for primary source pages matching the query. Return sources, not an unsourced explanation or solution.",
             )
         except Exception as exc:
             _annotate(exc, model, client.base_url, ["web_search"])
             raise
+        finally:
+            client.http_client.close()
         candidates = _search_candidates(response, query)
+        search_executed = extract_tool_usage(response)['web_search'] > 0
         return {
-            "candidates": [item.model_dump(mode="json") for item in candidates],
+            "candidates": [item.model_dump(mode="json") for item in candidates] if search_executed else [],
+            "search_executed": search_executed,
+            "tool_usage": extract_tool_usage(response),
+            "status": 'completed' if search_executed else 'tool_not_executed',
             "response_id": _value(response, "id"),
             "request_id": extract_request_id(response),
             "final_text": extract_final_text(response),

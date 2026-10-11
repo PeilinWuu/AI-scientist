@@ -43,10 +43,10 @@ def is_system_quality_gate(text: str) -> bool:
     return any(normalized.startswith(prefix) for prefix in SYSTEM_GATE_PREFIXES)
 
 
-def normalize_revision_plan(review: ReviewResult, planning_only: bool) -> list[RevisionIssue]:
+def normalize_revision_plan(review: ReviewResult, planning_only: bool, model_led: bool = False) -> list[RevisionIssue]:
     """Convert reviewer actions into deduplicated, correctly routed user-facing issues."""
 
-    actions = [action for action in review.revision_plan if not _action_is_system_gate(action)]
+    actions = [action for action in review.revision_plan if model_led or not _action_is_system_gate(action)]
     if not actions:
         actions = [
             RevisionAction(
@@ -56,36 +56,40 @@ def normalize_revision_plan(review: ReviewResult, planning_only: bool) -> list[R
                 completion_criteria=["The planning defect is explicitly resolved in the target artifact."],
             )
             for issue in review.blocking_issues
-            if not is_system_quality_gate(issue)
+            if model_led or not is_system_quality_gate(issue)
         ]
 
     issues: list[RevisionIssue] = []
     for action in actions:
         text = _action_text(action)
-        classification = _classify_action(text, action.priority, planning_only)
-        target = _route_target(action.target, text, classification)
+        classification = action.classification if model_led else _classify_action(text, action.priority, planning_only)
+        aliases = {'method': 'methodology', 'design': 'study_design', 'analysis': 'analysis_plan'}
+        target = aliases.get(action.target, action.target) if model_led else _route_target(action.target, text, classification)
         issue = RevisionIssue(
             source_action_ids=[action.action_id],
             classification=classification,
             target=target,
             problem=action.reason or (action.required_changes[0] if action.required_changes else "需要修订研究计划。"),
             severity=_severity_label(classification),
-            impact=_impact_text(target, classification),
+            impact=_impact_text(target, classification, planning_only),
             reviewer_recommendations=list(dict.fromkeys(action.required_changes)),
-            completion_criteria=normalize_completion_criteria(action.completion_criteria, planning_only),
+            completion_criteria=list(action.completion_criteria) if model_led else normalize_completion_criteria(action.completion_criteria, planning_only),
             priority=action.priority,
         )
-        _merge_or_append(issues, issue)
+        if model_led:
+            issues.append(issue)
+        else:
+            _merge_or_append(issues, issue)
 
     for text in review.non_blocking_issues:
-        if is_system_quality_gate(text):
+        if not model_led and is_system_quality_gate(text):
             continue
         issue = RevisionIssue(
             classification="non_blocking",
-            target=_route_target("method", text, "non_blocking"),
+            target='methodology' if model_led else _route_target("method", text, "non_blocking"),
             problem=text,
-            severity="建议改进，但不阻止规划审批",
-            impact="该问题影响完整性，但不应阻止 planning-only 研究计划进入人工批准。",
+            severity="建议改进；是否影响发布需结合当前执行结果判断",
+            impact="该问题被模型列为非阻断建议，不等于交付物已完成验证。",
             reviewer_recommendations=[text],
             completion_criteria=[],
             priority=50,
@@ -155,7 +159,7 @@ def build_approved_revision_plan(
     for issue_id, issue in issue_by_id.items():
         issue.completion_criteria = normalize_completion_criteria(
             issue.completion_criteria,
-            project.planning_only,
+            project.planning_only and project.research_policy_version == 1,
         )
         decision = decision_by_id[issue_id]
         if decision.disposition in {"accept_modified", "provide_content", "reject"} and not (
@@ -416,9 +420,10 @@ def _severity_label(classification: str) -> str:
     }[classification]
 
 
-def _impact_text(target: str, classification: str) -> str:
+def _impact_text(target: str, classification: str, planning_only: bool = True) -> str:
     if classification == "execution_prerequisite":
-        return "这是未来执行要求；planning-only 阶段只需明确执行安排，不要求现在已经完成。"
+        return ("这是未来执行要求；planning-only 阶段只需明确执行安排，不要求现在已经完成。"
+                if planning_only else "这是实际执行或交付要求；必须检查真实产物，修改计划文字不能视为已完成。")
     return {
         "analysis_plan": "若未预先规定，后续分析可能产生事后方法选择偏倚。",
         "reproducibility_plan": "若缺少可执行细节，其他研究者无法复现计划中的流程。",

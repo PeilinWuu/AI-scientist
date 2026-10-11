@@ -554,7 +554,7 @@ def test_rejected_source_card_does_not_nest_streamlit_expanders(
     app.run(timeout=20)
 
     assert not app.exception
-    assert any("AI 建议排除（1）" in item.value for item in app.markdown)
+    assert any("旧版规则建议排除（1）" in item.value for item in app.markdown)
 
 
 def test_failed_job_ui_retries_the_same_project_without_showing_cancelled_state(
@@ -586,6 +586,12 @@ def test_failed_job_ui_retries_the_same_project_without_showing_cancelled_state(
     def fake_get(url: str, **_: object) -> SuccessfulResponse:
         if "/api/research/jobs/" in url:
             return SuccessfulResponse(failed_job)
+        if url.endswith('/api/research/project_retry'):
+            return SuccessfulResponse({
+                'project_id': 'project_retry', 'phase': 'BACKGROUND_RESEARCH',
+                'planning_only': True, 'iteration': 0, 'research_assets': [],
+                'budget': {'used_model_calls': 1, 'max_model_calls': 10},
+            })
         return SuccessfulResponse([] if url.endswith("/events") else {})
 
     def fake_post(url: str, **_: object) -> SuccessfulResponse:
@@ -615,16 +621,16 @@ def test_failed_job_ui_retries_the_same_project_without_showing_cancelled_state(
     app.run(timeout=20)
 
     assert not app.exception
-    assert any(button.label == "🔄 重试本阶段" for button in app.button)
+    assert any(button.label == "重试当前研究阶段" for button in app.button)
     visible_text = "\n".join(
         str(item.value) for collection in (app.error, app.warning, app.markdown) for item in collection
     )
-    assert "本阶段执行失败" in visible_text
+    assert "上次操作未完成" in visible_text
     assert "项目已取消" not in visible_text
 
-    next(button for button in app.button if button.label == "🔄 重试本阶段").click().run(timeout=20)
+    next(button for button in app.button if button.label == "重试当前研究阶段").click().run(timeout=20)
 
-    assert calls == ["http://localhost:8000/api/research/project_retry/step_async"]
+    assert calls == ["http://localhost:8000/api/research/project_retry/continue_async"]
     assert app.session_state["research_project_id"] == "project_retry"
 
 

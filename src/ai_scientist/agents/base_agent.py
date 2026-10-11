@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 from src.ai_scientist.schemas import ResearchProject
 from src.ai_scientist.presentation import determine_output_language, language_instruction
+from src.ai_scientist.research_context import SHARED_CONTEXT_INSTRUCTION, build_research_context
 from src.ai_scientist.skill_loader import SkillLoader
 from src.ai_scientist.structured_client import StructuredCallMetadata, StructuredQwenClient
 
@@ -45,6 +46,13 @@ class BaseResearchAgent(Generic[OutputT]):
             domain_skill,
         )
         payload = self.build_payload(project)
+        payload["shared_research_context"] = build_research_context(project)
+        if project.research_policy_version == 2:
+            payload['research_basis'] = project.background_agent.get('scope')
+            payload['basis_decision'] = project.background_agent.get('basis_approval')
+            payload['evidence_rule'] = ('External literature is not universally required. Evaluate the actual question and '
+                'approved basis: mathematical derivations, uploaded data or future execution. A plan is not an observation. '
+                'Do not demand literature quotas or fabricate completed validation. Independently challenge an invalid basis.')
         output_language = determine_output_language(project.objective)
         payload["output_language"] = output_language
         payload["language_rule"] = language_instruction(output_language)
@@ -53,7 +61,7 @@ class BaseResearchAgent(Generic[OutputT]):
             payload["uploaded_asset_context"] = asset_context
         result = self.client.call(
             agent_name=self.agent_name,
-            instructions=self.skill_loader.compose_instructions(skills),
+            instructions=self.skill_loader.compose_instructions(skills) + "\n\n" + SHARED_CONTEXT_INSTRUCTION,
             payload=payload,
             output_model=self.output_model,
         )
@@ -78,7 +86,16 @@ def project_snapshot(project: ResearchProject, fields: list[str]) -> dict[str, A
     """Pass only named structured project fields to a role."""
 
     dumped = project.model_dump(mode="json")
-    return {field: dumped.get(field) for field in fields}
+    snapshot = {field: dumped.get(field) for field in fields}
+    if isinstance(snapshot.get('computation'), dict):
+        state = dict(snapshot['computation'])
+        # Do not duplicate every previous script and attempt in every reviewer
+        # prompt. Retain current work, latest executed evidence and report.
+        state.pop('history', None)
+        state['rounds'] = state.get('rounds', [])[-2:]
+        state['attempts'] = state.get('attempts', [])[-2:]
+        snapshot['computation'] = state
+    return snapshot
 
 
 def parsed_asset_context(project: ResearchProject) -> dict[str, Any]:

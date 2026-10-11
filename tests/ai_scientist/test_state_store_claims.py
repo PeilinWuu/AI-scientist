@@ -101,9 +101,8 @@ def test_claim_graph_requires_evidence_and_protects_conclusion() -> None:
     assert graph.validate_conclusion_traceability(conclusion) == [invalid.statement]
 
 
-def test_reviewer_cannot_approve_low_score() -> None:
-    with pytest.raises(ValidationError):
-        ReviewResult(
+def test_reviewer_low_score_is_preserved_as_model_judgment() -> None:
+    review = ReviewResult(
             evidence_quality_score=5,
             methodological_validity_score=8,
             feasibility_score=8,
@@ -111,7 +110,9 @@ def test_reviewer_cannot_approve_low_score() -> None:
             claim_support_score=8,
             uncertainty_handling_score=8,
             decision="approve",
-        )
+    )
+    assert review.evidence_quality_score == 5
+    assert review.decision == 'approve'
 
 
 def test_execution_adapter_exposes_only_controlled_operations() -> None:
@@ -205,8 +206,10 @@ def test_quality_metrics_source_grading_and_reviewer_gates() -> None:
         decision="approve",
     )
     gated = apply_reviewer_quality_gates(review, metrics)
-    assert gated.decision == "revise_hypothesis"
-    assert "hypothesis_completeness_below_0.8" in gated.failed_quality_gates
+    assert gated is review
+    assert gated.decision == 'approve'
+    assert 'hypothesis_completeness_below_0.8' in failed_quality_gates(metrics, review)
+    assert gated.failed_quality_gates == []
 
 
 def test_missing_conclusion_does_not_fail_traceability_gate() -> None:

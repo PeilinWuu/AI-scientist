@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from src.ai_scientist.quality import source_level_distribution
@@ -89,6 +90,8 @@ def build_research_plan_json(project: ResearchProject) -> dict[str, Any]:
         "reproducibility_plan": project.reproducibility_plan,
         "internal_execution_summary": project.internal_execution_summary,
         "controlled_python_runs": project.controlled_python_runs,
+        "computation": project.computation,
+        "research_workspace": project.research_workspace,
         "reviewer": review,
         "revision_workflow": {
             "issues": [item.model_dump(mode="json") for item in project.revision_issues],
@@ -267,6 +270,16 @@ def _execution_summary_markdown(project: ResearchProject) -> str:
     if project.controlled_python_runs:
         successful = len([item for item in project.controlled_python_runs if item.get("status") == "success"])
         lines.append(f"- Successful controlled Python runs: `{successful}`")
+    for record in project.computation.get('rounds', []):
+        audit = record['attempts'][-1]
+        lines.extend(['', f"### Generated computation round {record['round']}",
+                      f"- Approved method: {record['plan']['method']}",
+                      f"- Code SHA-256: `{audit.get('code_sha256')}`",
+                      f"- Programming repairs: `{len(record['attempts']) - 1}`",
+                      f"- Interpretation: {record['assessment']['interpretation']}",
+                      f"- Decision: `{record['assessment']['decision']}`",
+                      '```json', json.dumps(audit.get('result'), ensure_ascii=False, indent=2), '```'])
+        lines.extend(f"- Limitation: {item}" for item in record['assessment']['limitations'])
     return "\n".join(lines)
 
 

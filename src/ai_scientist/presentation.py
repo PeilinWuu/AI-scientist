@@ -39,7 +39,7 @@ PHASE_LABELS = {
     "FEASIBILITY_REVIEW": "独立审查与修订",
     "HUMAN_REVISION_REVIEW": "人工审查修订建议",
     "REVISION": "执行已批准的修订计划",
-    "CRITICAL_REVIEW": "修订后独立复审",
+    "CRITICAL_REVIEW": "独立复审",
     "HUMAN_APPROVAL": "等待人工批准",
     "SYNTHESIS": "形成研究方案",
     "COMPLETED": "研究方案完成",

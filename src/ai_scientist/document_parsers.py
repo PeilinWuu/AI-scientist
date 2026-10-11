@@ -64,14 +64,19 @@ def _parse_text(path: Path, digest: str) -> ParsedAssetContent:
 
 def _parse_delimited(path: Path, digest: str, suffix: str) -> ParsedAssetContent:
     text, encoding = _read_text(path)
-    sample = text[:8192]
+    # Keep the original bytes untouched. Record, rather than silently discard,
+    # scientific metadata/comment and title lines before the actual CSV header.
+    lines = text.splitlines()
+    noncomment = [line for line in lines if line.strip() and not line.lstrip().startswith('#')]
+    skipped_comments = len(lines) - len(noncomment)
+    sample = '\n'.join(noncomment)[:8192]
     fallback_delimiter = "\t" if suffix == ".tsv" else ","
     try:
         dialect = csv.Sniffer().sniff(sample, delimiters=",\t;|")
         delimiter = dialect.delimiter
     except csv.Error:
         delimiter = fallback_delimiter
-    reader = csv.reader(io.StringIO(text), delimiter=delimiter)
+    reader = csv.reader(io.StringIO('\n'.join(noncomment)), delimiter=delimiter)
     rows: list[list[str]] = []
     scan_limit_reached = False
     for index, row in enumerate(reader):
@@ -81,6 +86,10 @@ def _parse_delimited(path: Path, digest: str, suffix: str) -> ParsedAssetContent
         rows.append([str(value) for value in row])
     if not rows:
         raise ValueError("Delimited data file contains no rows.")
+    skipped_titles = 0
+    while len(rows) > 2 and len(rows[0]) == 1 and len(rows[1]) > 1 and len(rows[1]) == len(rows[2]):
+        rows.pop(0)
+        skipped_titles += 1
     headers = _unique_headers(rows[0])
     data_rows = rows[1:]
     missing = {
@@ -97,6 +106,8 @@ def _parse_delimited(path: Path, digest: str, suffix: str) -> ParsedAssetContent
         "row_count_is_partial": partial,
         "missing_values_in_scanned_rows": missing,
         "sample_rows": samples,
+        "skipped_comment_or_blank_lines": skipped_comments,
+        "skipped_title_rows": skipped_titles,
     }
     extracted, truncated = _bounded(json.dumps(summary, ensure_ascii=False, indent=2, default=str))
     return ParsedAssetContent(
@@ -105,7 +116,9 @@ def _parse_delimited(path: Path, digest: str, suffix: str) -> ParsedAssetContent
         summary=f"Tabular data with {len(headers)} columns and {len(data_rows)} scanned data rows.",
         extracted_text=extracted,
         structured_summary=summary,
-        warnings=["Row count is partial because the parser scan limit was reached."] if partial else [],
+        warnings=(["Row count is partial because the parser scan limit was reached."] if partial else [])
+            + ([f'Header inference skipped {skipped_comments} comment/blank lines and {skipped_titles} title rows; verify against the raw file.'] if skipped_comments or skipped_titles else [])
+            + (['Inconsistent row widths; inspect the raw data before analysis.'] if any(len(row) != len(headers) for row in data_rows) else []),
         content_sha256=digest,
         truncated=truncated,
     )

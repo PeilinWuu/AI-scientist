@@ -386,3 +386,45 @@ def test_zero_evidence_returns_to_source_review_and_claim_mapper_is_not_called(
     claim_result = orchestrator.run_next_step(item.project_id)
     assert claim_result["current_phase"] == ResearchPhase.HUMAN_SOURCE_REVIEW.value
     assert orchestrator.get_project(item.project_id).budget.used_model_calls == calls_before
+
+
+def test_stage_routes_paper_search_and_preserves_individual_reads(tmp_path, monkeypatch):
+    class PaperResearcher(FakeCurationResearcher):
+        def plan_search(self, project_arg):
+            run = super().plan_search(project_arg)
+            run.output.query_tools = {q: 'paper_search' for q in run.output.queries}
+            return run
+
+        def search_one_query(self, *args):
+            raise AssertionError('paper_search must not call the Qwen web endpoint')
+
+        def search_papers_query(self, query):
+            return FakeCurationResearcher.search_one_query(self, query, '')
+
+        def extract_candidate_batch(self, candidates, *args):
+            return {'model_calls': 0, 'source_results': {
+                c.candidate_id: {'status': 'completed', 'text': 'Actual text for ' + c.url,
+                                 'snapshot': {'sha256': c.candidate_id, 'retrieval_status': 'retrieved'}}
+                for c in candidates}}
+
+    monkeypatch.setattr('src.ai_scientist.orchestrator.EvidenceResearcherAgent', PaperResearcher)
+    monkeypatch.setattr(FakeCurationResearcher, 'normalization_returns_evidence', True)
+    o = ResearchOrchestrator(tmp_path)
+    item = project(o)
+    o.run_next_step(item.project_id)
+    o.approve_search_plan(item.project_id)
+    before = o.get_project(item.project_id).budget.used_model_calls
+    o.run_next_step(item.project_id)
+    searched = o.get_project(item.project_id)
+    assert searched.phase == ResearchPhase.HUMAN_SOURCE_REVIEW
+    assert searched.budget.used_model_calls == before
+    assert searched.background_research_checkpoint.query_records[0].tool_name == 'paper_search'
+    assert searched.background_research_checkpoint.query_records[0].actual_model == ''
+    o.submit_source_selection(item.project_id, [SourceDecisionInput(candidate_id=c.candidate_id, decision='keep')
+                                                for c in searched.background_research_checkpoint.candidates])
+    o.run_next_step(item.project_id)
+    extracted = o.get_project(item.project_id)
+    selected = extracted.background_research_checkpoint.selected_candidates
+    assert len({c.extracted_text for c in selected}) == len(selected)
+    assert all(c.url in c.extracted_text and c.retrieval_snapshot['sha256'] for c in selected)
+    assert extracted.budget.used_model_calls == before + 1  # normalization only, direct reads aren't Qwen calls

@@ -12,6 +12,17 @@ from src.ai_scientist.schemas import EvidenceCollection, EvidenceItem, Verificat
 def verify_evidence_item(item: EvidenceItem, search_client: object | None = None) -> EvidenceItem:
     """Verify one evidence record without fabricating missing identifiers."""
 
+    if item.retrieval_provenance:
+        matched = bool(item.retrieval_provenance.get('quote_matched')
+                       and item.retrieval_provenance.get('sha256')
+                       and item.retrieval_provenance.get('retrieval_status') == 'retrieved')
+        return item.model_copy(update={
+            'verified': matched, 'verification_status': 'verified' if matched else 'unverified',
+            'verification_method': 'source_snapshot',
+            'verification_note': ('已读取来源并逐字核对引文；不等于科学结论已证实，仍须审查相关性和论证。'
+                                  if matched else '原文读取或引文核对未通过；书目信息不能代替内容证据。'),
+        })
+
     doi = _normalize_doi(item.doi or item.citation or item.source_url or "")
     pmid = _normalize_numeric_id(item.pmid or "")
     arxiv_id = _normalize_arxiv_id(item.arxiv_id or item.source_url or "")

@@ -32,6 +32,10 @@ def enrich_evidence_items(evidence: list[EvidenceItem]) -> list[EvidenceItem]:
             seen[key] = item.evidence_id
         level = grade_source(item)
         is_primary = _is_primary_source(item, level)
+        if item.retrieval_provenance.get('content_assessed'):
+            # Content assessment is not replaced by DOI/title-derived quality scores.
+            enriched.append(item.model_copy(update={'duplicate_of': duplicate_of}))
+            continue
         enriched.append(
             item.model_copy(
                 update={
@@ -128,33 +132,8 @@ def failed_quality_gates(metrics: ResearchQualityMetrics, review: ReviewResult |
 
 
 def apply_reviewer_quality_gates(review: ReviewResult, metrics: ResearchQualityMetrics) -> ReviewResult:
-    """Force reviewer output to respect deterministic gates."""
-
-    failed = failed_quality_gates(metrics, review)
-    if not failed:
-        return review
-    target = required_revision_target(failed, review)
-    decision_map = {
-        "evidence": "revise_evidence",
-        "hypothesis": "revise_hypothesis",
-        "method": "revise_method",
-        "design": "revise_design",
-        "analysis": "revise_analysis",
-        "question": "revise_question",
-    }
-    decision = "reject" if review.decision == "reject" else decision_map.get(target, "revise_evidence")
-    # Failed gates are system metadata, not scientific revision issues.
-    blocking = list(dict.fromkeys(review.blocking_issues))
-    revision_plan = _merge_revision_actions(review.revision_plan, failed, target, blocking)
-    return review.model_copy(
-        update={
-            "decision": decision,
-            "failed_quality_gates": failed,
-            "required_revision_target": target,
-            "blocking_issues": blocking,
-            "revision_plan": revision_plan,
-        }
-    )
+    """Compatibility adapter: metrics inform review, never overwrite its verdict."""
+    return review
 
 
 def required_revision_target(failed: list[str], review: ReviewResult | None = None) -> str:

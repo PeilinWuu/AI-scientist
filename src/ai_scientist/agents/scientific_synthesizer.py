@@ -42,7 +42,7 @@ class ScientificSynthesizerAgent(BaseResearchAgent[Conclusion]):
     def build_payload(self, project: ResearchProject) -> dict:
         payload = project_snapshot(
             project,
-            ["question", "evidence", "claims", "hypotheses", "study_design", "analysis_plan", "reviews", "internal_execution_summary", "controlled_python_runs"],
+            ["question", "evidence", "claims", "hypotheses", "study_design", "analysis_plan", "reviews", "internal_execution_summary", "controlled_python_runs", "computation"],
         )
         executed = project.internal_execution_summary.get("status") == "complete" or any(
             item.get("status") == "success" for item in project.controlled_python_runs

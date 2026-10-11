@@ -88,6 +88,7 @@ VerificationMethod = Literal[
     "publisher_record",
     "exact_title_match",
     "title_author_year_match",
+    "source_snapshot",
     "none",
 ]
 EvidenceReviewMode = Literal["AUTO", "ASSISTED", "MANUAL"]
@@ -214,6 +215,8 @@ class EvidenceItem(StrictModel):
     reliability_score: float = Field(default=0.0, ge=0.0, le=1.0)
     relevance_score: float = Field(default=0.0, ge=0.0, le=1.0)
     selection_provenance: "SelectionProvenance | None" = None
+    source_quote: str = Field(default='', max_length=1200)
+    retrieval_provenance: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="before")
     @classmethod
@@ -266,6 +269,7 @@ class SearchPlan(StrictModel):
     generated_at: datetime = Field(default_factory=utc_now)
     planner_model: str = ""
     queries: list[str] = Field(default_factory=list)
+    query_tools: dict[str, Literal['web_search', 'paper_search']] = Field(default_factory=dict)
     target_source_types: list[str] = Field(default_factory=list)
     preferred_databases: list[str] = Field(default_factory=list)
     date_constraints: list[str] = Field(default_factory=list)
@@ -283,6 +287,7 @@ class SearchPlan(StrictModel):
         unique = list(dict.fromkeys(item.strip() for item in self.queries if item.strip()))[:maximum]
         self.maximum_queries = maximum
         self.queries = unique
+        self.query_tools = {query: self.query_tools.get(query, 'web_search') for query in unique}
         return self
 
 
@@ -316,6 +321,7 @@ class SourceCandidate(StrictModel):
     extraction_status: Literal["pending", "completed", "timeout", "failed", "skipped"] = "pending"
     extracted_text: str = ""
     extraction_error: str = ""
+    retrieval_snapshot: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="before")
     @classmethod
@@ -427,6 +433,7 @@ class SearchPlanRelevanceValidation(StrictModel):
 
 class SearchQueryRecord(StrictModel):
     query: str
+    tool_name: str = 'web_search'
     status: Literal["pending", "completed", "timeout", "failed"] = "pending"
     candidate_count: int = 0
     requested_model: str = ""
@@ -735,20 +742,8 @@ class ReviewResult(StrictModel):
 
     @model_validator(mode="after")
     def reject_invalid_approval(self) -> "ReviewResult":
-        scores = [
-            self.evidence_quality_score,
-            self.methodological_validity_score,
-            self.feasibility_score,
-            self.reproducibility_score,
-            self.claim_support_score,
-            self.uncertainty_handling_score,
-        ]
-        if self.decision == "approve" and min(scores) < 6:
-            raise ValueError("Review decision cannot be approve when any critical score is below 6.")
         if self.decision == "approve" and self.blocking_issues:
             raise ValueError("Review decision cannot be approve with blocking issues.")
-        if self.decision == "approve" and self.failed_quality_gates:
-            raise ValueError("Review decision cannot be approve with failed quality gates.")
         return self
 
 
@@ -820,6 +815,8 @@ class ResearchQualityMetrics(StrictModel):
 
 
 class RevisionAction(StrictModel):
+    classification: Literal['plan_blocking', 'execution_prerequisite', 'non_blocking', 'optional'] = Field(
+        default='plan_blocking', description='Reviewer scientific judgment, not inferred from priority or keywords.')
     target: Literal[
         "question",
         "evidence",
@@ -830,6 +827,7 @@ class RevisionAction(StrictModel):
         "analysis_plan",
         "analysis",
         "reproducibility_plan",
+        "execution_code", "result_table", "figure", "reproducibility_bundle", "report",
     ]
     priority: int = Field(default=1, ge=1)
     reason: str
@@ -853,6 +851,7 @@ RevisionIssueTarget = Literal[
     "analysis_plan",
     "reproducibility_plan",
     "execution_requirements",
+    "execution_code", "result_table", "figure", "reproducibility_bundle", "report",
 ]
 RevisionDisposition = Literal[
     "accept_ai",
@@ -1155,6 +1154,9 @@ class ResearchProject(StrictModel):
     analysis_plan: AnalysisPlan | None = None
     reproducibility_plan: dict[str, Any] = Field(default_factory=dict)
     reviews: list[ReviewResult] = Field(default_factory=list)
+    review_policy_findings: list[dict[str, Any]] = Field(default_factory=list)
+    background_agent: dict[str, Any] = Field(default_factory=dict)
+    research_policy_version: int = Field(default=1, ge=1, le=2)
     conclusion: Conclusion | None = None
     quality_metrics: ResearchQualityMetrics = Field(default_factory=ResearchQualityMetrics)
     artifacts: list[ArtifactRecord] = Field(default_factory=list)
@@ -1162,6 +1164,7 @@ class ResearchProject(StrictModel):
     review_package: ReviewPackage | None = None
     human_approval_history: list[HumanApprovalRecord] = Field(default_factory=list)
     human_revision_history: list[HumanRevisionRecord] = Field(default_factory=list)
+    human_dialogue: dict[str, Any] = Field(default_factory=dict)
     revision_issues: list[RevisionIssue] = Field(default_factory=list)
     approved_revision_plans: list[ApprovedRevisionPlan] = Field(default_factory=list)
     revision_verifications: list[RevisionVerificationResult] = Field(default_factory=list)
@@ -1195,6 +1198,8 @@ class ResearchProject(StrictModel):
     executor_binding: str | None = None
     internal_execution_summary: dict[str, Any] = Field(default_factory=dict)
     controlled_python_runs: list[dict[str, Any]] = Field(default_factory=list)
+    computation: dict[str, Any] = Field(default_factory=dict)
+    research_workspace: dict[str, Any] = Field(default_factory=dict)
     domain_hint: str | None = None
     method_rationale: str = ""
     validity_threats: list[str] = Field(default_factory=list)
@@ -1298,6 +1303,7 @@ class ReproducibilityOutput(StrictModel):
 
 
 class ResearchStartRequest(StrictModel):
+    research_policy_version: int = Field(default=1, ge=1, le=2)
     model_config = ConfigDict(
         extra="forbid",
         json_schema_extra={

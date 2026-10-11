@@ -15,6 +15,7 @@ from src.ai_scientist.schemas import (
     utc_now,
 )
 from src.ai_scientist.structured_client import StructuredQwenClient
+from src.ai_scientist.research_context import build_research_context
 
 
 class RevisionVerifierAgent:
@@ -41,9 +42,13 @@ class RevisionVerifierAgent:
                 "Act as an independent revision verifier. Check only whether the new artifact explicitly "
                 "satisfies each completion criterion. A model call or a general promise is not evidence. "
                 "Return criterion-level JSON and do not infer execution that has not occurred."
+                " For execution_code/result_table/figure/reproducibility_bundle, verify actual execution "
+                "and the provided artifact contents. A plan or file path alone cannot close an execution defect. "
+                "If image content was not inspected, do not certify its visual correctness."
             ),
             payload={
                 "project_id": project.project_id,
+                "shared_research_context": build_research_context(project),
                 "planning_only": project.planning_only,
                 "batch": batch.model_dump(mode="json"),
                 "issues": [issue.model_dump(mode="json") for issue in issues],

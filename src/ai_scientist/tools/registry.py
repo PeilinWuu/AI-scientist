@@ -26,8 +26,19 @@ class ToolRegistry:
             "1", "true", "yes", "on",
         }
         self._tools = {
+            "isolated_scientific_python": ToolDescriptor(
+                "isolated_scientific_python", "Generate question-specific Python, execute in Linux namespaces, validate outputs and review results; numpy/pandas/scipy/sklearn/matplotlib; uploaded tables or explicit simulation",
+                ["approved_plan", "registered_data_or_simulation"], ["code", "metrics", "csv", "png", "audit"],
+                90, "os_isolation", os.getenv("AI_SCIENTIST_ENABLE_COMPUTATION", "0").lower() in {"1", "true", "yes"}, True
+            ),
             "web_search": ToolDescriptor(
                 "web_search", "Retrieve current public web evidence", ["query"], ["reply", "sources"], 120, "network", True, False
+            ),
+            "paper_search": ToolDescriptor(
+                "paper_search", "Discover scholarly metadata via Crossref, not full text", ["query"], ["candidates"], 25, "network", True, True
+            ),
+            "read_source": ToolDescriptor(
+                "read_source", "Read approved public HTTPS sources with pinned DNS and individual snapshots", ["approved_url"], ["text", "sha256", "final_url"], 25, "network", True, True
             ),
             "web_extractor": ToolDescriptor(
                 "web_extractor", "Extract content from public pages selected by search", ["url"], ["text", "sources"], 120, "network", True, False

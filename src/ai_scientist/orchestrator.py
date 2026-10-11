@@ -76,6 +76,7 @@ from src.ai_scientist.revision_workflow import (
     normalize_completion_criteria,
     normalize_revision_plan,
 )
+from src.ai_scientist.exceptions import ModelInputRequired
 from src.ai_scientist.schemas import (
     AnalysisPlan,
     ApprovedRevisionPlan,
@@ -185,6 +186,7 @@ class ResearchOrchestrator:
         planning_only: bool = True,
         evidence_review_mode: EvidenceReviewMode = "ASSISTED",
         reproducibility_seed: int | None = None,
+        research_policy_version: int = 1,
     ) -> ResearchProject:
         objective = objective.strip()
         if not objective:
@@ -207,6 +209,7 @@ class ResearchOrchestrator:
             available_tools = [*available_tools, executor_binding]
         project = ResearchProject(
             title=objective[:100],
+            research_policy_version=research_policy_version,
             objective=objective,
             domain_hint=domain_hint,
             constraints=resolved_constraints,
@@ -260,6 +263,9 @@ class ResearchOrchestrator:
 
     def run_next_step(self, project_id: str, job_id: str | None = None) -> dict[str, Any]:
         project = self.get_project(project_id)
+        if project.human_dialogue.get('pending'):
+            return {'project_id': project_id, 'current_phase': project.phase.value,
+                    'stage_status': 'awaiting_model_requested_input'}
         previous_phase = project.phase
         if project.phase in TERMINAL_PHASES:
             raise InvalidTransitionError(f"Project in terminal phase {project.phase.value} cannot continue.")
@@ -326,13 +332,19 @@ class ResearchOrchestrator:
                 )
                 self.state_machine.transition(project, "next")
             elif project.phase == ResearchPhase.BACKGROUND_RESEARCH:
-                produced_artifacts += self._run_background_research(project, previous_phase)
-                if project.phase == ResearchPhase.BACKGROUND_RESEARCH:
+                if project.research_policy_version == 2:
+                    from src.ai_scientist.background_agent import BackgroundAgent
+                    produced_artifacts += BackgroundAgent(self).advance(project)
+                else:
+                    produced_artifacts += self._run_background_research(project, previous_phase)
+                if project.phase == ResearchPhase.BACKGROUND_RESEARCH and (project.research_policy_version == 1 or project.background_agent.get('status') == 'complete'):
                     self.state_machine.transition(project, "next")
                 elif project.phase == ResearchPhase.SEARCH_PLAN_REVIEW:
                     stage_status = "awaiting_search_plan_review"
                 elif project.phase == ResearchPhase.HUMAN_SOURCE_REVIEW:
                     stage_status = "awaiting_human_source_review"
+                elif project.research_policy_version == 2:
+                    stage_status = 'background_action_batch_finished'
             elif project.phase == ResearchPhase.SEARCH_PLAN_REVIEW:
                 stage_status = "awaiting_search_plan_review"
             elif project.phase == ResearchPhase.HUMAN_SOURCE_REVIEW:
@@ -396,25 +408,7 @@ class ResearchOrchestrator:
             elif project.phase == ResearchPhase.HUMAN_REVISION_REVIEW:
                 stage_status = "awaiting_human_revision_review"
             elif project.phase == ResearchPhase.HUMAN_INTERVENTION_REQUIRED:
-                # Projects created before the bounded re-review convergence fix
-                # may already be parked here after a verified revision.  Make
-                # the normal "run next stage" action recover those projects
-                # without editing persisted state by hand or spending another
-                # model call.  Integrity, safety, ethics, and hard-reject cases
-                # are deliberately left at the human-intervention gate.
-                latest_review = project.reviews[-1] if project.reviews else None
-                converged_review = (
-                    self._converge_verified_revision_review(project, latest_review)
-                    if latest_review is not None
-                    else None
-                )
-                if converged_review is not None and converged_review.decision == "approve":
-                    project.reviews[-1] = converged_review
-                    project.phase = ResearchPhase.CRITICAL_REVIEW
-                    self._apply_review_decision(project, converged_review)
-                    stage_status = "verified_revision_review_recovered"
-                else:
-                    stage_status = "waiting_for_human_intervention"
+                stage_status = "waiting_for_human_intervention"
             elif project.phase == ResearchPhase.REVISION:
                 if not job_id:
                     raise InvalidTransitionError("Approved revision batches must run through the asynchronous job endpoint.")
@@ -423,10 +417,26 @@ class ResearchOrchestrator:
                 stage_status = revision_status
                 revision_required = project.phase == ResearchPhase.HUMAN_REVISION_REVIEW
             elif project.phase == ResearchPhase.EXECUTION_WAITING:
+                from src.ai_scientist.computation import ComputationService, enabled as computation_enabled
                 if project.execution_capability == "INTERNAL_EXECUTABLE" and project.executor_binding:
                     self._transition_event(project, "execution_tool_available")
                 elif project.planning_only:
                     self._transition_event(project, "planning_only")
+                elif computation_enabled():
+                    if project.computation.get('awaiting_assessment'):
+                        self.store.save(project)
+                        ComputationService(self).resume_assessment(project.project_id)
+                        project = self.get_project(project.project_id)
+                    elif project.computation.get('status') != 'awaiting_approval':
+                        self.store.save(project)
+                        ComputationService(self).prepare(project.project_id, project=project,
+                            revision_request=project.computation.get('pending_revision_request') or project.computation.get('revision_request'))
+                    stage_status = 'computation_' + project.computation.get('status', 'needs_input')
+                    project.stage_messages.append(
+                        '已生成计算方案；请审阅方法、数据、指标和代码后批准执行。'
+                        if project.computation.get('status') == 'awaiting_approval'
+                        else '当前问题尚不能执行计算，请查看计算方案说明并补充资料或调整研究方案。'
+                    )
                 else:
                     stage_status = "waiting_for_execution_or_data"
                     project.human_actions_required.append(
@@ -441,13 +451,28 @@ class ResearchOrchestrator:
                 analysis_artifacts = self._record_execution_analysis(project)
                 if analysis_artifacts:
                     produced_artifacts += analysis_artifacts
-                    self.state_machine.transition(project, "next")
+                    if project.computation.get('revision_request') and project.active_revision_plan_id:
+                        project.phase = ResearchPhase.REVISION
+                        project.stage_messages.append('修订计算已登记；下一步按已批准的完成标准验证真实产物。')
+                    elif project.internal_execution_summary.get('executor_binding') == 'generated_python_v1' and project.computation.get('status') == 'iteration_proposed':
+                        project.phase = ResearchPhase.EXECUTION_WAITING
+                        project.stage_messages.append('本轮分析已登记，建议追加计算；下一轮方案和代码须重新审批。')
+                    elif project.internal_execution_summary.get('executor_binding') == 'generated_python_v1' and project.computation.get('status') == 'needs_input':
+                        project.phase = ResearchPhase.HUMAN_INTERVENTION_REQUIRED
+                        project.stage_messages.append('本轮分析未能闭环，请补充必要资料或验证条件。')
+                    else:
+                        self.state_machine.transition(project, "next")
                 else:
                     stage_status = "waiting_for_analysis_backend"
                     project.human_actions_required.append(
                         "A dataset is registered, but no verifiable execution result is available; no results were generated."
                     )
             elif project.phase == ResearchPhase.CRITICAL_REVIEW:
+                rounds = project.computation.get('rounds', [])
+                report = project.computation.get('delivery_report') or {}
+                if rounds and report.get('run_id') != rounds[-1]['attempts'][-1].get('run_id'):
+                    from src.ai_scientist.delivery_report import generate_report
+                    produced_artifacts.append(generate_report(self, project))
                 review = self._run_agent(project, SkepticalReviewerAgent)
                 self._refresh_quality_metrics(project)
                 gated_review = apply_reviewer_quality_gates(
@@ -468,6 +493,8 @@ class ResearchOrchestrator:
                 revision_required = review_flow["revision_required"]
                 max_revision_exhausted = review_flow["max_revision_exhausted"]
             elif project.phase == ResearchPhase.SYNTHESIS:
+                if (project.computation.get('delivery_validation') or {}).get('status') == 'needs_revision':
+                    raise InvalidTransitionError('真实交付检查未通过，不能发布为已完成；请先修复缺失或损坏产物。')
                 run = self._run_agent(project, ScientificSynthesizerAgent)
                 project.conclusion = run.output
                 self._refresh_quality_metrics(project)
@@ -477,6 +504,11 @@ class ResearchOrchestrator:
             else:
                 raise InvalidTransitionError(f"No stage handler for phase {project.phase.value}")
             project.active_job_id = None
+            self.store.save(project)
+        except ModelInputRequired:
+            project.phase = previous_phase
+            project.active_job_id = None
+            stage_status = 'awaiting_model_requested_input'
             self.store.save(project)
         except Exception as exc:
             stage_substep = self._substep_for_error(previous_phase, exc)
@@ -549,6 +581,8 @@ class ResearchOrchestrator:
         auto_approve_future: bool = False,
     ) -> ResearchProject:
         project = self.get_project(project_id)
+        if project.research_policy_version == 2:
+            raise InvalidTransitionError('Use background-agent/authorize for model-led research.')
         if project.phase != ResearchPhase.SEARCH_PLAN_REVIEW:
             raise InvalidTransitionError("Search plan can only be approved from SEARCH_PLAN_REVIEW.")
         checkpoint = project.background_research_checkpoint
@@ -607,6 +641,8 @@ class ResearchOrchestrator:
 
     def regenerate_search_plan(self, project_id: str) -> ResearchProject:
         project = self.get_project(project_id)
+        if project.research_policy_version == 2:
+            raise InvalidTransitionError('Use background-agent/feedback to regenerate the research basis.')
         if project.phase not in {ResearchPhase.SEARCH_PLAN_REVIEW, ResearchPhase.HUMAN_SOURCE_REVIEW}:
             raise InvalidTransitionError("Search can only be regenerated from a source-review phase.")
         project.background_research_checkpoint = BackgroundResearchCheckpoint()
@@ -629,6 +665,8 @@ class ResearchOrchestrator:
 
     def add_human_sources(self, project_id: str, entries: list[str]) -> ResearchProject:
         project = self.get_project(project_id)
+        if project.research_policy_version == 2:
+            raise InvalidTransitionError('Use background-stage feedback to request source discovery.')
         if project.phase != ResearchPhase.HUMAN_SOURCE_REVIEW:
             raise InvalidTransitionError("Sources can only be added during HUMAN_SOURCE_REVIEW.")
         checkpoint = project.background_research_checkpoint
@@ -657,6 +695,8 @@ class ResearchOrchestrator:
         selection_note: str = "",
     ) -> ResearchProject:
         project = self.get_project(project_id)
+        if project.research_policy_version == 2:
+            raise InvalidTransitionError('Use background-agent/adopt for read and assessed sources.')
         if project.phase != ResearchPhase.HUMAN_SOURCE_REVIEW:
             raise InvalidTransitionError("Source selection is only allowed during HUMAN_SOURCE_REVIEW.")
         checkpoint = project.background_research_checkpoint
@@ -969,11 +1009,21 @@ class ResearchOrchestrator:
             project.internal_execution_summary.get("status") == "complete"
             or any(item.artifact_type == "execution_analysis" for item in project.artifacts)
         )
+        if project.internal_execution_summary.get('executor_binding') == 'generated_python_v1':
+            from src.ai_scientist.computation import ComputationService
+            _, _, fingerprint = ComputationService(self).context(project)
+            execution_already_analyzed = (
+                project.computation.get('input_fingerprint') == fingerprint
+                and project.computation.get('status') == 'review_required'
+                and any(item.artifact_type == 'execution_analysis' for item in project.artifacts)
+            )
         approval_next_step = (
             "项目将进入科学综合阶段。"
             if execution_already_analyzed
             else "项目将进入内部确定性执行阶段。"
             if project.execution_capability == "INTERNAL_EXECUTABLE"
+            else "项目将生成计算方案，代码仍需单独审阅和批准。"
+            if 'isolated_scientific_python' in project.available_tools
             else "项目将等待外部实验结果。"
             if project.execution_capability == "EXTERNAL_EXECUTION_REQUIRED"
             else "项目将进入科学综合阶段。"
@@ -1443,6 +1493,15 @@ class ResearchOrchestrator:
 
         if project.executor_binding == "damped_oscillator_v1" or project.planning_only:
             return
+        from src.ai_scientist.computation import enabled as computation_enabled
+        if computation_enabled() and (not project.internal_execution_summary or
+                                      project.internal_execution_summary.get('executor_binding') == 'generated_python_v1'):
+            # New ordinary projects use question-driven code after explicit plan approval.
+            project.executor_binding = None
+            project.execution_capability = "EXTERNAL_EXECUTION_REQUIRED"
+            if "isolated_scientific_python" not in project.available_tools:
+                project.available_tools.append("isolated_scientific_python")
+            return
         eligible_modes = {
             ResearchMode.DATA_ANALYSIS,
             ResearchMode.OBSERVATIONAL,
@@ -1622,7 +1681,22 @@ class ResearchOrchestrator:
     def _record_execution_analysis(self, project: ResearchProject) -> list[str]:
         """Persist analysis provenance without inventing results for external projects."""
 
-        if project.internal_execution_summary:
+        if project.internal_execution_summary.get('executor_binding') == 'generated_python_v1':
+            from src.ai_scientist.computation import ComputationService
+            _, _, fingerprint = ComputationService(self).context(project)
+            if fingerprint != project.computation.get('input_fingerprint'):
+                raise InvalidTransitionError('研究方案或数据已改变，不能使用旧版本的计算结果推进分析。')
+            payload = {
+                'analysis_source': 'approved_generated_python',
+                'executor_binding': 'generated_python_v1',
+                'rounds': project.computation.get('rounds', []),
+                'assessment': project.internal_execution_summary.get('assessment', {}),
+                'execution_evidence_id': project.internal_execution_summary.get('execution_evidence_id'),
+                'handling_rule': 'Observed code outputs; scientific validity still requires independent review.',
+            }
+            status = 'generated_computation_analyzed'
+            markdown = '已整理获批代码的实际输出、指标、校验和及分析判断，下一步进入独立复审。'
+        elif project.internal_execution_summary:
             payload = {
                 "analysis_source": "internal_deterministic_executor",
                 "executor_binding": project.executor_binding,
@@ -1775,6 +1849,17 @@ class ResearchOrchestrator:
             )
             changed = True
         if active_plan is not None and active_plan.status == "in_progress":
+            revision = (project.computation.get('pending_revision_request')
+                        or project.computation.get('revision_request') or {})
+            if (revision.get('revision_plan_id') == active_plan.revision_plan_id
+                    and project.phase in {ResearchPhase.EXECUTION_WAITING, ResearchPhase.EXECUTION,
+                                          ResearchPhase.DATA_ANALYSIS}
+                    and any(batch.batch_id == revision.get('batch_id')
+                            and batch.target in {'execution_code', 'result_table', 'figure', 'reproducibility_bundle'}
+                            and batch.status == 'in_progress' for batch in active_plan.target_batches)):
+                # Human code approval and result assessment are intentional waits,
+                # not orphaned planning revisions to roll back on every GET.
+                return False
             if project.active_job_id and self._job_record_is_active(project.project_id, project.active_job_id):
                 return False
             interrupted = [batch for batch in active_plan.target_batches if batch.status == "in_progress"]
@@ -1819,7 +1904,7 @@ class ResearchOrchestrator:
             project.pending_revision_actions = []
             project.active_job_id = None
             if project.reviews:
-                project.revision_issues = normalize_revision_plan(project.reviews[-1], project.planning_only)
+                project.revision_issues = normalize_revision_plan(project.reviews[-1], project.planning_only, project.research_policy_version == 2)
             project.phase = ResearchPhase.HUMAN_REVISION_REVIEW
             project.revision_migration_version = max(project.revision_migration_version, 1)
             message = "检测到旧版自动修订流程未完整结束，已迁移到人工修订审查。"
@@ -1843,7 +1928,7 @@ class ResearchOrchestrator:
             and project.phase == ResearchPhase.HUMAN_REVISION_REVIEW
             and project.reviews
         ):
-            project.revision_issues = normalize_revision_plan(project.reviews[-1], project.planning_only)
+            project.revision_issues = normalize_revision_plan(project.reviews[-1], project.planning_only, project.research_policy_version == 2)
             project.revision_migration_version = 2
             changed = True
         if (
@@ -1855,7 +1940,7 @@ class ResearchOrchestrator:
             project.budget.used_iterations = max(0, project.budget.used_iterations - 1)
             project.revision_migration_version = 3
             changed = True
-        if project.revision_migration_version < 5 and project.planning_only:
+        if project.revision_migration_version < 5 and project.planning_only and project.research_policy_version == 1:
             for issue in project.revision_issues:
                 issue.completion_criteria = normalize_completion_criteria(
                     issue.completion_criteria,
@@ -1912,7 +1997,7 @@ class ResearchOrchestrator:
             self.state_machine.transition(project, "reject")
             return {"revision_required": False, "max_revision_exhausted": False}
 
-        issues = normalize_revision_plan(review, project.planning_only)
+        issues = normalize_revision_plan(review, project.planning_only, project.research_policy_version == 2)
         project.revision_issues = issues
         project.pending_revision_actions = []
         project.current_revision_action = None
@@ -1953,143 +2038,12 @@ class ResearchOrchestrator:
         return {"revision_required": True, "max_revision_exhausted": False}
 
     def _prepare_review_for_project(self, project: ResearchProject, review: ReviewResult) -> ReviewResult:
-        """Keep planning defects blocking while moving future execution work out of the gate."""
+        """Model judgments are immutable; policy signals are recorded separately."""
+        return review
 
-        if not project.planning_only or review.decision == "reject":
-            return review
-        issues = normalize_revision_plan(review, planning_only=True)
-        plan_blockers = [issue.problem for issue in issues if issue.classification == "plan_blocking"]
-        execution = [issue.problem for issue in issues if issue.classification == "execution_prerequisite"]
-        project.execution_requirements.extend(execution)
-        non_blocking = list(
-            dict.fromkeys(
-                review.non_blocking_issues
-                + [issue.problem for issue in issues if issue.classification in {"non_blocking", "optional"}]
-            )
-        )
-        scores = [
-            review.evidence_quality_score,
-            review.methodological_validity_score,
-            review.feasibility_score,
-            review.reproducibility_score,
-            review.claim_support_score,
-            review.uncertainty_handling_score,
-        ]
-        update: dict[str, Any] = {
-            "blocking_issues": list(dict.fromkeys(plan_blockers)),
-            "non_blocking_issues": non_blocking,
-        }
-        if not plan_blockers and min(scores) >= 6:
-            update.update({"decision": "approve", "required_revision_target": "none", "revision_plan": []})
-        return review.model_copy(update=update)
-
-    def _converge_verified_revision_review(
-        self,
-        project: ResearchProject,
-        review: ReviewResult,
-    ) -> ReviewResult:
-        """Bound critical re-review to verified, human-approved revision scope."""
-
-        completed_plans = [item for item in project.approved_revision_plans if item.status == "completed"]
-        if not completed_plans:
-            return review
-        plan = completed_plans[-1]
-        verification_by_id = {
-            item.verification_id: item for item in project.revision_verifications
-        }
-        if not plan.target_batches or any(
-            batch.status != "completed"
-            or not batch.verification_id
-            or not verification_by_id.get(batch.verification_id)
-            or not verification_by_id[batch.verification_id].overall_passed
-            for batch in plan.target_batches
-        ):
-            return review
-
-        integrity_tokens = (
-            "fabricated source",
-            "fabricated evidence",
-            "fabricated data",
-            "falsified",
-            "ethical violation",
-            "safety violation",
-            "fundamentally unresearchable",
-            "伪造来源",
-            "伪造证据",
-            "伪造数据",
-            "伦理违规",
-            "安全违规",
-            "根本不可研究",
-        )
-        integrity_blockers = [
-            issue
-            for issue in review.blocking_issues
-            if any(token in issue.lower() for token in integrity_tokens)
-        ]
-        if integrity_blockers or review.decision == "reject":
-            return review.model_copy(update={"blocking_issues": integrity_blockers or review.blocking_issues})
-
-        # A verified revision re-review is intentionally bounded to the scope the
-        # human approved.  The reviewer may still score an unrelated dimension
-        # below six (for example evidence quality) while proposing a brand-new
-        # execution prerequisite.  Letting that score reopen the cycle would
-        # defeat the bounded-review rule and can create the circular condition
-        # "produce execution results before execution is approved".  Preserve
-        # the review text as non-blocking follow-up, but normalize every quality
-        # score to the approval floor once the approved batch is verified.
-        score_updates: dict[str, float] = {
-            field: max(6.0, float(getattr(review, field)))
-            for field in (
-                "evidence_quality_score",
-                "methodological_validity_score",
-                "feasibility_score",
-                "reproducibility_score",
-                "claim_support_score",
-                "uncertainty_handling_score",
-            )
-        }
-        targets = {batch.target for batch in plan.target_batches}
-        target_score_fields = {
-            "question": ["feasibility_score", "uncertainty_handling_score"],
-            "evidence": ["evidence_quality_score", "claim_support_score"],
-            "hypothesis": ["claim_support_score", "uncertainty_handling_score"],
-            "methodology": ["methodological_validity_score", "feasibility_score"],
-            "study_design": ["methodological_validity_score", "feasibility_score"],
-            "analysis_plan": [
-                "methodological_validity_score",
-                "feasibility_score",
-                "reproducibility_score",
-                "uncertainty_handling_score",
-            ],
-            "reproducibility_plan": ["reproducibility_score", "feasibility_score"],
-        }
-        for target in targets:
-            for field in target_score_fields.get(target, []):
-                score_updates[field] = max(6.0, float(getattr(review, field)))
-        deferred_suggestions = list(
-            dict.fromkeys(review.non_blocking_issues + review.blocking_issues)
-        )
-        return review.model_copy(
-            update={
-                **score_updates,
-                "blocking_issues": [],
-                "non_blocking_issues": deferred_suggestions,
-                "decision": "approve",
-                "failed_quality_gates": [],
-                "required_revision_target": "none",
-                "revision_plan": [],
-                "approval_conditions": list(
-                    dict.fromkeys(
-                        review.approval_conditions
-                        + [
-                            "Human-approved blocking issues passed criterion-level verification.",
-                            "New non-integrity suggestions are retained as non-blocking follow-up items.",
-                            "Planning-only limitations and execution prerequisites remain explicitly disclosed.",
-                        ]
-                    )
-                ),
-            }
-        )
+    def _converge_verified_revision_review(self, project: ResearchProject, review: ReviewResult) -> ReviewResult:
+        """Completing a revision is not permission to rewrite a later scientific verdict."""
+        return review
 
     def get_revision_review(self, project_id: str) -> dict[str, Any]:
         project = self.get_project(project_id)
@@ -2276,6 +2230,12 @@ class ResearchOrchestrator:
         for index, batch in enumerate(plan.target_batches, start=1):
             if batch.status == "completed":
                 continue
+            # Compatibility for older reviewers: an explicitly requested report
+            # file is a delivery target, not a scientific analysis-plan rewrite.
+            # This changes the executor only, not approved completion criteria.
+            if (batch.target == 'analysis_plan' and project.computation.get('rounds')
+                    and any('report.md' in c for c in batch.completion_criteria)):
+                batch.target = 'report'
             issues = [issue.model_copy(deep=True) for issue in batch.issue_snapshots]
             if not issues:
                 issues = [issue_by_id[issue_id] for issue_id in batch.issue_ids if issue_id in issue_by_id]
@@ -2315,7 +2275,73 @@ class ResearchOrchestrator:
                 ),
             )
 
-            if batch.target == "execution_requirements":
+            if batch.target == 'report':
+                from src.ai_scientist.delivery_report import generate_report
+                produced.append(generate_report(self, project, batch.instructions))
+                actual = project.computation['delivery_report']
+                batch.new_artifact_version = actual['version']
+                verification, verification_id = self._verify_revision_batch(
+                    project, plan, batch, issues, None, actual, actual['version'])
+                produced.append(verification_id)
+                if not verification.overall_passed:
+                    batch.status = 'needs_attention'
+                    plan.status = 'needs_attention'
+                    project.phase = ResearchPhase.HUMAN_REVISION_REVIEW
+                    self.store.save(project)
+                    return produced, 'revision_needs_attention'
+            elif batch.target == 'figure' and batch.provided_content:
+                # A submitted visual-check record need not rerun sound statistics.
+                # Let the independent model decide whether the approved criteria
+                # are met; never turn a human assertion into an automatic pass.
+                actual = {'researcher_provided_visual_check': batch.provided_content,
+                          'execution': project.computation.get('rounds', [])[-1:]}
+                verification, verification_id = self._verify_revision_batch(
+                    project, plan, batch, issues, None, actual, 1)
+                produced.append(verification_id)
+                if not verification.overall_passed:
+                    batch.status = 'needs_attention'
+                    plan.status = 'needs_attention'
+                    project.phase = ResearchPhase.HUMAN_REVISION_REVIEW
+                    self.store.save(project)
+                    return produced, 'revision_needs_attention'
+            elif batch.target in {'execution_code', 'result_table', 'figure', 'reproducibility_bundle'}:
+                from src.ai_scientist.result_artifacts import inspect_result_artifacts
+                request = {'revision_plan_id': plan.revision_plan_id, 'batch_id': batch.batch_id}
+                matching = [record for record in project.computation.get('rounds', [])
+                            if (record.get('revision_request') or {}).get('batch_id') == batch.batch_id
+                            and (record.get('revision_request') or {}).get('revision_plan_id') == plan.revision_plan_id]
+                if not matching:
+                    project.computation['pending_revision_request'] = request
+                    project.phase = ResearchPhase.EXECUTION_WAITING
+                    project.stage_messages.append('已批准真实产物修订。请生成修订代码并审批执行；本批次尚未完成。')
+                    self.store.save(project)
+                    return produced, 'revision_execution_required'
+                latest = matching[-1]
+                audit = latest['attempts'][-1]
+                observed = inspect_result_artifacts(self.store.project_dir(project.project_id), audit,
+                                                     latest['plan'].get('expected_outputs', []))
+                actual = {'executed_code': latest['plan']['code'], 'execution': audit,
+                          'actual_artifacts': observed, 'assessment': latest['assessment'],
+                          'approved_revision_request': latest.get('revision_request')}
+                verification, verification_id = self._verify_revision_batch(
+                    project, plan, batch, issues, None, actual, latest['round'])
+                produced.append(verification_id)
+                if observed['delivery_validation']['status'] != 'complete' and verification.overall_passed:
+                    # This is an objective file-integrity gate, not a rewritten scientific verdict.
+                    verification.overall_passed = False
+                    verification.criteria_results.append(RevisionCriterionResult(
+                        criterion='Executed artifacts retain their verified content', passed=False,
+                        evidence='; '.join(observed['delivery_validation']['issues'])))
+                    produced.append(self._record_revision_verification(project, plan, batch, verification))
+                if not verification.overall_passed:
+                    batch.status = 'needs_attention'
+                    batch.job_id = None
+                    plan.status = 'needs_attention'
+                    project.phase = ResearchPhase.HUMAN_REVISION_REVIEW
+                    project.stage_messages.append('真实产物修订尚未满足完成标准，未标记为已解决。')
+                    self.store.save(project)
+                    return produced, 'revision_needs_attention'
+            elif batch.target == "execution_requirements":
                 project.execution_requirements.extend(batch.instructions)
                 record = self.artifacts.save_json(
                     project.project_id,
@@ -2389,6 +2415,14 @@ class ResearchOrchestrator:
                         break
                     previous_verification = verification
                     working_artifact = new_artifact
+                    from src.ai_scientist.job_store import ResearchJobStore
+                    try:
+                        paused = ResearchJobStore(self.store.root).load(
+                            project.project_id, project.active_job_id).pause_requested
+                    except (FileNotFoundError, TypeError):
+                        paused = False
+                    if paused:
+                        break
                     if retry_remaining:
                         failed_count = len([item for item in verification.criteria_results if not item.passed])
                         self._append_event(
@@ -2530,6 +2564,7 @@ class ResearchOrchestrator:
             },
             output_model,
         )
+        self._pause_for_model_input(project, result.value, result.metadata)
         return AgentRun(output=result.value, metadata=result.metadata)
 
     def _record_revision_output(
@@ -2582,28 +2617,47 @@ class ResearchOrchestrator:
         new_version: int,
         retry_remaining: bool = False,
     ) -> tuple[RevisionVerificationResult, str]:
-        deterministic = deterministic_verify_batch(batch, issues, new_artifact)
+        if project.research_policy_version == 2:
+            criteria = batch.completion_criteria or [c for issue in issues for c in issue.completion_criteria]
+            deterministic = [RevisionCriterionResult(criterion=c, passed=False, evidence='',
+                note='Awaiting independent semantic verification; no keyword-based scientific judgment applied.')
+                for c in dict.fromkeys(criteria)]
+        else:
+            deterministic = deterministic_verify_batch(batch, issues, new_artifact)
         try:
             verifier = RevisionVerifierAgent(client=self._structured_client_for_project(project))
             run = verifier.verify(
                 project, batch, issues, old_artifact, new_artifact, new_version, deterministic
             )
+            self._pause_for_model_input(project, run.output, run.metadata)
             self._apply_call_metadata(project, run.metadata)
             model_result = run.output
+            raw_verification = self.artifacts.save_json(project.project_id, 'model_revision_verification',
+                model_result.model_dump(mode='json'), run.metadata.agent_name)
+            project.artifacts.append(raw_verification)
             combined = combine_revision_verification_results(
                 deterministic,
                 model_result.criteria_results,
             )
+            if project.research_policy_version == 2:
+                # Validate coverage, but leave content judgments to the independent model.
+                by_criterion = {item.criterion: item for item in model_result.criteria_results}
+                combined = [by_criterion.get(item.criterion) or item.model_copy(update={
+                    'passed': False, 'note': 'Independent model did not assess this approved criterion.'})
+                    for item in deterministic]
             verification = model_result.model_copy(
                 update={
                     "action_id": batch.batch_id,
                     "target_artifact": batch.target,
                     "artifact_version": new_version,
                     "criteria_results": combined,
-                    "overall_passed": bool(combined) and all(item.passed for item in combined),
-                    "verification_method": "deterministic+independent_qwen",
+                    "overall_passed": bool(combined) and all(item.passed for item in combined)
+                        and (model_result.overall_passed if project.research_policy_version == 2 else True),
+                    "verification_method": "criterion_coverage+independent_qwen" if project.research_policy_version == 2 else "deterministic+independent_qwen",
                 }
             )
+        except ModelInputRequired:
+            raise
         except Exception as exc:
             verification = RevisionVerificationResult(
                 action_id=batch.batch_id,
@@ -2722,6 +2776,9 @@ class ResearchOrchestrator:
             "analysis_plan": "分析方案",
             "reproducibility_plan": "可复现性方案",
             "execution_requirements": "执行阶段要求",
+            "execution_code": "实际执行代码", "result_table": "实际结果表",
+            "figure": "图表产物", "reproducibility_bundle": "可复现交付包",
+            "report": "科研报告",
         }.get(target, target)
 
     def debug_claim_mapping(self, project_id: str) -> dict[str, Any]:
@@ -2959,6 +3016,10 @@ class ResearchOrchestrator:
                 continue
             if elapsed_before_invocation + (time.monotonic() - invocation_started) >= total_budget:
                 break
+            query_tool = checkpoint.search_plan.query_tools.get(query, 'web_search')
+            query_model = requested_search_model if query_tool == 'web_search' else ''
+            if query_tool == 'web_search':
+                self._ensure_budget(project, 1)
             self._append_event(
                 project,
                 completed_event(
@@ -2967,23 +3028,24 @@ class ResearchOrchestrator:
                     "evidence_researcher",
                     status="search_query_started",
                     stage_substep="search_query",
-                    requested_model=requested_search_model,
-                    actual_model=requested_search_model,
-                    tool_names=["web_search"],
-                    tool_name="web_search",
+                    requested_model=query_model,
+                    actual_model=query_model,
+                    tool_names=[query_tool],
+                    tool_name=query_tool,
                 ),
             )
             started = time.monotonic()
-            actual_model = requested_search_model
+            actual_model = query_model
             fallback_reason = ""
             original_error = ""
             try:
-                result = agent.search_one_query(query, requested_search_model)
+                result = (agent.search_papers_query(query) if query_tool == 'paper_search'
+                          else agent.search_one_query(query, requested_search_model))
                 status = "completed"
             except Exception as exc:
                 last_search_exception = exc
                 original_error = self._sanitize_text(str(exc))
-                if self._is_timeout_error(exc) and fallback_search_model and fallback_search_model != requested_search_model:
+                if query_tool == 'web_search' and self._is_timeout_error(exc) and fallback_search_model and fallback_search_model != requested_search_model:
                     actual_model = fallback_search_model
                     fallback_reason = "Primary search query timed out."
                     try:
@@ -2997,6 +3059,10 @@ class ResearchOrchestrator:
                 else:
                     status = "timeout" if self._is_timeout_error(exc) else "failed"
                     result = {"candidates": []}
+            if query_tool == 'web_search' and result.get('search_executed') is False:
+                status = 'failed'
+                original_error = 'Provider returned without executing web_search; no sources accepted.'
+                result['candidates'] = []
             discovered = [
                 SearchCandidate.model_validate(item)
                 for item in (result.get("candidates") or [])[:max_results]
@@ -3004,21 +3070,24 @@ class ResearchOrchestrator:
             checkpoint.candidates.extend(discovered)
             record = SearchQueryRecord(
                 query=query,
+                tool_name=query_tool,
                 status=status,
                 candidate_count=len(discovered),
-                requested_model=requested_search_model,
+                requested_model=query_model,
                 actual_model=actual_model,
                 fallback_reason=fallback_reason,
                 original_error=original_error,
                 elapsed_seconds=time.monotonic() - started,
             )
             checkpoint.query_records = [item for item in checkpoint.query_records if item.query != query] + [record]
-            project.budget.attempted_model_calls += 1 + int(bool(fallback_reason))
+            model_calls = int(query_tool == 'web_search')
+            project.budget.attempted_model_calls += model_calls + int(bool(fallback_reason))
             if status == "completed":
-                project.budget.successful_model_calls += 1
-                project.budget.used_model_calls += 1
+                project.budget.successful_model_calls += model_calls
+                project.budget.used_model_calls += model_calls
             else:
-                project.budget.failed_model_calls += 1
+                project.budget.failed_model_calls += model_calls
+            project.budget.failed_model_calls += int(bool(fallback_reason))
             checkpoint.elapsed_seconds += time.monotonic() - started
             produced += self._save_search_checkpoint(project, checkpoint)
             self._append_event(
@@ -3029,16 +3098,16 @@ class ResearchOrchestrator:
                     "evidence_researcher",
                     status=f"search_query_{status}",
                     stage_substep="search_query",
-                    requested_model=requested_search_model,
+                    requested_model=query_model,
                     actual_model=actual_model,
-                    fallback_used=actual_model != requested_search_model,
-                    tool_names=["web_search"],
-                    tool_name="web_search",
+                    fallback_used=bool(fallback_reason),
+                    tool_names=[query_tool],
+                    tool_name=query_tool,
                     search_result_count=len(discovered),
-                    successful_calls=int(status == "completed"),
-                    failed_calls=int(status != "completed"),
-                    attempted_calls=1,
-                    model_call_count=1,
+                    successful_calls=model_calls * int(status == "completed"),
+                    failed_calls=model_calls * int(status != "completed") + int(bool(fallback_reason)),
+                    attempted_calls=model_calls + int(bool(fallback_reason)),
+                    model_call_count=model_calls + int(bool(fallback_reason)),
                 ),
             )
 
@@ -3160,13 +3229,15 @@ class ResearchOrchestrator:
                     "evidence_researcher",
                     status="source_extraction_started",
                     stage_substep="source_extraction",
-                    tool_names=["web_search", "web_extractor"],
+                    tool_names=["read_source"],
                     display_markdown=(
                         f"正在读取选定文献来源（{min(offset + len(batch), len(pending))}/{len(pending)}）……"
                     ),
                 ),
             )
             started = time.monotonic()
+            result = {}
+            text = ''
             try:
                 result = agent.extract_candidate_batch(
                     batch,
@@ -3183,21 +3254,31 @@ class ResearchOrchestrator:
                 status = "timeout" if self._is_timeout_error(exc) else "failed"
                 error = self._sanitize_text(str(exc))
             for candidate in batch:
-                updated = candidate.model_copy(
-                    update={
-                        "extraction_status": status,
-                        "extracted_text": text if status == "completed" else "",
-                        "extraction_error": error,
+                source_result = result.get('source_results', {}).get(candidate.candidate_id)
+                update = {
+                    'extraction_status': status, 'extracted_text': text if status == 'completed' else '',
+                    'extraction_error': error,
+                }
+                if 'source_results' in result:
+                    source_result = source_result or {'status': 'failed', 'error': 'No per-source result returned'}
+                    update = {
+                        'extraction_status': source_result['status'],
+                        'extracted_text': source_result.get('text', ''),
+                        'extraction_error': source_result.get('error', ''),
+                        'retrieval_snapshot': source_result.get('snapshot', {'retrieval_status': 'failed'}),
                     }
+                updated = candidate.model_copy(
+                    update=update
                 )
                 checkpoint.selected_candidates[checkpoint.selected_candidates.index(candidate)] = updated
             checkpoint.elapsed_seconds += time.monotonic() - started
-            project.budget.attempted_model_calls += 1
+            model_calls = int(result.get('model_calls', 1))
+            project.budget.attempted_model_calls += model_calls
             if status == "completed":
-                project.budget.successful_model_calls += 1
-                project.budget.used_model_calls += 1
+                project.budget.successful_model_calls += model_calls
+                project.budget.used_model_calls += model_calls
             else:
-                project.budget.failed_model_calls += 1
+                project.budget.failed_model_calls += model_calls
             produced += self._save_search_checkpoint(project, checkpoint)
             self._append_event(
                 project,
@@ -3207,9 +3288,10 @@ class ResearchOrchestrator:
                     "evidence_researcher",
                     status=f"source_extraction_{status}",
                     stage_substep="source_extraction",
-                    successful_calls=int(status == "completed"),
-                    failed_calls=int(status != "completed"),
-                    extracted_page_count=len(batch) if status == "completed" else 0,
+                    successful_calls=model_calls * int(status == "completed"),
+                    failed_calls=model_calls * int(status != "completed"),
+                    extracted_page_count=(sum(s['status'] == 'completed' for s in result['source_results'].values())
+                                          if 'source_results' in result else len(batch) if status == 'completed' else 0),
                 ),
             )
 
@@ -3223,7 +3305,7 @@ class ResearchOrchestrator:
                 f"Only {len(usable)} sources were extracted; the configured minimum is {min_usable}. Supplementary search is recommended."
             )
         if not usable:
-            warnings.append("No source extraction completed; normalization will use selected source metadata only.")
+            warnings.append("No source extraction completed. Metadata is not findings; request accessible sources or uploaded references.")
         acquisition = SearchAcquisitionResult(
             final_text="\n\n".join(
                 item.extracted_text for item in checkpoint.selected_candidates if item.extracted_text
@@ -3490,7 +3572,8 @@ class ResearchOrchestrator:
                 current_substep,
                 evidence_count=len(evidence_collection.evidence_items),
             )
-            if not evidence_collection.evidence_items:
+            from src.ai_scientist.background_agent import independent_basis_approved
+            if not evidence_collection.evidence_items and not independent_basis_approved(project):
                 project.phase = ResearchPhase.HUMAN_SOURCE_REVIEW
                 project.background_research_checkpoint.awaiting_source_review = True
                 project.background_research_checkpoint.source_selection_completed = False
@@ -3642,6 +3725,8 @@ class ResearchOrchestrator:
             self.store.save(project)
             self._claim_mapping_event(project, phase, "phase_transition_completed", current_substep)
             return produced
+        except ModelInputRequired:
+            raise
         except InvalidEvidenceReferenceError:
             raise
         except AIScientistError:
@@ -3814,15 +3899,27 @@ class ResearchOrchestrator:
     def _run_agent(self, project: ResearchProject, agent_class: type) -> AgentRun:
         self._ensure_budget(project, 1)
         try:
-            return agent_class(client=self._structured_client_for_project(project)).run(project)
+            run = agent_class(client=self._structured_client_for_project(project)).run(project)
         except Exception:
             project.budget.attempted_model_calls += 1
             project.budget.failed_model_calls += 1
             self.store.save(project)
             raise
+        self._pause_for_model_input(project, run.output, run.metadata)
+        return run
+
+    def _pause_for_model_input(self, project, output, metadata):
+        if getattr(metadata, 'human_input_request', '').strip():
+            self._record_structured_output(project, project.phase, metadata.agent_name, output,
+                                           'pending_model_draft', metadata=metadata)
+            self.store.save(project)
+            raise ModelInputRequired(metadata.human_input_request)
 
     def _structured_client_for_project(self, project: ResearchProject) -> StructuredQwenClient:
-        return StructuredQwenClient(registry=ModelRegistry(project.model_overrides))
+        from src.ai_scientist.research_context import build_research_context
+        client = StructuredQwenClient(registry=ModelRegistry(project.model_overrides))
+        client.shared_context = build_research_context(project)
+        return client
 
     def _run_domain_selection(self, project: ResearchProject) -> tuple[DomainSelectionOutput, StructuredCallMetadata]:
         payload = {
@@ -3844,12 +3941,13 @@ class ResearchOrchestrator:
                 payload,
                 DomainSelectionOutput,
             )
-            return result.value, result.metadata
         except Exception:
             project.budget.attempted_model_calls += 1
             project.budget.failed_model_calls += 1
             self.store.save(project)
             raise
+        self._pause_for_model_input(project, result.value, result.metadata)
+        return result.value, result.metadata
 
     def _run_claim_mapping(
         self,
@@ -3861,11 +3959,16 @@ class ResearchOrchestrator:
             "question": project.question.model_dump(mode="json") if project.question else None,
             "project_id": project.project_id,
             "evidence_collection": evidence_collection.model_dump(mode="json"),
+            "research_basis": project.background_agent.get('scope'),
+            "basis_approval": project.background_agent.get('basis_approval'),
             "task": (
                 "Build a claim-evidence mapping using only the current EvidenceCollection. "
                 "Use only provided evidence_ids in links and evidence ID lists. "
                 "Do not invent new evidence, URLs, DOI, authors, or citations. "
                 "Mark unsupported or disputed claims explicitly."
+                " If the approved basis does not require external literature and evidence is empty, "
+                "map only the given premises, hypotheses and validation obligations with status unknown, "
+                "empty evidence references and explicit assumptions. Planned computation is not a finding."
             ),
         }
         try:
@@ -3875,13 +3978,14 @@ class ResearchOrchestrator:
                 payload,
                 ClaimEvidenceMappingResult,
             )
-            return result.value, result.metadata
         except Exception:
             if track_failure_budget:
                 project.budget.attempted_model_calls += 1
                 project.budget.failed_model_calls += 1
                 self.store.save(project)
             raise
+        self._pause_for_model_input(project, result.value, result.metadata)
+        return result.value, result.metadata
 
     def _record_agent_output(
         self,
@@ -3910,7 +4014,18 @@ class ResearchOrchestrator:
         project.active_artifact_versions[artifact_type] = record.version
         if artifact_type in project.stale_artifacts:
             project.stale_artifacts.remove(artifact_type)
-        display_markdown = self._stage_display_markdown(project, artifact_type, run.output)
+        if isinstance(run.output, ReviewResult):
+            from src.ai_scientist.quality import failed_quality_gates
+            findings = {'review_artifact_id': record.artifact_id, 'policy_version': 2,
+                        'advisory_signals': failed_quality_gates(project.quality_metrics, run.output),
+                        'model_verdict_preserved': True,
+                        'note': 'Heuristic signals, not scientific verdicts; the model review is unchanged.'}
+            project.review_policy_findings.append(findings)
+            policy_record = self.artifacts.save_json(project.project_id, 'review_policy_findings', findings, 'orchestrator')
+            project.artifacts.append(policy_record)
+        self._remember_model_message(project, run.metadata)
+        display_markdown = (getattr(run.metadata, 'public_response', '')
+                            or self._stage_display_markdown(project, artifact_type, run.output))
         if display_markdown:
             project.stage_messages.append(display_markdown)
         event = completed_event(
@@ -3986,6 +4101,8 @@ class ResearchOrchestrator:
         if artifact_type in project.stale_artifacts:
             project.stale_artifacts.remove(artifact_type)
         if metadata:
+            self._remember_model_message(project, metadata)
+            display_markdown = getattr(metadata, 'public_response', '') or display_markdown
             project.budget.attempted_model_calls += metadata.attempted_calls
             project.budget.successful_model_calls += metadata.successful_calls
             project.budget.failed_model_calls += metadata.failed_calls
@@ -4013,6 +4130,16 @@ class ResearchOrchestrator:
         )
         self._append_event(project, event)
         return [record.artifact_id]
+
+    @staticmethod
+    def _remember_model_message(project, metadata):
+        prompt = getattr(metadata, 'human_input_request', '')
+        if prompt.strip():
+            request_id = getattr(metadata, 'call_id', '') or new_id('human_request')
+            request = {'request_id': request_id, 'prompt': prompt, 'phase': project.phase.value,
+                       'agent_name': metadata.agent_name, 'model': metadata.actual_model}
+            if not project.human_dialogue.get('pending'):
+                project.human_dialogue['pending'] = request
 
     def _record_human_edit(
         self,
@@ -4061,6 +4188,10 @@ class ResearchOrchestrator:
         if target in {"question", "evidence"}:
             project.background_research_checkpoint = BackgroundResearchCheckpoint()
             project.curated_sources = []
+            if project.background_agent:
+                from src.ai_scientist.background_agent import BackgroundAgent
+                BackgroundAgent(self).record(project, 'background_rollback_archive', project.background_agent)
+                project.background_agent = {}
         previous_phase = project.phase
         invalidated = self._artifact_ids_from_phase(target_phase, project)
         preserved = [item.artifact_id for item in project.artifacts if item.artifact_id not in set(invalidated)]

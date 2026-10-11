@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+
+class ModelInputRequired(Exception):
+    """A valid public request pauses the stage; it is neither completion nor failure."""
+
 from typing import Any
 
 

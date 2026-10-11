@@ -6,6 +6,7 @@ import json
 import os
 import re
 import tempfile
+import threading
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal
@@ -27,6 +28,10 @@ class ResearchJob(BaseModel):
     finished_at: datetime | None = None
     error: dict[str, Any] | None = None
     result: dict[str, Any] | None = None
+    run_mode: str = "single_stage"
+    pause_requested: bool = False
+    progress: dict[str, Any] = Field(default_factory=dict)
+    model_updates: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class ResearchJobStore:
@@ -34,6 +39,45 @@ class ResearchJobStore:
 
     def __init__(self, projects_root: str | Path) -> None:
         self.projects_root = Path(projects_root)
+        self._update_lock = threading.RLock()
+
+    def update(self, project_id: str, job_id: str, change) -> ResearchJob:
+        """Serialize live output and cooperative pause writes within this API worker."""
+        with self._update_lock:
+            job = self.load(project_id, job_id)
+            change(job)
+            self.save(job)
+            return job
+
+    def record_model_progress(self, project_id: str, job_id: str, event: dict) -> None:
+        # Accept public content only: never persist provider hidden reasoning or prompts.
+        allowed = {'call_id', 'agent_name', 'model', 'status', 'timestamp', 'public_response',
+                   'human_input_request', 'receipt', 'provider_responses', 'token_usage',
+                   'elapsed_seconds', 'received_chunks', 'output_chars'}
+        public = {key: value for key, value in event.items() if key in allowed}
+        receipt_fields = {'requested_model', 'response_model', 'response_id', 'request_id', 'status'}
+        for key in ('receipt',):
+            if isinstance(public.get(key), dict):
+                public[key] = {k: v for k, v in public[key].items() if k in receipt_fields}
+            elif key in public:
+                public.pop(key)
+        if 'provider_responses' in public:
+            public['provider_responses'] = [
+                {k: v for k, v in value.items() if k in receipt_fields}
+                for value in public['provider_responses'] if isinstance(value, dict)]
+        if 'token_usage' in public:
+            public['token_usage'] = {k: v for k, v in public['token_usage'].items()
+                                     if k in {'prompt_tokens', 'completion_tokens', 'total_tokens'}
+                                     and isinstance(v, int)}
+        def change(job):
+            job.progress = {**public, 'phase': job.phase}
+            call_id = public.get('call_id')
+            existing = next((item for item in job.model_updates if item.get('call_id') == call_id), None)
+            if existing is not None:
+                existing.update(public)
+            else:
+                job.model_updates.append({**public, 'phase': job.phase})
+        self.update(project_id, job_id, change)
 
     def jobs_dir(self, project_id: str) -> Path:
         path = self.projects_root / project_id / "jobs"
@@ -51,7 +95,10 @@ class ResearchJobStore:
     def save(self, job: ResearchJob) -> Path:
         directory = self.jobs_dir(job.project_id)
         target = directory / f"{job.job_id}.json"
-        payload = _sanitize_text(job.model_dump_json(indent=2))
+        # Redact scalar values before serializing. Applying text regexes to the
+        # JSON document itself can consume its closing quotes and corrupt a job
+        # as soon as a streamed sentence ends with e.g. "api_key=...".
+        payload = json.dumps(_sanitize_values(job.model_dump(mode='json')), ensure_ascii=False, indent=2)
         temp_path: Path | None = None
         try:
             with tempfile.NamedTemporaryFile(
@@ -141,6 +188,16 @@ def fail_job(job: ResearchJob, exc: Exception) -> ResearchJob:
         "validation_errors": getattr(exc, "validation_errors", []),
     }
     return job
+
+
+def _sanitize_values(value: Any) -> Any:
+    if isinstance(value, str):
+        return _sanitize_text(value)
+    if isinstance(value, dict):
+        return {key: _sanitize_values(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_sanitize_values(item) for item in value]
+    return value
 
 
 def _sanitize_text(text: str) -> str:

@@ -1,5 +1,26 @@
 # AI Scientist
 
+The original staged research workflow is the single product entry point.
+[Model-led background research, immutable reviews and frontend instructions](deployment/MODEL_LED_BACKGROUND.md).
+New frontend projects use research policy v2: Qwen assesses information needs,
+chooses stage-local tools from actual observations, reads sources before recommending
+adoption, and submits the research basis for human confirmation. Existing projects
+remain on their recorded policy until explicitly migrated. Program heuristics do
+not rewrite model review verdicts or scores.
+[Stage-local tools, human reproduction and acceptance boundaries](deployment/FIXED_WORKFLOW_TOOLS.md).
+Qwen proposes web or scholarly search within background research; approved sources
+are read individually and quotations checked against actual snapshots. After
+research-plan approval, Qwen can propose isolated Python computation, with separate
+code approval, followed by data analysis, independent review and synthesis.
+The experimental parallel workspace is archived read-only; historical competition
+projects and exploration records are preserved without rewriting their status.
+
+Question-driven Python computation is available as an opt-in Linux feature:
+[setup, frontend reproduction, API and acceptance](deployment/GENERAL_COMPUTATION.md).
+Qwen generates code from the question and registered data; approved code runs in
+OS namespaces with independently assessed scientific rounds. Changed repair code
+requires a new human approval, even if its method description is unchanged.
+
 This project exposes one product: a domain-neutral AI Scientist workflow with a
 deterministic Competition 1B feedback demo. The workflow uses shared Qwen clients
 internally for structured scientific roles, authenticated model diagnostics, and
@@ -18,7 +39,7 @@ It combines:
 - atomic project persistence and append-only events;
 - explicit execution capability boundaries.
 
-Agents do not hold a free-form group chat. `ResearchOrchestrator` calls one stage in sequence, and roles exchange only validated structured artifacts. Hidden reasoning, raw provider responses, complete prompts, credentials, and authorization headers are never persisted or returned by the research API.
+Agents do not hold a free-form group chat. `ResearchOrchestrator` advances one stage at a time, using bounded tools inside their designated stages. Hidden reasoning, raw provider responses, complete prompts, credentials, and authorization headers are never persisted or returned by the research API.
 
 ## AI Scientist Architecture
 
@@ -34,15 +55,18 @@ The research roles are:
 - Skeptical Reviewer
 - Scientific Synthesizer
 
-The Reviewer is an independent Qwen call that receives structured project state only. A critical score below 6 cannot produce an `approve` decision.
+The Reviewer is an independent Qwen call that receives structured project state only.
+Its verdict, scores and blockers are preserved. Heuristic quality signals are
+recorded separately as advisory policy findings, not substituted for model judgment.
+Contradictory structured output (approval with unresolved blockers) remains invalid.
 
 ### Independent review and human-controlled revision
 
 Reviewer revision requests stop at `HUMAN_REVISION_REVIEW`; they do not immediately rewrite artifacts. The workspace classifies issues as planning blockers, execution prerequisites, non-blocking improvements, or optional suggestions. A human can accept the AI proposal, modify it, provide exact content, accept an issue as a limitation, defer it to execution, or reject it with a reason.
 
-Accepted issues are grouped by target artifact and executed as batches. A successful model response only creates a new artifact version. Completion requires deterministic checks followed by an independent structured verifier call. Failed verification returns the project to human review instead of silently advancing. `AI_SCIENTIST_REVISION_VERIFIER_MODEL` can assign a separate Qwen model to this verification role.
+Accepted issues are grouped by target artifact and executed as batches. A successful model response only creates a new artifact version. In policy v2, the model's issue classifications and completion criteria are preserved; criterion coverage is checked structurally and an independent model judges content without keyword vetoes. Legacy v1 retains its recorded normalization rules. Failed verification returns the project to human review instead of silently advancing. `AI_SCIENTIST_REVISION_VERIFIER_MODEL` can assign a separate Qwen model to this verification role.
 
-Each role call loads exactly four selected skill files:
+The original role calls load four selected skill files (the new stage-local action loop uses its own bounded tool and evidence instructions):
 
 1. `skills/core/epistemic_policy.yaml`
 2. the current role skill
@@ -64,13 +88,14 @@ The current release can:
 - run independent review;
 - synthesize an approved planning-only research report.
 
-Evidence acquisition is bounded, resumable, and human-curated. Evidence Researcher first creates an offline `SearchPlan` bound to the project and active research-question hash. In the default `ASSISTED` mode, the researcher must approve or edit that plan before any network request. Bounded queries then create `SourceCandidate` records, not evidence. The UI shows source metadata, AI recommendations, relevance, and verification signals; a human decides which candidates to keep, reject, or defer. Only kept candidates are extracted in small streaming batches, verified, and normalized into formal `EvidenceItem` records. Versioned checkpoints are bound to `project_id`, `question_hash`, and `search_plan_id`, so a plan or checkpoint cannot cross projects or questions.
+Evidence acquisition is bounded, resumable, and human-curated. Evidence Researcher first creates an offline `SearchPlan` bound to the project and active research-question hash. In default `ASSISTED` mode, the researcher approves or edits that plan before network requests. Each query specifies web search or Crossref bibliographic search. Results become candidates, not evidence. The researcher chooses candidates to read. Direct public HTTPS reads preserve separate text, final URL, hash and failures for each source. New evidence requires an exact quote from its own retrieved snapshot; metadata alone cannot pass that check. Snapshot verification proves retrieval and quotation, not scientific truth or logical entailment. Versioned checkpoints remain bound to the project, question and approved search plan.
 
 The governing rule is: **AI discovers sources, the researcher decides whether to adopt them, and the system verifies and builds the evidence chain.** Search results never become evidence automatically in `ASSISTED` or `MANUAL` mode. Supported uploaded research files are parsed locally into bounded, auditable context; parsing does not verify scientific claims or execute an analysis.
 
-The general AI Scientist workflow does not connect to an arbitrary laboratory,
-simulation, code-execution, or statistical-analysis backend. It waits for human data
-or execution and does not invent experimental results. Competition 1B adds only a
+The staged workflow does not connect to arbitrary laboratories. Its execution stage
+can request bounded isolated Python analysis when enabled and human-approved;
+physical experiments and unavailable data still require human
+input. It must not invent experimental results. Competition 1B retains a
 whitelisted deterministic damped-oscillator executor for the documented benchmark;
 planning-only synthesis still states when a plan has not been executed.
 

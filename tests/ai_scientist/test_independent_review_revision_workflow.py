@@ -447,7 +447,7 @@ def _completed_verified_revision(orchestrator: ResearchOrchestrator):
     return project
 
 
-def test_verified_revision_rereview_converges_new_method_suggestions_to_non_blocking(
+def test_verified_revision_preserves_model_blockers_and_scores(
     tmp_path: Path,
 ) -> None:
     orchestrator = ResearchOrchestrator(tmp_path)
@@ -467,14 +467,13 @@ def test_verified_revision_rereview_converges_new_method_suggestions_to_non_bloc
 
     converged = orchestrator._converge_verified_revision_review(project, review)
 
-    assert converged.decision == "approve"
-    assert converged.blocking_issues == []
-    assert converged.failed_quality_gates == []
-    assert converged.reproducibility_score == 6
-    assert "Add another optional sensitivity analysis." in converged.non_blocking_issues
+    assert converged is review
+    assert converged.decision == 'revise_analysis'
+    assert converged.reproducibility_score == 5
+    assert converged.blocking_issues == ['Add another optional sensitivity analysis.']
 
 
-def test_verified_revision_does_not_require_execution_results_before_approval(
+def test_verified_revision_does_not_override_model_execution_requirements(
     tmp_path: Path,
 ) -> None:
     orchestrator = ResearchOrchestrator(tmp_path)
@@ -499,16 +498,14 @@ def test_verified_revision_does_not_require_execution_results_before_approval(
 
     converged = orchestrator._converge_verified_revision_review(project, review)
 
-    assert converged.decision == "approve"
-    assert converged.blocking_issues == []
-    assert converged.failed_quality_gates == []
-    assert converged.evidence_quality_score == 6
-    assert converged.feasibility_score == 6
-    assert converged.claim_support_score == 6
-    assert review.blocking_issues[0] in converged.non_blocking_issues
+    assert converged is review
+    assert converged.evidence_quality_score == 4.5
+    assert converged.feasibility_score == 5.5
+    assert converged.claim_support_score == 5
+    assert converged.decision == 'revise_analysis'
 
 
-def test_verified_revision_project_recovers_from_existing_human_intervention(
+def test_verified_revision_does_not_auto_approve_existing_human_intervention(
     tmp_path: Path,
 ) -> None:
     orchestrator = ResearchOrchestrator(tmp_path)
@@ -536,10 +533,9 @@ def test_verified_revision_project_recovers_from_existing_human_intervention(
     result = orchestrator.run_next_step(project.project_id)
     recovered = orchestrator.get_project(project.project_id)
 
-    assert result["current_phase"] == ResearchPhase.HUMAN_APPROVAL.value
-    assert result["stage_status"] == "verified_revision_review_recovered"
-    assert recovered.reviews[-1].decision == "approve"
-    assert recovered.approval_status == "pending"
+    assert result["current_phase"] == ResearchPhase.HUMAN_INTERVENTION_REQUIRED.value
+    assert result["stage_status"] == "waiting_for_human_intervention"
+    assert recovered.reviews[-1].decision == "revise_analysis"
 
 
 def test_verified_revision_does_not_override_integrity_blocker(tmp_path: Path) -> None:
@@ -756,7 +752,7 @@ def test_revision_artifact_events_include_batch_and_version(tmp_path: Path) -> N
     assert any("v2_generated" in key for key in keys)
 
 
-def test_planning_only_execution_prerequisite_does_not_block_approval(tmp_path: Path) -> None:
+def test_planning_only_does_not_rewrite_model_prerequisites(tmp_path: Path) -> None:
     orchestrator = ResearchOrchestrator(tmp_path)
     project = orchestrator.create_project("Planning only", planning_only=True)
     review = ReviewResult(
@@ -772,9 +768,10 @@ def test_planning_only_execution_prerequisite_does_not_block_approval(tmp_path: 
         revision_plan=[RevisionAction(target="method", reason="Register PROSPERO", required_changes=["Register PROSPERO"])],
     )
     prepared = orchestrator._prepare_review_for_project(project, review)
-    assert prepared.decision == "approve"
-    assert prepared.blocking_issues == []
-    assert project.execution_requirements == ["Register PROSPERO"]
+    assert prepared is review
+    assert prepared.decision == 'revise_method'
+    assert prepared.blocking_issues == ['Register PROSPERO']
+    assert project.execution_requirements == []
 
 
 def test_frontend_contains_human_gate_and_specific_submit_error() -> None:

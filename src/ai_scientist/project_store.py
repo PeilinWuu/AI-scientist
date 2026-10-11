@@ -22,6 +22,21 @@ class ProjectStore:
     def project_dir(self, project_id: str) -> Path:
         return self.root / project_id
 
+    def list_projects(self) -> list[dict]:
+        """Small navigation records; never return prompts, credentials or results."""
+        projects = []
+        for path in self.root.glob('*/project.json'):
+            if path.is_symlink() or path.parent.is_symlink():
+                continue
+            try:
+                data = json.loads(path.read_text(encoding='utf-8'))
+                title = data.get('title') or data.get('objective') or '未命名研究'
+                projects.append({'project_id': path.parent.name, 'title': title[:160],
+                                 'phase': data.get('phase'), 'updated_at': data.get('updated_at', '')})
+            except (OSError, ValueError, TypeError):
+                continue
+        return sorted(projects, key=lambda p: p['updated_at'], reverse=True)
+
     def save(self, project: ResearchProject) -> Path:
         """Atomically replace project.json after validating the project schema."""
 
