@@ -22,6 +22,9 @@ def generate_report(orchestrator, project, instructions=()):
         raise ValueError('Cannot write report from missing or modified execution artifacts')
     orchestrator._ensure_budget(project, 2)
     client = orchestrator._structured_client_for_project(project)
+    from src.ai_scientist.figure_refs import available_figures
+    client.public_figures = available_figures({'computation': {'attempts': [audit]}},
+                                              orchestrator.store.project_dir(project.project_id))
     run = client.call('scientific_synthesizer',
         'Write the actual research report in the user language, not a plan to write it. '
         'Use only the supplied verified execution observations and research context. '
@@ -43,13 +46,16 @@ def generate_report(orchestrator, project, instructions=()):
     orchestrator._pause_for_model_input(project, run.value, run.metadata)
     orchestrator._apply_call_metadata(project, run.metadata)
     version = project.active_artifact_versions.get('report', 0) + 1
+    from src.ai_scientist.figure_refs import export_figure_markdown
+    exported = export_figure_markdown(run.value.markdown, getattr(run.metadata, 'figures', []))
     record = orchestrator.artifacts.save_named_text(project.project_id,
-        f'research_report_v{version}.md', 'report', run.value.markdown, 'scientific_synthesizer')
+        f'research_report_v{version}.md', 'report', exported, 'scientific_synthesizer')
     record.version = version
     project.artifacts.append(record)
     project.active_artifact_versions['report'] = version
     project.computation['delivery_report'] = {'filename': record.filename,
         'artifact_id': record.artifact_id, 'checksum': record.checksum, 'run_id': audit['run_id'],
-        'version': version, 'markdown': run.value.markdown, 'review_status': 'draft'}
+        'version': version, 'markdown': run.value.markdown, 'review_status': 'draft',
+        'figures': getattr(run.metadata, 'figures', []), 'export_markdown': exported}
     orchestrator.store.save(project)
     return record.artifact_id

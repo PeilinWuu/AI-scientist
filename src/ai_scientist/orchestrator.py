@@ -292,9 +292,11 @@ class ResearchOrchestrator:
             elif project.phase == ResearchPhase.QUESTION_FORMULATION:
                 run = self._run_agent(project, ResearchDirectorAgent)
                 project.question = run.output.research_question
-                project.title = run.output.project_title
+                if not project.title_user_edited:
+                    project.title = run.output.project_title
                 project.constraints.update(run.output.initial_constraints)
                 project.human_actions_required = run.output.clarification_questions
+                self._queue_clarifications(project, run.output.clarification_questions)
                 produced_artifacts += self._record_agent_output(project, previous_phase, run, "research_question")
                 self.state_machine.transition(project, "next")
             elif project.phase == ResearchPhase.RESEARCH_MODE_SELECTION:
@@ -318,6 +320,7 @@ class ResearchOrchestrator:
                 project.domain = resolution.canonical_primary_domain
                 project.secondary_domains = resolution.canonical_secondary_domains
                 project.human_actions_required.extend(selection.clarification_questions)
+                self._queue_clarifications(project, selection.clarification_questions)
                 produced_artifacts += self._record_structured_output(
                     project,
                     previous_phase,
@@ -418,7 +421,16 @@ class ResearchOrchestrator:
                 revision_required = project.phase == ResearchPhase.HUMAN_REVISION_REVIEW
             elif project.phase == ResearchPhase.EXECUTION_WAITING:
                 from src.ai_scientist.computation import ComputationService, enabled as computation_enabled
-                if project.execution_capability == "INTERNAL_EXECUTABLE" and project.executor_binding:
+                from src.ai_scientist.literature_execution import eligible
+                if eligible(project):
+                    from src.ai_scientist.literature_experience import run_draft, review_draft, finish_draft
+                    operation = project.literature_review.pop('pending_operation', 'draft')
+                    produced_artifacts += {'draft': run_draft, 'review': review_draft, 'finish': finish_draft}[operation](self, project)
+                    if project.literature_review.get('status') == 'complete':
+                        self._transition_event(project, 'execution_complete')
+                    else:
+                        stage_status = 'literature_draft_ready'
+                elif project.execution_capability == "INTERNAL_EXECUTABLE" and project.executor_binding:
                     self._transition_event(project, "execution_tool_available")
                 elif project.planning_only:
                     self._transition_event(project, "planning_only")
@@ -495,12 +507,14 @@ class ResearchOrchestrator:
             elif project.phase == ResearchPhase.SYNTHESIS:
                 if (project.computation.get('delivery_validation') or {}).get('status') == 'needs_revision':
                     raise InvalidTransitionError('真实交付检查未通过，不能发布为已完成；请先修复缺失或损坏产物。')
-                run = self._run_agent(project, ScientificSynthesizerAgent)
-                project.conclusion = run.output
-                self._refresh_quality_metrics(project)
-                produced_artifacts += self._record_agent_output(project, previous_phase, run, "research_plan_synthesis")
-                self.state_machine.transition(project, "next")
-                produced_artifacts += self._write_research_plan(project)
+                if project.literature_review.get('delivery_policy') == 'draft_first':
+                    from src.ai_scientist.literature_experience import delivery_conclusion
+                    project.conclusion = delivery_conclusion(project)
+                    self._refresh_quality_metrics(project)
+                    self.state_machine.transition(project, 'next')
+                    produced_artifacts += self._write_research_plan(project)
+                else:
+                    produced_artifacts += self._legacy_synthesis(project, previous_phase)
             else:
                 raise InvalidTransitionError(f"No stage handler for phase {project.phase.value}")
             project.active_job_id = None
@@ -512,6 +526,9 @@ class ResearchOrchestrator:
             self.store.save(project)
         except Exception as exc:
             stage_substep = self._substep_for_error(previous_phase, exc)
+            if previous_phase == ResearchPhase.EXECUTION_WAITING and project.literature_review.get('status') == 'synthesizing':
+                project.literature_review['status'] = 'draft_ready' if project.literature_review.get('draft') else 'generation_failed'
+                project.literature_review['generation_error'] = '这次回答生成未完成。已有内容已保留，可以继续修改或重试。'
             cause_type = getattr(exc, "cause_type", None) or type(exc).__name__
             cause_message = getattr(exc, "cause_message", None) or str(exc)
             event = ResearchEvent(
@@ -1020,6 +1037,8 @@ class ResearchOrchestrator:
         approval_next_step = (
             "项目将进入科学综合阶段。"
             if execution_already_analyzed
+            else "项目将进行原文证据提取、对照表与文献综合，不会自动生成或执行代码。"
+            if project.research_mode == ResearchMode.SYSTEMATIC_REVIEW and not project.planning_only
             else "项目将进入内部确定性执行阶段。"
             if project.execution_capability == "INTERNAL_EXECUTABLE"
             else "项目将生成计算方案，代码仍需单独审阅和批准。"
@@ -1492,6 +1511,11 @@ class ResearchOrchestrator:
         """Bind the safe dataset executor only when mode, data, and user intent permit it."""
 
         if project.executor_binding == "damped_oscillator_v1" or project.planning_only:
+            return
+        if project.research_mode == ResearchMode.SYSTEMATIC_REVIEW:
+            project.executor_binding = None
+            if 'literature_synthesis' not in project.available_tools:
+                project.available_tools.append('literature_synthesis')
             return
         from src.ai_scientist.computation import enabled as computation_enabled
         if computation_enabled() and (not project.internal_execution_summary or
@@ -2728,7 +2752,8 @@ class ResearchOrchestrator:
     def _apply_revision_output(project: ResearchProject, target: str, output: Any) -> None:
         if target == "question":
             project.question = output.research_question
-            project.title = output.project_title
+            if not project.title_user_edited:
+                project.title = output.project_title
         elif target == "hypothesis":
             project.hypotheses = output.hypotheses
         elif target == "methodology":
@@ -3898,11 +3923,13 @@ class ResearchOrchestrator:
 
     def _run_agent(self, project: ResearchProject, agent_class: type) -> AgentRun:
         self._ensure_budget(project, 1)
+        client = self._structured_client_for_project(project)
         try:
-            run = agent_class(client=self._structured_client_for_project(project)).run(project)
+            run = agent_class(client=client).run(project)
         except Exception:
-            project.budget.attempted_model_calls += 1
-            project.budget.failed_model_calls += 1
+            attempts = max(1, getattr(client, '_provider_attempts', 0))
+            project.budget.attempted_model_calls += attempts
+            project.budget.failed_model_calls += attempts
             self.store.save(project)
             raise
         self._pause_for_model_input(project, run.output, run.metadata)
@@ -3918,7 +3945,11 @@ class ResearchOrchestrator:
     def _structured_client_for_project(self, project: ResearchProject) -> StructuredQwenClient:
         from src.ai_scientist.research_context import build_research_context
         client = StructuredQwenClient(registry=ModelRegistry(project.model_overrides))
+        client.request_budget = max(0, project.budget.max_model_calls - project.budget.attempted_model_calls)
         client.shared_context = build_research_context(project)
+        from src.ai_scientist.figure_refs import available_figures
+        client.public_figures = available_figures(project.model_dump(mode='json'),
+                                                  self.store.project_dir(project.project_id))
         return client
 
     def _run_domain_selection(self, project: ResearchProject) -> tuple[DomainSelectionOutput, StructuredCallMetadata]:
@@ -3934,16 +3965,18 @@ class ResearchOrchestrator:
                 "prefer social_science with computer_science as a possible secondary domain."
             ),
         }
+        client = self._structured_client_for_project(project)
         try:
-            result = self._structured_client_for_project(project).call(
+            result = client.call(
                 "research_director",
                 "You are an AI Scientist domain analyst. Return structured domain routing only.",
                 payload,
                 DomainSelectionOutput,
             )
         except Exception:
-            project.budget.attempted_model_calls += 1
-            project.budget.failed_model_calls += 1
+            attempts = max(1, getattr(client, '_provider_attempts', 0))
+            project.budget.attempted_model_calls += attempts
+            project.budget.failed_model_calls += attempts
             self.store.save(project)
             raise
         self._pause_for_model_input(project, result.value, result.metadata)
@@ -4130,6 +4163,33 @@ class ResearchOrchestrator:
         )
         self._append_event(project, event)
         return [record.artifact_id]
+
+    @staticmethod
+    def _queue_clarifications(project, questions):
+        """Legacy role questions share the same visible, resumable dialogue gate."""
+        answered = [r.get('prompt', '') for r in project.human_dialogue.get('responses', [])]
+        pending = [q for q in questions if q.strip() and not any(q in prompt for prompt in answered)]
+        if pending and not project.human_dialogue.get('pending'):
+            project.human_dialogue['pending'] = {'request_id': new_id('human_request'),
+                'prompt': '\n\n'.join(pending), 'phase': project.phase.value,
+                'agent_name': 'research_director', 'model': ''}
+
+    def _legacy_synthesis(self, project, previous_phase):
+        run = self._run_agent(project, ScientificSynthesizerAgent)
+        if project.literature_review.get('status') == 'complete':
+            from src.ai_scientist.background_agent import BackgroundAgent
+            from src.ai_scientist.literature_execution import audit_synthesis
+            audit = audit_synthesis(BackgroundAgent(self), project, {
+                'proposed_assessment': run.output.model_dump(), 'public_response': run.metadata.public_response})
+            if not audit.supported:
+                project.literature_review['final_review_feedback'] = audit.model_dump()
+                self._record_agent_output(project, previous_phase, run, 'unpublished_synthesis_draft')
+                raise InvalidTransitionError('最终综合尚未通过证据核查：' + audit.rationale)
+        project.conclusion = run.output
+        self._refresh_quality_metrics(project)
+        artifacts = self._record_agent_output(project, previous_phase, run, 'research_plan_synthesis')
+        self.state_machine.transition(project, 'next')
+        return artifacts + self._write_research_plan(project)
 
     @staticmethod
     def _remember_model_message(project, metadata):

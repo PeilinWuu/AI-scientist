@@ -32,7 +32,7 @@ class _LocalizedAgent(BaseResearchAgent[_LocalizedOutput]):
 
 
 def test_known_statuses_are_chinese_and_unknown_status_is_preserved() -> None:
-    assert status_label("EXECUTION_WAITING") == "等待实验执行"
+    assert status_label("EXECUTION_WAITING") == "研究执行与分析"
     assert status_label("supported") == "有证据支持"
     assert status_label("future_status") == "future_status"
 

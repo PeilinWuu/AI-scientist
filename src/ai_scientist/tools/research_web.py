@@ -6,6 +6,7 @@ fetch proves retrieval, not scientific validity, peer review, or truth.
 from __future__ import annotations
 
 import hashlib
+import io
 import http.client
 import ipaddress
 import json
@@ -61,7 +62,7 @@ def fetch_public(url: str) -> tuple[str, str, bytes]:
         try:
             connection.request('GET', path, headers={
                 'User-Agent': 'AI-Scientist-Research/1.0', 'Accept-Encoding': 'identity',
-                'Accept': 'text/html,application/json,text/plain,application/xml;q=0.9',
+                'Accept': 'text/html,application/pdf,application/json,text/plain,application/xml;q=0.9',
             })
             response = connection.getresponse()
             if response.status in {301, 302, 303, 307, 308}:
@@ -75,8 +76,8 @@ def fetch_public(url: str) -> tuple[str, str, bytes]:
             if response.getheader('Content-Encoding', 'identity') not in ('identity', ''):
                 raise ValueError('Compressed source responses are not accepted')
             kind = response.getheader('Content-Type', '').split(';')[0].lower()
-            if kind not in {'text/html', 'text/plain', 'text/csv', 'text/tab-separated-values', 'application/json', 'application/xml', 'text/xml', 'application/xhtml+xml'}:
-                raise ValueError('Unsupported source type; upload PDFs through the document parser')
+            if kind not in {'application/pdf', 'text/html', 'text/plain', 'text/csv', 'text/tab-separated-values', 'application/json', 'application/xml', 'text/xml', 'application/xhtml+xml'}:
+                raise ValueError('Unsupported source type; use public HTML, PDF or plain text')
             chunks, total = [], 0
             while True:
                 if time.monotonic() > deadline:
@@ -106,17 +107,24 @@ class _ReadableHTML(HTMLParser):
         self.links = []
 
     def handle_starttag(self, tag, attrs):
+        if not self.hidden:
+            if tag in {'p', 'div', 'section', 'h1', 'h2', 'h3', 'h4', 'li', 'tr', 'table', 'br'}:
+                self.parts.append('\n')
+            elif tag in {'th', 'td'}:
+                self.parts.append(' | ')
         if tag == 'a' and not self.hidden:
             href = dict(attrs).get('href')
             if href and len(self.links) < 200:
                 self.links.append(href)
-        if tag in {'script', 'style', 'noscript', 'svg'}:
+        if tag in {'script', 'style', 'noscript', 'svg', 'nav', 'footer'}:
             self.hidden += 1
         if tag == 'title':
             self.in_title = True
 
     def handle_endtag(self, tag):
-        if tag in {'script', 'style', 'noscript', 'svg'}:
+        if not self.hidden and tag in {'p', 'h1', 'h2', 'h3', 'h4', 'li', 'tr', 'table'}:
+            self.parts.append('\n')
+        if tag in {'script', 'style', 'noscript', 'svg', 'nav', 'footer'}:
             self.hidden = max(0, self.hidden - 1)
         if tag == 'title':
             self.in_title = False
@@ -169,14 +177,35 @@ def read_source_snapshot(url: str, *, max_text: int = MAX_TEXT) -> dict:
     text = body.decode('utf-8', errors='replace')
     title = final_url
     links = []
-    if kind in {'text/html', 'application/xhtml+xml'}:
+    parser_truncated = False
+    if kind == 'application/pdf':
+        from pypdf import PdfReader
+        reader = PdfReader(io.BytesIO(body))
+        if reader.is_encrypted:
+            raise ValueError('Encrypted PDF: provide a readable public copy')
+        fragments = []
+        count = 0
+        for page in reader.pages[:100]:
+            fragment = f'[Page {count + 1}]\n' + (page.extract_text() or '')
+            fragments.append(fragment)
+            count += 1
+            if sum(map(len, fragments)) > max_text:
+                break
+        text = '\n'.join(fragments)
+        parser_truncated = count < len(reader.pages)
+        title = str((reader.metadata or {}).get('/Title') or final_url)
+        if len(normalize_text(re.sub(r'\[Page \d+\]', '', text))) < 80:
+            raise ValueError('PDF contains no usable text; scanned pages require OCR or a text copy')
+    elif kind in {'text/html', 'application/xhtml+xml'}:
         parser = _ReadableHTML()
         parser.feed(text)
         text = ' '.join(parser.parts)
         title = normalize_text(' '.join(parser.title_parts)) or title
         links = list(dict.fromkeys(urljoin(final_url, link) for link in parser.links
                                   if urlsplit(urljoin(final_url, link)).scheme == 'https'))
-    text = normalize_text(text)
+    # Preserve paragraph and table-row boundaries; whitespace normalization for
+    # exact quote checks remains separate and backwards-compatible with old reads.
+    text = '\n'.join(line for line in (normalize_text(s) for s in text.splitlines()) if line)
     access_failure = source_access_failure(text, title)
     if access_failure:
         raise ValueError(access_failure)
@@ -184,7 +213,7 @@ def read_source_snapshot(url: str, *, max_text: int = MAX_TEXT) -> dict:
         raise ValueError('Insufficient readable text; page may require JavaScript or authentication')
     return {'url': final_url, 'title': title[:500], 'text': text[:max_text],
             'links': links,
-            'truncated': len(text) > max_text, 'cache_truncated': len(text) > max_text,
+            'truncated': parser_truncated or len(text) > max_text, 'cache_truncated': parser_truncated or len(text) > max_text,
             'source_text_chars': len(text), 'cache_chars': min(len(text), max_text),
             'cache_limit_chars': max_text, 'content_type': kind,
             'sha256': hashlib.sha256(body).hexdigest(), 'retrieval_status': 'retrieved',
@@ -198,9 +227,11 @@ def read_source(url: str) -> dict:
 
 def search_papers(query: str) -> dict:
     # Metadata only: Crossref hits are not full text and never become evidence automatically.
-    _, _, body = fetch_public('https://api.crossref.org/works?rows=5&query.bibliographic=' + quote(query, safe=''))
+    provider_query = normalize_text(re.sub(r'\b(?:AND|OR|NOT)\b|[()\"]', ' ', query))
+    _, _, body = fetch_public('https://api.crossref.org/works?rows=5&filter=type:journal-article&query.title=' + quote(provider_query, safe=''))
     items = json.loads(body)['message']['items']
-    return {'provider': 'Crossref', 'metadata_only': True, 'papers': [
+    return {'provider': 'Crossref', 'metadata_only': True, 'provider_query': provider_query,
+            'search_scope': 'Journal article title metadata; not full text or Boolean search. Use web search for other source types and open copies.', 'papers': [
         {'title': (item.get('title') or [''])[0], 'doi': item.get('DOI'),
          'url': item.get('URL'), 'publisher': item.get('publisher'),
          'type': item.get('type'), 'published': item.get('published'),

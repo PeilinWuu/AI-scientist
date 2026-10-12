@@ -542,10 +542,9 @@ def _render_final_synthesis(conclusion: dict) -> None:
     ]
     for title, key in section_specs:
         items = conclusion.get(key) or []
-        st.markdown(f"### {title}")
         if not items:
-            st.caption("暂无内容。")
             continue
+        st.markdown(f"### {title}")
         for item in items:
             if isinstance(item, dict):
                 statement = item.get("statement") or item.get("finding") or "未命名条目"
@@ -582,6 +581,8 @@ def render_scientist_model_config(backend_url: str) -> dict[str, str]:
             st.session_state[key] = defaults.get(role, "")
 
     with st.expander("模型团队配置", expanded=False):
+        st.caption('科研判断与检索服务分开配置；搜索模型不会自动替代证据研究员。已有项目保留创建时的角色设置。')
+        st.caption('检索服务模型：' + str((config.get('ai_scientist') or {}).get('search_model') or '服务器默认'))
         if st.button("从 .env 重置模型团队"):
             for role, (key, _) in SCIENTIST_MODEL_KEYS.items():
                 st.session_state[key] = defaults.get(role, "")
@@ -604,7 +605,7 @@ def render_scientist_model_config(backend_url: str) -> dict[str, str]:
                 model = normalize_model_name(st.session_state.get(key)) or defaults.get(role, "")
                 if not model:
                     continue
-                mode = "search" if role == "evidence_researcher" else "chat"
+                mode = "chat"
                 model_to_roles.setdefault((model, mode), []).append(label)
             for (model, test_mode), labels in model_to_roles.items():
                 result = test_model(backend_url, model, test_mode)
@@ -827,6 +828,8 @@ def _render_research_next_action(backend_url: str, project: dict, job: dict | No
         _render_revision_review_gate(backend_url, project, False, show_debug)
     elif kind == 'approval':
         _render_plan_approval(backend_url, project, False, show_debug)
+    elif kind == 'literature_draft':
+        st.markdown('[阅读回答并修改、核查或保存](#research-answer)')
     elif kind == 'computation_approval':
         render_general_computation(backend_url, project, show_debug, approval_only=True)
     elif kind in {'prepare_computation', 'resume_assessment'}:
@@ -870,7 +873,7 @@ def _render_research_next_action(backend_url: str, project: dict, job: dict | No
 
 def render_research_workspace(backend_url: str, show_debug: bool) -> None:
     st.title("AI Scientist")
-    st.caption("输入科学问题和已有资料，系统将形成可审计的实验规划、执行、分析与反馈迭代流程。")
+    st.caption("提出科学问题，与 Qwen 一起查找资料、制定方案、开展研究并阅读结果；需要你的决定时会停下提示。")
     question_shown = bool(st.session_state.get('research_project'))
     if question_shown:
         from src.ai_scientist.workspace_ui import render_project_question
@@ -960,7 +963,7 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
                 "仅生成研究方案（不等待实验结果）",
                 value=False,
                 key="research_planning_only",
-                help="未选中时，如无内部执行器，项目会等待研究者完成外部实验并上传真实结果。",
+                help="选中仅交付方案；未选中则按研究方法推进。文献研究执行证据提取与综合，数值研究执行获批计算，确需外部实验的任务才等待真实结果。",
             )
             evidence_review_mode = st.selectbox(
                 "证据审查模式",
@@ -1016,6 +1019,7 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
                     payload,
                 )
                 st.session_state.research_project_id = created["project_id"]
+                st.query_params['project'] = created['project_id']
                 st.session_state.research_job_id = None
                 saved, upload_errors = _save_research_assets(
                     backend_url,
@@ -1061,17 +1065,20 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
     job_running = bool(job and job.get('status') in {'queued', 'running'})
     phase = project.get('phase', '')
     phase_label = PHASE_LABELS.get(phase, phase)
+    if phase == 'EXECUTION_WAITING' and project.get('research_mode') == 'systematic_review' and not project.get('planning_only'):
+        phase_label = '文献证据综合'
     st.caption(f"当前阶段：{phase_label} · 研究模式：{research_mode_label(project.get('research_mode'))}")
     st.caption('使用路径：提出问题 → 自动研究 → 必要时回答或审批 → 查看结果。研究可能因复审返回修订，并非一次直线完成。')
 
-    from src.ai_scientist.product_ui import render_result_gallery
-    render_result_gallery(backend_url, project, get_json)
+    from src.ai_scientist.product_ui import render_result_gallery, render_model_answer
+    literature = project.get('literature_review') or {}
+    if literature.get('rows') and not (literature.get('draft') or {}).get('report_markdown'):
+        stage_name = {'extracting': '提取与核查来源', 'synthesizing': '检查依据并撰写综述',
+                      'auditing': '核查综述结论', 'needs_revision': '草稿需修订，尚未发布',
+                      'needs_input': '等待补充信息', 'complete': '限定范围综述已保存'}.get(literature.get('status'), '待继续')
+        st.caption(f"证据表已核查 {len(literature.get('rows') or [])}/{len(project.get('evidence') or [])} 篇 · "
+                   f"{stage_name}。已保存的证据行会在继续时复用；这不等于整个研究已完成。")
     report = (project.get('computation') or {}).get('delivery_report')
-    if report:
-        with st.expander('科研报告 · ' + ('已完成' if project.get('phase') == 'COMPLETED' else '待最终验收'), expanded=False):
-            st.markdown(report.get('markdown', ''), unsafe_allow_html=False)
-            st.download_button('下载科研报告', report.get('markdown', ''), file_name=report['filename'],
-                               key=f"report_{project['project_id']}")
 
     with st.container(border=True):
         st.subheader('当前进展与下一步')
@@ -1079,19 +1086,48 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
 
     view = st.radio('查看研究内容', ['研究对话', '资料与成果', '运行记录'],
                     horizontal=True, key=f"research_view_{project['project_id']}")
+    def submit_literature(payload):
+        try:
+            created = post_json(backend_url, f"/api/research/{project['project_id']}/literature/action", payload)
+            st.session_state.research_job_id = created.get('job_id')
+            refresh_research_project(backend_url)
+            st.rerun()
+        except BackendAPIError as exc:
+            st.warning(user_error_message(exc))
+    literature_submit = submit_literature if phase in {'EXECUTION_WAITING', 'COMPLETED'} else None
     if view == '研究对话':
+        from src.ai_scientist.literature_ui import render_literature_answer
+        render_literature_answer(project, job_running, literature_submit)
         try:
             conversation = get_json(backend_url, f"/api/research/{project['project_id']}/conversation")
             messages = conversation.get('messages', [])
         except BackendAPIError:
             messages = []
             st.warning('暂时无法加载对话，已有研究记录不会因此丢失。')
-        render_research_conversation(project, messages, PHASE_LABELS)
+        render_research_conversation(project, messages, PHASE_LABELS, backend_url, get_json)
+        from src.ai_scientist.product_ui import latest_successful_attempt, has_inline_figures
+        latest_attempt = latest_successful_attempt(project)
+        if latest_attempt and not has_inline_figures(messages, latest_attempt):
+            with st.expander('已有计算成果（尚未关联到模型回答）', expanded=False):
+                st.caption('这些历史记录没有保存回答与图片的关联，或结果尚待模型解读；不会改写原回答。新回答可在解释中直接引用图表。')
+                render_result_gallery(backend_url, project, get_json)
         if phase == 'BACKGROUND_RESEARCH':
             with st.expander('本阶段工具进展与补查意见', expanded=False):
                 _render_evidence_curation_gate(backend_url, project, job_running, show_debug)
     elif view == '资料与成果':
-        _render_research_details(backend_url, project, job_running, show_debug)
+        from src.ai_scientist.literature_ui import render_literature_answer
+        render_literature_answer(project, job_running, literature_submit)
+        render_result_gallery(backend_url, project, get_json)
+        if report:
+            with st.expander('科研报告 · ' + ('已完成' if project.get('phase') == 'COMPLETED' else '待最终验收'), expanded=True):
+                render_model_answer(backend_url, project, report.get('markdown', ''), report.get('figures', []),
+                                    get_json, f"report_{project['project_id']}")
+                st.download_button('下载科研报告', report.get('export_markdown', report.get('markdown', '')), file_name=report['filename'],
+                                   key=f"report_{project['project_id']}")
+                if report.get('figures'):
+                    st.caption('网页中直接查看图文报告；下载的 Markdown 使用相对图片路径，离线查看需同时保留对应计算文件目录。')
+        with st.expander('研究档案：来源、方案与审核记录', expanded=not bool(literature)):
+            _render_research_details(backend_url, project, job_running, show_debug)
     else:
         _render_research_history(backend_url, project, show_debug)
 
@@ -1122,24 +1158,40 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
         _poll_research_page(backend_url)
 
 
-@st.fragment(run_every=3)
+@st.fragment(run_every=2)
 def _poll_research_page(backend_url):
     # The main script completes instead of leaving stale forms on screen in a
     # sleep/rerun loop. Only a scheduled fragment requests subsequent refreshes.
+    import time
+    now = time.monotonic()
+    previous = st.session_state.get('_last_research_refresh')
+    if previous is None:
+        st.session_state['_last_research_refresh'] = now
+        return
+    if now - previous < 1.8:
+        return
+    st.session_state['_last_research_refresh'] = now
     try:
         refresh_research_project(backend_url)
     except BackendAPIError:
         st.warning('连接暂时中断，已有研究仍保留。')
         return
-    count = st.session_state.get('_research_poll_count', 0)
-    st.session_state['_research_poll_count'] = count + 1
-    if count % 2:
-        st.rerun(scope='app')
+    st.rerun(scope='app')
 
 
 def _render_plan_approval(backend_url: str, project: dict, job_running: bool, show_debug: bool) -> None:
     if project.get("phase") == "HUMAN_APPROVAL":
-        st.subheader("人工审查包")
+        st.subheader("确认本轮研究方案")
+        from src.ai_scientist.experience_ui import approval_summary
+        for label, text in approval_summary(project):
+            st.markdown(f'**{label}**：{text}')
+        with st.expander('查看完整方案与审查意见'):
+            for key, label in [('study_design', '研究设计'), ('analysis_plan', '分析计划')]:
+                st.markdown(f'**{label}**')
+                _render_mapping_sections(project.get(key) or {}, {})
+            for review in (project.get('reviews') or [])[-1:]:
+                for note in review.get('non_blocking_issues') or []:
+                    st.write('• ' + note)
         _render_research_asset_uploader(
             backend_url,
             project,
@@ -1158,13 +1210,14 @@ def _render_plan_approval(backend_url: str, project: dict, job_running: bool, sh
                 render_debug_object(exc.detail)
         if isinstance(review_package, dict):
             if review_package.get("ready_for_approval"):
-                st.success("独立审查已通过且没有阻断问题。请在下方“资料与成果”中核对各项研究产物，再回到此处决定是否批准。")
+                st.caption("模型审查未发现阻断问题。请确认以上范围和局限；批准不代表科学结论已证实。")
             else:
                 st.warning("当前审查包尚未满足批准条件，请先处理独立审查提出的问题。")
             versions = review_package.get("artifact_versions") or {}
-            st.caption("本次审批将冻结：" + "；".join(f"{key} v{value}" for key, value in versions.items()))
+            if show_debug:
+                st.caption("本次审批将冻结：" + "；".join(f"{key} v{value}" for key, value in versions.items()))
             acknowledged = st.checkbox(
-                "我已审阅研究问题、证据、主张映射、假设、方法、设计、分析、可复现性方案和独立审查结果。",
+                "我已审阅本轮方案和局限，同意按此范围继续。",
                 key=f"approval_ack_{project['project_id']}_{review_package.get('package_id')}",
             )
             approval_columns = st.columns(2)
@@ -1192,18 +1245,23 @@ def _render_plan_approval(backend_url: str, project: dict, job_running: bool, sh
                 )
 
     with st.expander("请求修订"):
-        target = st.selectbox(
-            "修订目标",
-            ["question", "evidence", "hypothesis", "method", "design", "analysis", "reproducibility"],
-            format_func=lambda value: {"question": "研究问题", "evidence": "证据", "hypothesis": "假设", "method": "研究方法", "design": "研究设计", "analysis": "分析方案", "reproducibility": "可复现性"}[value],
-        )
-        feedback = st.text_area("反馈意见", key="revision_feedback")
-        if st.button("提交修订请求", disabled=job_running or project.get("phase") != "HUMAN_APPROVAL"):
-            _research_action(
-                backend_url,
-                f"/api/research/{project['project_id']}/revise",
-                {"target": target, "feedback": feedback},
+        with st.form(f"plan_revision_{project['project_id']}"):
+            target = st.selectbox(
+                "修订目标",
+                ["question", "evidence", "hypothesis", "method", "design", "analysis", "reproducibility"],
+                format_func=lambda value: {"question": "研究问题", "evidence": "证据", "hypothesis": "假设", "method": "研究方法", "design": "研究设计", "analysis": "分析方案", "reproducibility": "可复现性"}[value],
             )
+            feedback = st.text_area("反馈意见", key=f"revision_feedback_{project['project_id']}")
+            if st.form_submit_button("提交意见并开始修订", disabled=job_running or project.get("phase") != "HUMAN_APPROVAL"):
+                if feedback.strip():
+                    _research_action(
+                        backend_url,
+                        f"/api/research/{project['project_id']}/revise",
+                        {"target": target, "feedback": feedback},
+                        continue_after=True,
+                    )
+                else:
+                    st.warning("请填写需要修订的内容；尚未提交。")
 
 
 
@@ -1250,7 +1308,9 @@ def _render_research_details(backend_url: str, project: dict, job_running: bool,
     phase_label = PHASE_LABELS.get(phase, phase)
     execution_capability = project.get('execution_capability') or 'EXTERNAL_EXECUTION_REQUIRED'
     computation_available = 'isolated_scientific_python' in (project.get('available_tools') or [])
-    if phase == 'COMPLETED':
+    literature_answer = bool((project.get('literature_review') or {}).get('draft') or
+                             (project.get('literature_review') or {}).get('report_markdown'))
+    if phase == 'COMPLETED' and not literature_answer:
         st.subheader('研究成果与局限')
         if project.get('conclusion'):
             _render_final_synthesis(project['conclusion'])
@@ -1280,6 +1340,11 @@ def _render_research_details(backend_url: str, project: dict, job_running: bool,
             else "受控 Python 分析"
         )
         st.success(f"执行方式：{execution_label}已完成。当前仍处于“{phase_label}”；计算成功不等于科研验证完成。")
+    elif project.get('research_mode') == 'systematic_review' and not project.get('planning_only'):
+        if (project.get('literature_review') or {}).get('status') == 'complete':
+            st.success('已完成限定范围的文献证据综合；没有执行新实验或 Python 计算。请结合来源和局限阅读结果。')
+        else:
+            st.info('本研究采用文献证据综合：方案获批后提取已采用原文、形成证据表并撰写综述；不会为完成流程而强行生成 Python 代码。')
     elif computation_available:
         st.info('可用工具：隔离 Python 计算。研究方案获批后，系统会根据问题和实际资料生成代码，再由你审批执行。无法计算的任务仍需补充数据或外部实验。')
     else:
@@ -1464,7 +1529,8 @@ def _render_research_details(backend_url: str, project: dict, job_running: bool,
             st.json(execution_summary)
 
     metrics = project.get("quality_metrics") or {}
-    st.subheader("研究质量")
+    st.subheader("研究记录检查")
+    st.caption('以下是记录完整性与模型审查指标，不是科学正确性或研究质量的客观认证。')
     quality_columns = st.columns(5)
     quality_columns[0].metric("证据覆盖率", metrics.get("evidence_coverage", 0) if project.get('claims') else '尚未评估')
     quality_columns[1].metric("假设完整度", metrics.get("hypothesis_completeness", 0) if project.get('hypotheses') else '尚未评估')
@@ -1475,7 +1541,7 @@ def _render_research_details(backend_url: str, project: dict, job_running: bool,
     quality_columns[3].metric("审查最低评分", metrics.get("reviewer_min_score", 0) if project.get('reviews') else '尚未评估')
     quality_columns[4].metric("不可验证来源", metrics.get("unverifiable_source_count", 0))
     st.caption(
-        f"已验证的唯一来源：{metrics.get('verified_evidence_count', 0)}/"
+        f"有核验记录的唯一来源：{metrics.get('verified_evidence_count', 0)}/"
         f"{metrics.get('unique_evidence_count', metrics.get('total_evidence_count', 0))}"
     )
 
@@ -1736,11 +1802,13 @@ def _render_research_details(backend_url: str, project: dict, job_running: bool,
                                 st.caption(f"依据：{criterion.get('evidence')}")
     with tabs[10]:
         conclusion = project.get("conclusion")
-        if conclusion:
+        if literature_answer:
+            st.markdown('本轮研究回答、核查状态与下载见上方[研究回答](#research-answer)。这里不重复生成另一份结论。')
+        elif conclusion:
             _render_final_synthesis(conclusion)
         else:
             st.info("最终研究计划尚未生成。")
-        if phase != 'COMPLETED':
+        if phase != 'COMPLETED' and not literature_answer:
             render_research_downloads(backend_url, project)
 
     if show_debug:
@@ -1998,7 +2066,7 @@ def _render_evidence_curation_gate(
             from src.ai_scientist.background_agent_ui import render_background_agent
             render_background_agent(project, job_running,
                 lambda path, payload: _research_action(backend_url, path, payload,
-                    continue_after=path.endswith(('/authorize', '/adopt'))), show_debug)
+                    continue_after=path.endswith(('/authorize', '/adopt', '/feedback'))), show_debug)
         return
     if phase in {'BACKGROUND_RESEARCH', 'SEARCH_PLAN_REVIEW', 'HUMAN_SOURCE_REVIEW'}:
         with st.expander('升级当前项目的背景研究方式（保留历史）'):
@@ -2246,7 +2314,7 @@ def _render_named_list(title: str, items: list) -> None:
     if items:
         st.markdown("\n".join(f"- {item}" for item in items))
     else:
-        st.caption("尚未明确。")
+        st.caption('无阻断问题。' if title == '阻断问题' else '未列出相关事项。')
 
 
 def _render_mapping_sections(data: dict, labels: dict[str, str]) -> None:
@@ -2268,7 +2336,14 @@ def _render_mapping_sections(data: dict, labels: dict[str, str]) -> None:
     }
     for key, value in data.items():
         if key in {"research_mode", "feasibility"}:
-            st.markdown(f"**{labels.get(key, key.replace('_', ' '))}：** {value}")
+            if key == 'research_mode':
+                st.markdown(f'**研究方式**：{research_mode_label(value)}')
+            elif value not in (None, '', 'unknown'):
+                st.markdown('**可行性判断**：' + {
+                    'feasible_with_current_evidence': '可基于当前资料开展',
+                    'feasible': '当前条件可行'}.get(str(value), str(value)))
+            continue
+        if value in (None, '', [], {}):
             continue
         title = labels.get(key, default_labels.get(key, "其他说明"))
         values = value if isinstance(value, list) else [value]
@@ -2334,16 +2409,19 @@ def _render_research_job_status(backend_url: str, project: dict, show_debug: boo
             seconds = max(0, int((datetime.now(timezone.utc) - datetime.fromisoformat(job['started_at'].replace('Z', '+00:00'))).total_seconds()))
             elapsed = f' · 已运行 {seconds // 60} 分 {seconds % 60} 秒'
         progress = job.get('progress') or {}
-        substep = {'started': '请求已发出，等待模型首个响应', 'working': '模型正在生成（已收到响应数据）', 'streaming': '正在生成回答或代码',
+        substep = {'started': '请求已发出，等待模型响应', 'working': '模型正在处理资料，正文尚未返回', 'streaming': '正在撰写回答',
                    'repair': '修复模型输出格式', 'completed': '回答已返回，正在处理本阶段',
                    'failure': '模型请求失败'}.get(progress.get('status'), '处理当前阶段')
         st.info('任务已排队' if status == 'queued' else f"{PHASE_LABELS.get(str(phase), phase)} · {substep}{elapsed}")
         if progress.get('elapsed_seconds') is not None:
-            st.caption(f"本次模型调用 {progress['elapsed_seconds']:.0f} 秒 · 已接收 {progress.get('received_chunks', 0)} 个响应片段；以上耗时为整项任务累计时间。")
+            from src.ai_scientist.experience_ui import model_activity
+            st.caption(model_activity(progress))
+            if show_debug:
+                st.caption(f"接口调试：已接收 {progress.get('received_chunks', 0)} 个响应片段（不是研究进度）。")
         if job.get('pause_requested'):
-            st.warning('暂停请求已收到；当前阶段结束后停止推进，已发出的模型请求不会中途取消。')
+            st.warning('暂停请求已收到；背景检索会在当前动作保存后停止，其他阶段在阶段结束后停止。已发出的请求不会被伪装成取消。')
         elif job.get('run_mode') == 'until_human_gate':
-            if st.button('当前阶段结束后暂停', key=f'pause_{job_id}'):
+            if st.button('暂停研究（保存当前进展）', key=f'pause_{job_id}'):
                 try:
                     post_json(backend_url, f'/api/research/jobs/{job_id}/pause', {})
                     st.rerun()
@@ -2353,6 +2431,11 @@ def _render_research_job_status(backend_url: str, project: dict, show_debug: boo
             st.caption('本次只处理当前操作，不会绕过后续人工确认。')
     elif status == 'failed':
         error = job.get('error') or {}
+        from src.ai_scientist.experience_ui import failure_explanation
+        explanation = failure_explanation(error, project)
+        if explanation:
+            st.warning(explanation)
+            return
         st.error('上次操作未完成，已有研究记录已保留。请按此处提示恢复，不需要重新创建项目。')
         st.warning(model_service_error_message(error) if any(
             marker in str(error).lower() for marker in ('timeout', 'connection', 'network', 'ratelimit', '429')
@@ -2369,6 +2452,7 @@ def _render_research_job_status(backend_url: str, project: dict, show_debug: boo
 
 def _research_failure_message(stage_substep: str) -> str:
     messages = {
+        "audit_protocol": "补充核查的引用未能定位到原文，草稿仍保留。这不是模型服务故障，也不代表研究内容全部无效。",
         "model_output_parse": "主张映射输出未通过格式检查，已有证据已保留。",
         "schema_validation": "主张映射输出未通过结构验证，已有证据已保留。",
         "evidence_reference_validation": "部分主张引用了缺失或过期的证据，因此未写入不一致结果。",

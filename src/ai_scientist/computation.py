@@ -113,6 +113,9 @@ class ComputationService:
     def call(self, project, instructions, payload, schema, artifact_type):
         self.o._ensure_budget(project, 4)
         client = StructuredQwenClient(ModelRegistry(project.model_overrides))
+        from src.ai_scientist.figure_refs import available_figures
+        client.public_figures = available_figures(project.model_dump(mode='json'),
+                                                  self.o.store.project_dir(project.project_id))
         try:
             result = client.call(
                 'analyst' if schema == ComputationPlan else 'skeptical_reviewer', instructions, payload, schema)

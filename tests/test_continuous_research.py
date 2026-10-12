@@ -153,7 +153,8 @@ def test_background_six_action_batches_continue_until_a_real_human_gate():
 def test_continuation_is_bounded_even_if_every_step_records_progress():
     project = project_at(ResearchPhase.BACKGROUND_RESEARCH)
     project.background_agent = {"observations": []}
-    orchestrator = StepDouble(project, lambda p: p.background_agent["observations"].append({"id": "an-observation"}))
+    orchestrator = StepDouble(project, lambda p: p.background_agent["observations"].append(
+        {"id": "an-observation", "status": "completed", "result": {"status": "read_excerpt"}}))
     result = continue_research(orchestrator, project.project_id, "job-test", max_steps=3)
     assert result["pause_reason"] == "batch_limit"
     assert result["stages_run"] == 3

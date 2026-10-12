@@ -1,9 +1,53 @@
 """Navigation and artifact-first presentation, independent of scientific judgments."""
 import base64
+import hashlib
 from pathlib import PurePosixPath
 from urllib.parse import quote
 
 import streamlit as st
+
+from src.ai_scientist.figure_refs import answer_blocks, clean_figure_refs, computation_attempts, figures_for_audit
+
+
+def has_inline_figures(messages, attempt):
+    expected = {f['figure_id']: f for f in figures_for_audit(attempt or {})}
+    for message in messages:
+        bound = {f['figure_id'] for f in clean_figure_refs(message.get('figures', []))
+                 if expected.get(f['figure_id']) == f}
+        if any(kind == 'figure' and content in bound
+               for kind, content in answer_blocks(message.get('public_response') or '')):
+            return True
+    return False
+
+
+def render_model_answer(backend_url, project, text, figures, get_json, key_prefix):
+    """Render model-authored placement against this project's immutable manifest."""
+    allowed = {f['figure_id']: f for a in computation_attempts(project) for f in figures_for_audit(a)}
+    bound = {f['figure_id']: f for f in clean_figure_refs(figures)
+             if allowed.get(f['figure_id']) == f}
+    for index, (kind, content) in enumerate(answer_blocks(text)):
+        if kind == 'text':
+            st.markdown(content, unsafe_allow_html=False)
+            continue
+        figure = bound.get(content)
+        if figure is None or get_json is None:
+            st.caption('此处引用的图表尚不可用，未替换为其他实验的图片。')
+            continue
+        path = figure['relative_path']
+        try:
+            cache_key = ('verified_figure', backend_url, project['project_id'], content)
+            if cache_key not in st.session_state:
+                payload = get_json(backend_url, f"/api/research/{project['project_id']}/computation/file?path={quote(path, safe='')}")
+                data = base64.b64decode(payload['content_base64'], validate=True)
+                if hashlib.sha256(data).hexdigest() != figure['checksum_sha256']:
+                    raise ValueError('Figure checksum mismatch')
+                st.session_state[cache_key] = data
+            data = st.session_state[cache_key]
+            st.image(data, caption=PurePosixPath(path).name, use_container_width=True)
+            st.download_button('下载此图', data, file_name=PurePosixPath(path).name,
+                               key=f'{key_prefix}_figure_{index}_{content}')
+        except Exception:
+            st.warning('此处图表无法读取或校验未通过，回答正文仍保留。请稍后重试或查看“资料与成果”。')
 
 
 def render_project_sidebar(backend_url, get_json, refresh_project, phase_labels, rename_project=None):
@@ -88,24 +132,13 @@ def render_result_gallery(backend_url, project, get_json):
     attempt = latest_successful_attempt(project)
     if not attempt:
         return
-    images = [a for a in attempt.get('artifacts', [])
-              if PurePosixPath(a['relative_path']).suffix.lower() in {'.png', '.jpg', '.jpeg'}]
+    images = figures_for_audit(attempt)
     if not images:
         return
     st.subheader('已生成的图表')
     st.caption('来自实际计算文件；计算成功不等于科学结论已通过复审。')
     columns = st.columns(2)
     for index, item in enumerate(images[:8]):
-        path = item['relative_path']
-        cache_key = ('result_image', project['project_id'], path, item.get('checksum_sha256'))
         with columns[index % 2]:
-            try:
-                if cache_key not in st.session_state:
-                    payload = get_json(backend_url, f"/api/research/{project['project_id']}/computation/file?path={quote(path, safe='')}")
-                    st.session_state[cache_key] = base64.b64decode(payload['content_base64'])
-                data = st.session_state[cache_key]
-                st.image(data, caption=PurePosixPath(path).name, use_container_width=True)
-                st.download_button('下载图片', data, file_name=PurePosixPath(path).name,
-                                   key=f'gallery_{project["project_id"]}_{index}')
-            except Exception:
-                st.warning(f'图片暂时无法读取：{PurePosixPath(path).name}。可稍后刷新。')
+            render_model_answer(backend_url, project, item['marker'], images, get_json,
+                                f'gallery_{project["project_id"]}_{index}')

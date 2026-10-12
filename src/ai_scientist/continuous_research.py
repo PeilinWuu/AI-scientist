@@ -14,6 +14,9 @@ def pause_reason(project) -> str | None:
         return 'human_gate'
     if phase in TERMINAL:
         return 'terminal'
+    if (phase == 'EXECUTION_WAITING' and project.literature_review.get('status') == 'draft_ready'
+            and not project.literature_review.get('pending_operation')):
+        return 'literature_draft_ready'
     if phase == 'EXECUTION_WAITING' and project.computation.get('status') == 'awaiting_approval':
         return 'code_approval_required'
     if phase == 'EXECUTION':
@@ -23,8 +26,12 @@ def pause_reason(project) -> str | None:
 
 
 def progress_signature(project):
-    return (project.phase.value, len(project.artifacts),
-            len(project.background_agent.get('observations', [])), project.computation.get('plan_id'))
+    observations = project.background_agent.get('observations', [])
+    successes = sum(o.get('status') == 'completed' and (o.get('result') or {}).get('status') not in
+                    {'proposal_requires_revision', 'tool_not_executed', 'no_new_sources'} for o in observations)
+    return (project.phase.value, successes,
+            len(project.background_agent.get('assessments', {})), project.computation.get('plan_id'),
+            tuple(sorted(project.active_artifact_versions.items())))
 
 
 def continue_research(orchestrator, project_id, job_id, *, max_steps=40,
@@ -44,6 +51,8 @@ def continue_research(orchestrator, project_id, job_id, *, max_steps=40,
         reason = pause_reason(updated)
         if reason:
             return {**result, 'pause_reason': reason, 'stages_run': index + 1}
+        if should_pause():
+            return {**result, 'pause_reason': 'user_pause', 'stages_run': index + 1}
         if progress_signature(updated) == before:
             return {**result, 'pause_reason': 'no_progress', 'stages_run': index + 1}
     return {**result, 'pause_reason': 'batch_limit', 'stages_run': max_steps}

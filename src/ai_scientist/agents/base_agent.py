@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 from src.ai_scientist.schemas import ResearchProject
 from src.ai_scientist.presentation import determine_output_language, language_instruction
-from src.ai_scientist.research_context import SHARED_CONTEXT_INSTRUCTION, build_research_context
+from src.ai_scientist.research_context import SHARED_CONTEXT_INSTRUCTION, build_research_context, adopted_source_passages
 from src.ai_scientist.skill_loader import SkillLoader
 from src.ai_scientist.structured_client import StructuredCallMetadata, StructuredQwenClient
 
@@ -47,6 +47,15 @@ class BaseResearchAgent(Generic[OutputT]):
         )
         payload = self.build_payload(project)
         payload["shared_research_context"] = build_research_context(project)
+        if project.evidence and self.agent_name != 'scientific_synthesizer':
+            payload['adopted_source_read_receipts'] = adopted_source_passages(project)
+        payload['stage_capabilities'] = {
+            'current_role': self.agent_name,
+            'available_project_tools': project.available_tools,
+            'rule': 'This role plans or reasons within its stage. Background research can actually search/read '
+                    'public sources after network authorization. Do not call the whole application offline '
+                    'because this role does not directly browse. Distinguish not yet executed from unavailable. '
+                    'Use human_input_request for a decision needed NOW; future prerequisites belong in the plan.'}
         if project.research_policy_version == 2:
             payload['research_basis'] = project.background_agent.get('scope')
             payload['basis_decision'] = project.background_agent.get('basis_approval')
@@ -59,9 +68,17 @@ class BaseResearchAgent(Generic[OutputT]):
         asset_context = parsed_asset_context(project)
         if asset_context["assets"]:
             payload["uploaded_asset_context"] = asset_context
+        self.client.narrative_first = self.agent_name not in {'domain_router', 'domain_analyst', 'skeptical_reviewer'}
+        public_style = (
+            '\nPublic stage update: briefly explain only this stage decision, what changed, '
+            'and the next step (roughly 100-200 Chinese characters or equivalent unless a '
+            'real decision needs more explanation). Do not repeat the full answer, source '
+            'table or previous limitations. Keep full analysis in the structured artifact; '
+            'concise public updates must not omit required scientific work from that artifact.'
+            if self.agent_name != 'scientific_synthesizer' else '')
         result = self.client.call(
             agent_name=self.agent_name,
-            instructions=self.skill_loader.compose_instructions(skills) + "\n\n" + SHARED_CONTEXT_INSTRUCTION,
+            instructions=self.skill_loader.compose_instructions(skills) + "\n\n" + SHARED_CONTEXT_INSTRUCTION + public_style,
             payload=payload,
             output_model=self.output_model,
         )

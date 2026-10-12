@@ -37,7 +37,8 @@ class QwenEvidenceSearchTool:
                 verification_note='Crossref metadata only; original source not yet read.',
             )
             candidates.append(candidate.model_dump(mode='json'))
-        return {'candidates': candidates, 'provider': 'Crossref', 'model_calls': 0}
+        return {'candidates': candidates, 'provider': 'Crossref', 'model_calls': 0,
+                'provider_query': result.get('provider_query'), 'search_scope': result.get('search_scope')}
 
     def read_sources(self, candidates, progress_callback=None):
         """Keep each actual public response separate; never attribute a batch summary to a page."""
@@ -83,6 +84,9 @@ class QwenEvidenceSearchTool:
         search_executed = extract_tool_usage(response)['web_search'] > 0
         return {
             "candidates": [item.model_dump(mode="json") for item in candidates] if search_executed else [],
+            "provider": "Qwen Responses web_search",
+            "query": query,
+            "search_scope": "Public web via provider tool; internal rewritten queries are not exposed.",
             "search_executed": search_executed,
             "tool_usage": extract_tool_usage(response),
             "status": 'completed' if search_executed else 'tool_not_executed',
@@ -166,7 +170,12 @@ def _search_candidates(response: Any, query: str) -> list[SearchCandidate]:
 
     def append_source(source: Any) -> None:
         url = _text(source, ["url", "source_url", "link"])
-        if not url or url in seen:
+        if not url:
+            return
+        if url in seen:
+            existing = next(item for item in candidates if item.url == url)
+            existing.title = existing.title or _text(source, ['title', 'name'])
+            existing.snippet = existing.snippet or _text(source, ['snippet', 'summary', 'text'])
             return
         seen.add(url)
         candidates.append(

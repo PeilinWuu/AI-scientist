@@ -71,7 +71,6 @@ class ModelRegistry:
         override_model = self.overrides.get(agent_name)
         environment_model = os.getenv(ROLE_ENV_VARS[agent_name], "").strip() or None
         fallback = self.overrides.get("fallback") or os.getenv("AI_SCIENTIST_FALLBACK_MODEL", "").strip() or None
-        search_default = os.getenv("LLM_SEARCH_MODEL", "").strip() or None
         llm_default = os.getenv("LLM_MODEL", "").strip() or None
         if override_model:
             selected = override_model
@@ -82,9 +81,6 @@ class ModelRegistry:
         elif fallback:
             selected = fallback
             source = "fallback"
-        elif agent_name == ROLE_EVIDENCE_RESEARCHER and search_default:
-            selected = search_default
-            source = "search_default"
         elif llm_default:
             selected = llm_default
             source = "llm_default"
@@ -98,7 +94,7 @@ class ModelRegistry:
             environment_model=environment_model,
             requested_model=selected,
             actual_model=selected,
-            fallback_model=fallback or search_default or llm_default or self.fallback_model,
+            fallback_model=fallback or llm_default or self.fallback_model,
             resolved_model=selected,
             resolution_source=source,
             fallback_used=source != "override" and source != "environment",
@@ -110,10 +106,17 @@ class ModelRegistry:
             for role in ROLE_ENV_VARS
         }
 
+    def search_model(self) -> str:
+        """Retrieval adapter selection must not change scientific reasoning roles."""
+        return (os.getenv('AI_SCIENTIST_SEARCH_ACQUISITION_MODEL', '').strip()
+                or os.getenv('LLM_SEARCH_MODEL', '').strip()
+                or self.resolve('evidence_researcher').resolved_model)
+
     @classmethod
     def public_defaults(cls) -> dict[str, object]:
         registry = cls()
         return {
             "roles": registry.public_configuration(),
             "fallback_model": registry.fallback_model,
+            "search_model": registry.search_model(),
         }

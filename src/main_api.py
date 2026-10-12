@@ -265,6 +265,7 @@ def research_project_title(project_id: str, request: ProjectTitleUpdate) -> dict
     try:
         project = research_orchestrator.get_project(project_id)
         project.title = request.title.strip()
+        project.title_user_edited = True
         research_orchestrator.store.save(project)
         return project.model_dump(mode='json')
     except Exception as exc:
@@ -427,6 +428,79 @@ def research_continue_async(project_id: str):
         raise _research_http_error(exc) from exc
 
 
+class LiteratureActionRequest(BaseModel):
+    action: str
+    feedback: str = ''
+    acknowledged: bool = False
+    max_model_calls: int | None = Field(default=None, ge=1, le=300)
+
+
+@app.post('/api/research/{project_id}/literature/action', status_code=202)
+def research_literature_action(project_id: str, request: LiteratureActionRequest):
+    from src.ai_scientist.literature_experience import validate_approval, current_draft
+    from src.ai_scientist.schemas import ResearchPhase
+    try:
+        with computation_queue_lock:
+            if research_job_store.active_step_job(project_id):
+                raise HTTPException(409, '项目正在运行，请等待当前操作结束。')
+            project = research_orchestrator.get_project(project_id)
+            completed_draft = (project.phase.value == 'COMPLETED'
+                               and project.literature_review.get('delivery_policy') == 'draft_first')
+            if (project.phase.value != 'EXECUTION_WAITING' and not completed_draft) or project.research_mode.value != 'systematic_review':
+                raise HTTPException(409, '当前阶段不支持文献草稿操作。')
+            validate_approval(research_orchestrator, project)
+            if request.action not in {'review', 'revise', 'finish', 'budget'}:
+                raise HTTPException(422, '未知操作。')
+            if not current_draft(project.literature_review):
+                raise HTTPException(409, '请先生成研究回答。')
+            if request.action == 'budget':
+                if (not request.acknowledged or request.max_model_calls is None or
+                        request.max_model_calls <= max(project.budget.max_model_calls,
+                                                      project.budget.attempted_model_calls)):
+                    raise HTTPException(422, '请明确确认增加调用额度，并设置更高的总上限。')
+                project.budget.max_model_calls = request.max_model_calls
+                research_orchestrator.store.save(project)
+                return JSONResponse({'status': 'budget_updated', 'max_model_calls': request.max_model_calls})
+            if request.action == 'finish' and not request.acknowledged:
+                raise HTTPException(422, '请确认保留当前核查状态，不代表结论已获验证。')
+            if request.action == 'revise' and not request.feedback.strip():
+                raise HTTPException(422, '请说明需要修改的内容。')
+            if request.action != 'finish' and project.budget.attempted_model_calls >= project.budget.max_model_calls:
+                raise HTTPException(409, '本轮模型额度已用完，已有回答保留；追加额度后才可修改或核查。')
+            state = project.literature_review
+            if completed_draft:
+                if request.action == 'finish':
+                    raise HTTPException(409, '本轮已经保存；可以继续修改或核查。')
+                # Explicit user action reopens only this approved literature draft.
+                # Preserve the last delivery and never broaden tool permissions.
+                state.setdefault('delivery_history', []).append({
+                    'report_markdown': state.get('report_markdown'),
+                    'review_status': state.get('review_status'),
+                    'review_notes': state.get('review_notes', []),
+                    'completed_at': state.get('completed_at')})
+                project.phase = ResearchPhase.EXECUTION_WAITING
+                project.conclusion = None
+                state.update(status='draft_ready')
+                state.pop('human_delivery_acknowledged', None)
+                state.pop('completed_at', None)
+            state['pending_operation'] = 'draft' if request.action == 'revise' else request.action
+            if request.action == 'revise':
+                state['revision_request'] = request.feedback.strip()
+                project.revision_feedback.append(request.feedback.strip())
+            if request.action == 'finish':
+                state['human_delivery_acknowledged'] = True
+            research_orchestrator.store.save(project)
+            job = research_job_store.create(project_id, project.phase.value)
+            job.run_mode = 'until_human_gate'
+            research_job_store.save(job)
+            threading.Thread(target=_run_research_job, args=(project_id, job.job_id), daemon=True).start()
+            return job.model_dump(mode='json')
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise _research_http_error(exc) from exc
+
+
 @app.post('/api/research/jobs/{job_id}/pause')
 def research_pause_job(job_id: str):
     job = research_job_store.load_any(job_id)
@@ -458,7 +532,7 @@ class HumanDialogueReply(BaseModel):
 
 @app.post('/api/research/{project_id}/reply')
 def research_reply(project_id: str, request: HumanDialogueReply):
-    from src.ai_scientist.schemas import utc_now
+    from src.ai_scientist.schemas import utc_now, ResearchPhase
     project = research_orchestrator.get_project(project_id)
     pending = project.human_dialogue.get('pending') or {}
     if pending.get('request_id') != request.request_id:
@@ -468,6 +542,10 @@ def research_reply(project_id: str, request: HumanDialogueReply):
     answer = {**pending, 'response': request.response, 'answered_at': utc_now().isoformat()}
     project.human_dialogue.setdefault('responses', []).append(answer)
     project.human_dialogue.pop('pending', None)
+    if pending.get('resume_phase') == 'BACKGROUND_RESEARCH':
+        project.phase = ResearchPhase.BACKGROUND_RESEARCH
+        project.background_agent['status'] = 'ready'
+        project.background_agent['consecutive_no_progress'] = 0
     # The answer is input, NOT an approval or proof that any research requirement is met.
     research_orchestrator.store.save(project)
     return {'status': 'received', 'request_id': request.request_id,
@@ -564,6 +642,7 @@ class StageAdoptionRequest(BaseModel):
 class StageFeedbackRequest(BaseModel):
     message: str = Field(min_length=1, max_length=4000)
     regenerate: bool = False
+    consolidate: bool = False
 
 
 def _stage_action(project_id, operation, **kwargs):
@@ -930,22 +1009,27 @@ def research_resume_assessment(project_id: str):
 @app.get('/api/research/{project_id}/computation/file')
 def research_computation_file(project_id: str, path: str):
     project = research_orchestrator.get_project(project_id)
-    state = project.computation
-    attempts = list(state.get('attempts', []))
-    for record in state.get('rounds', []):
-        attempts.extend(record['attempts'])
+    from src.ai_scientist.figure_refs import computation_attempts
+    from src.ai_scientist.result_artifacts import _read_verified
+    attempts = computation_attempts(project.model_dump(mode='json'))
     attempts.extend(r['audit'] for r in project.research_workspace.get('runs', []))
-    allowed = {a.get('code_path') for a in attempts}
-    allowed.update(f['relative_path'] for a in attempts for f in a.get('artifacts', []))
-    if path not in allowed:
+    entries = [f for a in attempts for f in a.get('artifacts', []) if f.get('relative_path') == path]
+    entries.extend({'checksum_sha256': a.get('code_sha256')} for a in attempts if a.get('code_path') == path)
+    if not entries:
         raise HTTPException(404, 'Artifact not in computation manifest')
     root = research_orchestrator.store.project_dir(project_id).resolve()
-    target = root / path
-    if target.is_symlink() or not target.resolve().is_relative_to(root) or not target.is_file():
-        raise HTTPException(404, 'Artifact unavailable')
-    if target.stat().st_size > 16 * 1024**2:
-        raise HTTPException(413, 'Artifact too large')
-    return {'filename': target.name, 'content_base64': base64.b64encode(target.read_bytes()).decode()}
+    try:
+        target, size, _ = _read_verified(root, path, entries[0].get('checksum_sha256'),
+                                        entries[0].get('size_bytes'))
+        if size > 16 * 1024**2:
+            raise HTTPException(413, 'Artifact too large')
+        data = target.read_bytes()
+        import hashlib
+        if hashlib.sha256(data).hexdigest() != entries[0]['checksum_sha256']:
+            raise ValueError('Artifact changed during read')
+    except (OSError, ValueError):
+        raise HTTPException(409, 'Artifact unavailable or checksum changed')
+    return {'filename': target.name, 'content_base64': base64.b64encode(data).decode()}
 
 
 @app.post('/api/research/{project_id}/computation/execute', status_code=202)

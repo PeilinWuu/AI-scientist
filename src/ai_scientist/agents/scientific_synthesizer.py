@@ -37,12 +37,14 @@ class ScientificSynthesizerAgent(BaseResearchAgent[Conclusion]):
                 if executed
                 else "This report is a research plan produced through AI Scientist multi-role planning and review. No real experiment, simulation, or data analysis has been executed, so it must not be treated as an experimental conclusion."
             )
+        if project.literature_review.get('status') == 'complete':
+            result.output.planning_status_statement = '已完成限定范围内的文献证据提取与综合，未开展新实验或数值计算；结论受来源质量与检索覆盖范围限制。'
         return result
 
     def build_payload(self, project: ResearchProject) -> dict:
         payload = project_snapshot(
             project,
-            ["question", "evidence", "claims", "hypotheses", "study_design", "analysis_plan", "reviews", "internal_execution_summary", "controlled_python_runs", "computation"],
+            ["question", "evidence", "claims", "hypotheses", "study_design", "analysis_plan", "reviews", "internal_execution_summary", "controlled_python_runs", "computation", "literature_review"],
         )
         executed = project.internal_execution_summary.get("status") == "complete" or any(
             item.get("status") == "success" for item in project.controlled_python_runs
@@ -56,4 +58,13 @@ class ScientificSynthesizerAgent(BaseResearchAgent[Conclusion]):
             if determine_output_language(project.objective) == "zh-CN"
             else "Planning only; no experiment, simulation, code, or analysis result exists."
         )
+        if project.literature_review.get('status') == 'complete':
+            from src.ai_scientist.literature_execution import synthesis_rows, synthesis_passages
+            payload['literature_review'] = {
+                **{k: project.literature_review.get(k) for k in (
+                    'status', 'report_markdown', 'limitations', 'open_questions', 'final_review_feedback')},
+                'rows': synthesis_rows(project),
+                'source_read_receipts': synthesis_passages(project),
+            }
+            payload['execution_status'] = 'Literature synthesis actually completed and independently audited. Use its evidence table and bounded findings. No new experiment or computation executed.'
         return payload

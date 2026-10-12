@@ -68,8 +68,8 @@ def next_research_action(project: dict, job: dict | None = None) -> dict[str, st
         return _action('running', '正在确认任务状态', '暂时无法读取现有任务状态。请刷新后再操作，避免重复启动或在任务运行中修改项目。')
     if (matching_job and matching_job.get('status') in {'queued', 'running'}) or unresolved_active:
         if matching_job and matching_job.get('pause_requested'):
-            return _action('running', '将在当前阶段结束后暂停', '已收到暂停请求；当前模型调用或计算不会被强行中断，请等待保存结果。')
-        return _action('running', '正在研究', '请在研究对话中查看进展。需要暂停时，可请求在当前阶段结束后暂停，无需重复启动。')
+            return _action('running', '正在保存进展并暂停', '已收到暂停请求；当前请求不会被强行中断。背景检索在当前动作后停止，其他阶段在阶段结束后停止。')
+        return _action('running', '正在研究', '可暂停以补充要求；背景检索会保存当前动作再停止，无需重复启动。')
 
     if phase in _TERMINAL_ACTIONS:
         return _action(*_TERMINAL_ACTIONS[phase])
@@ -78,13 +78,22 @@ def next_research_action(project: dict, job: dict | None = None) -> dict[str, st
         return _action('reply', '回答 Qwen 的问题', '请先回答下面的必要问题。提交后将从暂停处继续，不会跳过审批或重新执行已完成的计算。')
 
     if phase == 'SEARCH_PLAN_REVIEW':
+        if (project.get('background_agent') or {}).get('status') == 'budget_paused':
+            return _action('evidence_review', '确认是否追加研究额度', '已有资料与权限保留；这里仅决定追加动作和模型额度，不代表重新批准研究结论。')
         return _action('evidence_review', '确认资料检索计划', '请检查检索范围与资料需求，再决定是否采用此计划；此处不会自动确认资料结论。')
     if phase == 'HUMAN_SOURCE_REVIEW':
+        if (project.get('background_agent') or {}).get('status') == 'needs_input':
+            return _action('evidence_review', '研究已暂停，选择下一步', '可整理已有资料、提供新来源或补充要求；工具故障不等于需要你批准证据，也不必强行采用资料。')
         return _action('evidence_review', '确认采用的资料', '请查看来源、相关性与读取内容，再确认采用或要求调整。没有合适资料时，请明确说明局限，不必为继续而强行采用。')
     if phase == 'HUMAN_REVISION_REVIEW':
         return _action('revision_review', '处理审查意见', '请逐项决定修订、暂缓或接受为局限，确认后才会执行对应修订；不会自动批准新代码。')
     if phase == 'HUMAN_APPROVAL':
         return _action('approval', '审阅并确认研究方案', '请核对问题、方法、数据和风险，再明确批准或提出修改。方案获批不等于计算代码获批。')
+    if phase == 'EXECUTION_WAITING' and project.get('research_mode') == 'systematic_review' and not project.get('planning_only'):
+        literature = project.get('literature_review') or {}
+        if (literature.get('draft') or {}).get('report_markdown'):
+            return _action('literature_draft', '研究回答已保存', '先阅读下方回答；可以按需核查、提出修改，或保留当前核查状态结束本轮。不必反复重跑整个阶段。')
+        return _action('continue', '继续文献证据综合', '基于已采用的原文直接生成可读回答；核查可按需追加，不自动运行 Python 或声称完成实验。')
     state = project.get('computation') or {}
     computation_input_recovery = (
         phase == 'HUMAN_INTERVENTION_REQUIRED'

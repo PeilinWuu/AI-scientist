@@ -60,16 +60,19 @@ def test_empty_evidence_override_uses_environment_model(monkeypatch: pytest.Monk
     assert resolution.resolution_source == "environment"
 
 
-def test_evidence_model_uses_search_default_when_role_and_fallback_empty(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_evidence_reasoning_does_not_inherit_search_adapter_model(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("AI_SCIENTIST_RESEARCH_MODEL", raising=False)
     monkeypatch.delenv("AI_SCIENTIST_FALLBACK_MODEL", raising=False)
     monkeypatch.setenv("LLM_SEARCH_MODEL", "search-default-model")
+    monkeypatch.setenv("LLM_MODEL", "reasoning-model")
+    monkeypatch.delenv("AI_SCIENTIST_SEARCH_ACQUISITION_MODEL", raising=False)
     registry = ModelRegistry({"evidence_researcher": None, "fallback": ""})
 
     resolution = registry.resolve_model("evidence_researcher")
 
-    assert resolution.resolved_model == "search-default-model"
-    assert resolution.resolution_source == "search_default"
+    assert resolution.resolved_model == "reasoning-model"
+    assert resolution.resolution_source == "llm_default"
+    assert registry.search_model() == "search-default-model"
 
 
 def test_created_project_persists_model_overrides(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

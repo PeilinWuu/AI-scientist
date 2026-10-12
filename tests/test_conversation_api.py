@@ -3,6 +3,7 @@
 from types import SimpleNamespace
 import hashlib
 import json
+import base64
 
 import pytest
 from fastapi.testclient import TestClient
@@ -41,6 +42,57 @@ def api(tmp_path, monkeypatch):
     orchestrator.store.save(project)
     return SimpleNamespace(client=TestClient(main_api.app), o=orchestrator, jobs=jobs, project=project,
                            threads=threads, monkeypatch=monkeypatch)
+
+
+@pytest.mark.parametrize('change', ['none', 'modified', 'symlink', 'unknown'])
+def test_computation_download_verifies_exact_manifest(api, change):
+    p = api.project
+    root = api.o.store.project_dir(p.project_id)
+    relative = 'computation/inline_run/output/figure.png'
+    target = root / relative
+    target.parent.mkdir(parents=True)
+    content = b'original output bytes'
+    target.write_bytes(content)
+    p.computation = {'attempts': [{'run_id': 'inline_run', 'status': 'success', 'artifacts': [
+        {'relative_path': relative, 'checksum_sha256': hashlib.sha256(content).hexdigest(),
+         'size_bytes': len(content)}]}]}
+    api.o.store.save(p)
+    if change == 'modified':
+        target.write_bytes(b'changed bytes')
+    elif change == 'symlink':
+        target.unlink()
+        other = root / 'other.png'
+        other.write_bytes(content)
+        target.symlink_to(other)
+    elif change == 'unknown':
+        relative = 'computation/unlisted/output/figure.png'
+    response = api.client.get(f'/api/research/{p.project_id}/computation/file', params={'path': relative})
+    assert response.status_code == {'none': 200, 'modified': 409, 'symlink': 409, 'unknown': 404}[change]
+    if change == 'none':
+        assert base64.b64decode(response.json()['content_base64']) == content
+
+
+def test_manual_title_has_persistent_ownership(api):
+    response = api.client.patch(f'/api/research/{api.project.project_id}/title', json={'title': '用户研究名称'})
+    assert response.status_code == 200
+    saved = api.o.get_project(api.project.project_id)
+    assert saved.title == '用户研究名称'
+    assert saved.title_user_edited is True
+
+
+def test_background_question_reply_resumes_without_approval(api):
+    p = api.project
+    p.phase = ResearchPhase.HUMAN_SOURCE_REVIEW
+    p.human_dialogue['pending'] = {'request_id': 'request-test', 'prompt': '请确认范围',
+                                 'resume_phase': 'BACKGROUND_RESEARCH'}
+    api.o.store.save(p)
+    response = api.client.post(f'/api/research/{p.project_id}/reply',
+                               json={'request_id': 'request-test', 'response': '限定范围'})
+    assert response.status_code == 200
+    saved = api.o.get_project(p.project_id)
+    assert saved.phase == ResearchPhase.BACKGROUND_RESEARCH
+    assert saved.approval_status != 'valid'
+    assert not saved.human_dialogue.get('pending')
 
 
 def test_continue_worker_persists_live_public_output_and_conversation(api):

@@ -53,9 +53,13 @@ class ResearchJobStore:
         # Accept public content only: never persist provider hidden reasoning or prompts.
         allowed = {'call_id', 'agent_name', 'model', 'status', 'timestamp', 'public_response',
                    'human_input_request', 'receipt', 'provider_responses', 'token_usage',
-                   'elapsed_seconds', 'received_chunks', 'output_chars'}
+                   'elapsed_seconds', 'received_chunks', 'output_chars', 'figures', 'message_kind'}
         public = {key: value for key, value in event.items() if key in allowed}
-        receipt_fields = {'requested_model', 'response_model', 'response_id', 'request_id', 'status'}
+        if 'figures' in public:
+            from src.ai_scientist.figure_refs import clean_figure_refs
+            public['figures'] = clean_figure_refs(public['figures'])
+        receipt_fields = {'requested_model', 'response_model', 'response_id', 'request_id', 'status',
+                          'first_chunk_seconds', 'first_content_seconds', 'total_seconds', 'output_chars'}
         for key in ('receipt',):
             if isinstance(public.get(key), dict):
                 public[key] = {k: v for k, v in public[key].items() if k in receipt_fields}
@@ -70,7 +74,13 @@ class ResearchJobStore:
                                      if k in {'prompt_tokens', 'completion_tokens', 'total_tokens'}
                                      and isinstance(v, int)}
         def change(job):
-            job.progress = {**public, 'phase': job.phase}
+            previous = job.progress if job.progress.get('call_id') == public.get('call_id') else {}
+            job.progress = {**previous, **public, 'phase': job.phase}
+            receipts = public.get('provider_responses') or []
+            if public.get('status') in {'completed', 'failure'} and receipts:
+                durations = [r.get('total_seconds') for r in receipts]
+                if all(isinstance(d, (int, float)) for d in durations):
+                    job.progress['elapsed_seconds'] = round(sum(durations), 3)
             call_id = public.get('call_id')
             existing = next((item for item in job.model_updates if item.get('call_id') == call_id), None)
             if existing is not None:

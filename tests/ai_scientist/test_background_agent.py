@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import pytest
 from streamlit.testing.v1 import AppTest
 
-from src.ai_scientist.background_agent import BackgroundAgent, ResearchBasis, BackgroundAction, BasisProposalReview, fingerprint, independent_basis_approved
+from src.ai_scientist.background_agent import BackgroundAgent, ResearchBasis, BackgroundAction, BasisProposalReview, SourceAssessmentReview, fingerprint, independent_basis_approved
 from src.ai_scientist.orchestrator import ResearchOrchestrator
 from src.ai_scientist.schemas import ResearchPhase, SearchCandidate, ReviewResult, ResearchQualityMetrics, RevisionAction
 from src.ai_scientist.quality import enrich_evidence_items
@@ -24,7 +24,8 @@ def stage(tmp_path, monkeypatch):
     o.store.save(p)
     s = BackgroundAgent(o)
     monkeypatch.setattr(s, 'call', lambda p, schema, *args, **kwargs: BasisProposalReview(
-        decision='ready_for_human', rationale='Matches actual observations') if schema == BasisProposalReview else basis())
+        decision='ready_for_human', rationale='Matches actual observations') if schema == BasisProposalReview else
+        SourceAssessmentReview(supported=True, rationale='Matches supplied source') if schema == SourceAssessmentReview else basis())
     s.advance(p)
     return s, p
 
@@ -95,7 +96,7 @@ def test_metadata_can_reject_but_cannot_fake_reading(stage):
     assessment = s.perform(p, action('assess_source', source_id=sid, decision='reject', summary='主题无关'))
     assert assessment['reading_basis'] == 'metadata_only'
     assert not assessment['quote_matched']
-    with pytest.raises(ValueError, match='Required external'):
+    with pytest.raises(ValueError, match='assess_source'):
         s.perform(p, action('finish'))
 
 

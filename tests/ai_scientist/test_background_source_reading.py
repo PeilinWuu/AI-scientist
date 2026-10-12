@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.ai_scientist.background_agent import BackgroundAction, BackgroundAgent
+from src.ai_scientist.background_agent import BackgroundAction, BackgroundAgent, SourceAssessmentReview
 from src.ai_scientist.orchestrator import ResearchOrchestrator
 from src.ai_scientist.schemas import ResearchPhase, SearchCandidate, utc_now
 from src.ai_scientist.structured_client import StructuredCallMetadata, StructuredCallResult
@@ -35,6 +35,8 @@ def cached_snapshot(text, **overrides):
 
 def test_short_alias_resolves_to_canonical_evidence_id(stage, monkeypatch):
     service, project, source_id = stage
+    monkeypatch.setattr(service, 'call', lambda *args, **kwargs:
+        SourceAssessmentReview(supported=True, rationale='Reader mechanics test double'))
     text = 'This source discusses uncertainty in confidence interval coverage.'
     monkeypatch.setattr('src.ai_scientist.background_agent.read_source', lambda url: cached_snapshot(text))
     read = service.perform(project, action('read_source', source_id='S1'))

@@ -1127,6 +1127,8 @@ class HumanRevisionRecord(StrictModel):
 class ResearchProject(StrictModel):
     project_id: str = Field(default_factory=lambda: new_id("project"))
     title: str
+    title_user_edited: bool = False
+    literature_review: dict[str, Any] = Field(default_factory=dict)
     objective: str
     domain: str = "general"
     secondary_domains: list[str] = Field(default_factory=list)

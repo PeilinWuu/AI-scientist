@@ -89,6 +89,7 @@ def build_research_plan_json(project: ResearchProject) -> dict[str, Any]:
         "analysis_plan": project.analysis_plan.model_dump(mode="json") if project.analysis_plan else None,
         "reproducibility_plan": project.reproducibility_plan,
         "internal_execution_summary": project.internal_execution_summary,
+        "literature_review": project.literature_review,
         "controlled_python_runs": project.controlled_python_runs,
         "computation": project.computation,
         "research_workspace": project.research_workspace,
@@ -206,10 +207,15 @@ def build_research_plan_markdown(project: ResearchProject) -> str:
         ),
         "",
     ]
+    if project.literature_review.get('status') == 'complete':
+        from src.ai_scientist.literature_experience import export_report
+        lines.extend(['', '## 文献证据综合', export_report(project.literature_review)])
     return "\n".join(lines)
 
 
 def _research_status_statement(project: ResearchProject) -> str:
+    if project.literature_review.get('status') == 'complete':
+        return '已保存限定范围文献研究回答；未开展新实验或数值计算，核查状态与未解决意见随报告保留。'
     if _execution_completed(project):
         if project.conclusion and project.conclusion.planning_status_statement:
             return project.conclusion.planning_status_statement
