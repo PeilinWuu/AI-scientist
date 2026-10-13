@@ -28,7 +28,8 @@ def pause_reason(project) -> str | None:
 def progress_signature(project):
     observations = project.background_agent.get('observations', [])
     successes = sum(o.get('status') == 'completed' and (o.get('result') or {}).get('status') not in
-                    {'proposal_requires_revision', 'tool_not_executed', 'no_new_sources'} for o in observations)
+                    {'proposal_requires_revision', 'tool_not_executed', 'no_new_sources', 'phrase_not_found'}
+                    and (o.get('result') or {}).get('new_chars') != 0 for o in observations)
     return (project.phase.value, successes,
             len(project.background_agent.get('assessments', {})), project.computation.get('plan_id'),
             tuple(sorted(project.active_artifact_versions.items())))

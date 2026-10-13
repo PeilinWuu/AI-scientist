@@ -22,8 +22,8 @@ class ScientificSynthesizerAgent(BaseResearchAgent[Conclusion]):
             result.output.supported_findings = [
                 item for item in result.output.supported_findings if item.statement not in unsupported_set
             ]
-            result.output.unsupported_claims.extend(
-                item for item in unsupported_findings if item not in result.output.unsupported_claims
+            result.output.traceability_pending_findings.extend(
+                item for item in unsupported_findings if item not in result.output.traceability_pending_findings
             )
         if determine_output_language(project.objective) == "zh-CN":
             result.output.planning_status_statement = (

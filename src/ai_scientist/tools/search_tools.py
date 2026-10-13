@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from concurrent.futures import ThreadPoolExecutor
 from collections.abc import Callable
 from typing import Any
 from urllib.parse import urlparse
@@ -82,7 +83,9 @@ class QwenEvidenceSearchTool:
             client.http_client.close()
         candidates = _search_candidates(response, query)
         search_executed = extract_tool_usage(response)['web_search'] > 0
+        previews = enrich_source_previews(candidates[:5]) if search_executed else {}
         return {
+            'source_previews': previews,
             "candidates": [item.model_dump(mode="json") for item in candidates] if search_executed else [],
             "provider": "Qwen Responses web_search",
             "query": query,
@@ -162,6 +165,34 @@ class QwenEvidenceSearchTool:
             "request_id": result.get("request_id"),
             "search_used": bool(candidates),
         }
+
+
+def enrich_source_previews(candidates):
+    """Fetch bounded discovery previews in parallel, never invent missing abstracts.
+
+    Uses the same public HTTPS/SSRF-protected reader as explicit reading. Cached
+    bodies are returned separately, not exposed as already-read evidence.
+    """
+    from src.ai_scientist.tools.research_web import read_source_snapshot
+    missing = [c for c in candidates if not c.title or not c.snippet]
+    def fetch(candidate):
+        try:
+            snapshot = read_source_snapshot(candidate.url)
+            snapshot['retrieved_at'] = utc_now().isoformat()
+            return candidate, snapshot, None
+        except Exception as exc:
+            return candidate, None, type(exc).__name__
+    previews = {}
+    with ThreadPoolExecutor(max_workers=5) as pool:
+        for candidate, snapshot, error in pool.map(fetch, missing):
+            if snapshot:
+                candidate.title = candidate.title or snapshot.get('title') or candidate.url
+                candidate.snippet = candidate.snippet or snapshot['text'][:1200]
+                candidate.verification_note = '网页开头预览，非论文摘要；尚未完成正文阅读或可信度判断。'
+                previews[candidate.url] = snapshot
+            else:
+                candidate.verification_note = f'搜索仅提供链接；网页预览不可用（{error}），模型可尝试其他来源。'
+    return previews
 
 
 def _search_candidates(response: Any, query: str) -> list[SearchCandidate]:

@@ -29,6 +29,7 @@ class ResearchJob(BaseModel):
     error: dict[str, Any] | None = None
     result: dict[str, Any] | None = None
     run_mode: str = "single_stage"
+    dialogue_message_id: str | None = None
     pause_requested: bool = False
     progress: dict[str, Any] = Field(default_factory=dict)
     model_updates: list[dict[str, Any]] = Field(default_factory=list)
@@ -84,9 +85,10 @@ class ResearchJobStore:
             call_id = public.get('call_id')
             existing = next((item for item in job.model_updates if item.get('call_id') == call_id), None)
             if existing is not None:
+                existing.setdefault('started_at', existing.get('timestamp'))
                 existing.update(public)
             else:
-                job.model_updates.append({**public, 'phase': job.phase})
+                job.model_updates.append({**public, 'phase': job.phase, 'started_at': public.get('timestamp')})
         self.update(project_id, job_id, change)
 
     def jobs_dir(self, project_id: str) -> Path:

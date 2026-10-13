@@ -210,6 +210,18 @@ def build_research_plan_markdown(project: ResearchProject) -> str:
     if project.literature_review.get('status') == 'complete':
         from src.ai_scientist.literature_experience import export_report
         lines.extend(['', '## 文献证据综合', export_report(project.literature_review)])
+    if project.conclusion:
+        lines.extend(['', '## 最终综合与局限', project.conclusion.planning_status_statement])
+        for label, field in [
+            ('有证据支持的发现', 'supported_findings'),
+            ('引用关联待核对（不等于结论为假）', 'traceability_pending_findings'),
+            ('暂定推论', 'tentative_inferences'), ('证据不足的主张', 'unsupported_claims'),
+            ('阴性结果', 'negative_results'), ('不确定性', 'uncertainties'),
+            ('适用范围', 'scope_of_validity'), ('研究局限', 'limitations'), ('后续问题', 'next_questions')]:
+            items = getattr(project.conclusion, field)
+            if items:
+                lines.extend(['', '### ' + label, _bullet_list([
+                    item.statement if hasattr(item, 'statement') else item for item in items])])
     return "\n".join(lines)
 
 

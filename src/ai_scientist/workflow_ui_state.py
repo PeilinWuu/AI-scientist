@@ -20,6 +20,16 @@ def _action(kind: str, label: str, description: str) -> dict[str, str]:
     return {'kind': kind, 'label': label, 'description': description}
 
 
+def active_human_question(project: dict) -> dict:
+    pending = (project.get('human_dialogue') or {}).get('pending') or {}
+    if project.get('phase') not in _TERMINAL_ACTIONS:
+        return pending
+    messages = (project.get('human_dialogue') or {}).get('messages') or []
+    if pending.get('dialogue_origin') or (messages and messages[-1].get('status') == 'needs_input'):
+        return pending
+    return {}  # Old workflow questions cannot reopen a terminal project.
+
+
 def _authorized_artifact_revision(project: dict, request: object) -> bool:
     """Mirror the saved-approval eligibility in ComputationService.
 
@@ -71,6 +81,9 @@ def next_research_action(project: dict, job: dict | None = None) -> dict[str, st
             return _action('running', '正在保存进展并暂停', '已收到暂停请求；当前请求不会被强行中断。背景检索在当前动作后停止，其他阶段在阶段结束后停止。')
         return _action('running', '正在研究', '可暂停以补充要求；背景检索会保存当前动作再停止，无需重复启动。')
 
+    pending = active_human_question(project)
+    if phase == 'COMPLETED' and pending:
+        return _action('reply', '回答 Qwen 的问题', '补充当前讨论所需的信息；不会自动重开研究或批准执行。')
     if phase in _TERMINAL_ACTIONS:
         return _action(*_TERMINAL_ACTIONS[phase])
 
@@ -91,6 +104,8 @@ def next_research_action(project: dict, job: dict | None = None) -> dict[str, st
         return _action('approval', '审阅并确认研究方案', '请核对问题、方法、数据和风险，再明确批准或提出修改。方案获批不等于计算代码获批。')
     if phase == 'EXECUTION_WAITING' and project.get('research_mode') == 'systematic_review' and not project.get('planning_only'):
         literature = project.get('literature_review') or {}
+        if literature.get('pending_operation'):
+            return _action('continue', '继续处理已保存的请求', '你的要求已保存。继续处理这次修改或核查，无需重新提交，也不重新检索。')
         if (literature.get('draft') or {}).get('report_markdown'):
             return _action('literature_draft', '研究回答已保存', '先阅读下方回答；可以按需核查、提出修改，或保留当前核查状态结束本轮。不必反复重跑整个阶段。')
         return _action('continue', '继续文献证据综合', '基于已采用的原文直接生成可读回答；核查可按需追加，不自动运行 Python 或声称完成实验。')

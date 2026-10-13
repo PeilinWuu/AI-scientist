@@ -10,6 +10,11 @@ def approval_summary(project):
                ('交付内容', analysis.get('visualization_plan')),
                ('停止条件', design.get('stopping_rules')),
                ('主要局限', design.get('risks'))]
+    if project.get('planning_only'):
+        entries = [('本轮交付', '资料解释与研究方案；不开展新的实测或计算，也不等待实验数据'),
+                   ('研究目标', design.get('objective') or project.get('objective')),
+                   ('未来实验建议', design.get('sampling_plan')),
+                   ('主要局限', design.get('risks'))]
     result = []
     for label, values in entries:
         if values:

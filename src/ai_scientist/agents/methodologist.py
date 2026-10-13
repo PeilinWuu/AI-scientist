@@ -11,5 +11,6 @@ class MethodologistAgent(BaseResearchAgent[MethodologyOutput]):
     def build_payload(self, project: ResearchProject) -> dict:
         return project_snapshot(
             project,
-            ["question", "research_mode", "secondary_modes", "constraints", "available_tools", "missing_capabilities"],
+            ["objective", "question", "research_mode", "secondary_modes", "constraints", "planning_only",
+             "revision_feedback", "available_tools", "missing_capabilities"],
         )

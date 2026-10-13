@@ -10,6 +10,7 @@ from src.ai_scientist.background_agent import (
 from src.ai_scientist.tools.research_web import normalize_text
 from src.ai_scientist.structured_client import MarkdownDraft
 from src.ai_scientist.grounded_audit import grounded_review
+from src.ai_scientist.research_context import source_for_evidence
 
 
 class EvidenceRow(StrictModel):
@@ -55,11 +56,17 @@ def synthesis_passages(project):
     """
     result = []
     for row in synthesis_rows(project):
-        source = next((s for s in project.background_agent.get('sources', [])
-                       if s.get('url') == row['url']), {})
+        source = _source_for_row(project, row)
         result.append({'evidence_id': row['evidence_id'], 'url': row['url'],
                        'actual_read_passages': [t[:12000] for t in assessment_passages(source, row['quote'])]})
     return result
+
+
+def _source_for_row(project, row):
+    evidence = next((e for e in project.evidence if e.evidence_id == row['evidence_id']
+                     and e.source_url == row['url']), None)
+    return source_for_evidence(project, evidence) if evidence else next((
+        s for s in project.background_agent.get('sources', []) if s.get('url') == row['url']), {})
 
 
 def audit_synthesis(agent, project, proposed):
@@ -69,8 +76,7 @@ def audit_synthesis(agent, project, proposed):
     if not rows:
         raise ValueError('缺少证据表，不能核查并发布综述。')
     for row in rows:
-        source = next((s for s in project.background_agent.get('sources', [])
-                       if s.get('url') == row['url']), {})
+        source = _source_for_row(project, row)
         passages = assessment_passages(source, row['quote'])
         if not passages:
             raise ValueError('缺少报告核查所需原文：' + row['title'])
@@ -146,8 +152,7 @@ def _run_review_once(orchestrator, project):
         if any(row['evidence_id'] == evidence.evidence_id for row in state['rows']):
             continue
         state['revision_scope'] = evidence.evidence_id
-        source = next((s for s in project.background_agent.get('sources', [])
-                       if s.get('url') == evidence.source_url), {})
+        source = source_for_evidence(project, evidence)
         passages = assessment_passages(source, evidence.source_quote or '')
         if not passages:
             raise ValueError('缺少已读取的原文凭据，请返回资料阶段阅读来源，不能凭摘要完成综述：' + evidence.title)

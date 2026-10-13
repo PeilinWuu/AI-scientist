@@ -213,104 +213,13 @@ def _render_research_asset_uploader(
     embedded: bool = False,
     allow_experimental_results: bool = False,
 ) -> None:
-    """Render one auditable multi-file upload entry for an existing project."""
-
+    """Historical files are inspected here; the composer owns all new uploads."""
+    if key_prefix != "project_workspace_asset":
+        st.caption('补充文字、资料或实验数据，请使用下方“发送消息与附件”。')
+        return
     project_id = str(project.get("project_id") or "")
-    container = st.container(border=True) if embedded else st.expander(title, expanded=expanded)
-    with container:
-        if embedded:
-            st.markdown(f"**{title}**")
-        st.caption(
-            "支持 PDF、Markdown、TXT、CSV、TSV、JSON、XML 和 Excel。"
-            "文件会在本地安全解析为有边界的文本或结构摘要，并在后续科研阶段作为带来源标识的材料使用。"
-        )
-        uploads = st.file_uploader(
-            "选择一个或多个文件",
-            type=RESEARCH_ASSET_EXTENSIONS,
-            accept_multiple_files=True,
-            key=f"{key_prefix}_files_{project_id}",
-        )
-        asset_role = "research_material"
-        research_round = None
-        source = "user_upload"
-        if allow_experimental_results:
-            asset_role = st.radio(
-                "添加类型",
-                options=["research_material", "experimental_result"],
-                format_func=lambda value: {
-                    "research_material": "添加研究资料",
-                    "experimental_result": "添加实验结果",
-                }[value],
-                horizontal=True,
-                key=f"{key_prefix}_role_{project_id}",
-            )
-        if asset_role == "experimental_result":
-            purpose = "data"
-            research_round = int(st.number_input(
-                "实验轮次",
-                min_value=1,
-                value=max(1, int(project.get("iteration") or 0) + 1),
-                key=f"{key_prefix}_round_{project_id}",
-            ))
-            source = st.text_input(
-                "数据来源",
-                value="human_experiment",
-                key=f"{key_prefix}_source_{project_id}",
-                help="例如：human_experiment、instrument_export 或 external_lab。",
-            )
-        else:
-            purpose = st.radio(
-                "文件用途",
-                options=["reference", "data", "other"],
-                format_func=lambda value: {
-                    "reference": "参考资料",
-                    "data": "数据来源",
-                    "other": "其他项目文件",
-                }[value],
-                horizontal=True,
-                key=f"{key_prefix}_purpose_{project_id}",
-            )
-        description = st.text_area(
-            "文件说明（可选）",
-            placeholder="例如：研究者提供的原始数据、需要复核的方法附件或补充文献。",
-            key=f"{key_prefix}_description_{project_id}",
-        )
-        if st.button(
-            "保存到项目",
-            disabled=not uploads,
-            key=f"{key_prefix}_save_{project_id}",
-        ):
-            saved, errors = _save_research_assets(
-                backend_url,
-                project_id,
-                list(uploads or []),
-                purpose,
-                description,
-                "experimental_result" if asset_role == "experimental_result" else upload_context,
-                asset_role=asset_role,
-                research_round=research_round,
-                source=source,
-            )
-            if saved:
-                st.success(f"已保存 {len(saved)} 个文件。")
-                if asset_role == "experimental_result":
-                    try:
-                        post_json(
-                            backend_url,
-                            f"/api/research/{project_id}/provide-data",
-                            {
-                                "artifact_paths": [str(item.get("saved_path") or item.get("asset_id")) for item in saved],
-                                "description": description or f"Round {research_round} experimental result",
-                                "data_type": ",".join(sorted({str(item.get("content_type") or "data") for item in saved})),
-                            },
-                        )
-                    except BackendAPIError as exc:
-                        st.warning("文件已保存，但当前工作流阶段尚不能登记为待分析实验结果。")
-                        LOGGER.warning("Experimental result registration deferred: %s", exc.detail)
-                refresh_research_project(backend_url)
-            for error in errors:
-                st.error(error)
-
+    with st.expander("已保存附件 · 查看、下载与管理", expanded=expanded):
+        st.caption("这里只管理已保存文件；新增资料请在对话输入区添加附件。")
         assets = project.get("research_assets") or []
         if assets:
             st.markdown("**当前项目已登记文件**")
@@ -532,6 +441,7 @@ def _render_final_synthesis(conclusion: dict) -> None:
         st.info(statement)
     section_specs = [
         ("有证据支持的发现", "supported_findings"),
+        ("引用关联待核对（不等于结论为假）", "traceability_pending_findings"),
         ("暂定推论", "tentative_inferences"),
         ("证据不足的主张", "unsupported_claims"),
         ("阴性结果", "negative_results"),
@@ -692,7 +602,7 @@ def build_research_start_payload(
     }
 
 
-def render_general_computation(backend_url: str, project: dict, show_debug: bool = False, *, approval_only: bool = False) -> None:
+def render_general_computation(backend_url: str, project: dict, show_debug: bool = False, *, approval_only: bool = False, unified: bool = False) -> None:
     if project.get('planning_only', True):
         return
     if project.get('executor_binding') and not project.get('computation'):
@@ -748,6 +658,9 @@ def render_general_computation(backend_url: str, project: dict, show_debug: bool
                              key='computation_execute'):
                     _queue_research_computation(backend_url, project['project_id'], 'execute',
                                                 {'plan_id': state['plan_id']})
+                if unified:
+                    st.caption('如需修改方法或代码，请在下方输入框说明；不会执行当前代码。')
+                    return
                 with st.form(f"reject_code_{state.get('plan_id')}"):
                     feedback = st.text_area('对计算方案或代码的修改意见', placeholder='指出需要修改的问题；不会执行当前代码。')
                     if st.form_submit_button('退回并保存修改意见', disabled=not allowed):
@@ -809,29 +722,41 @@ def _queue_research_computation(backend_url: str, project_id: str, action: str, 
         st.error(user_error_message(exc))
 
 
-def _render_research_next_action(backend_url: str, project: dict, job: dict | None, show_debug: bool) -> None:
+def _render_research_next_action(backend_url: str, project: dict, job: dict | None, show_debug: bool, *, unified=False) -> None:
     """One state-derived action area; approvals and replies replace the generic continue button."""
     action = next_research_action(project, job)
     kind = action['kind']
-    st.markdown(f"**{action['label']}**")
-    st.write(action['description'])
+    headline = action['label']
+    if unified and kind == 'completed':
+        headline = '本轮已结束'
+    elif unified and kind == 'continue':
+        headline = '已暂停，进展已保存' if job and job.get('pause_requested') else '等待继续'
+    st.markdown(f"**{headline}**")
+    if not unified or kind not in {'running', 'completed', 'literature_draft', 'reply'}:
+        st.write(action['description'])
     _render_research_job_status(backend_url, project, show_debug, job=job)
     pid = project['project_id']
+    if unified and job and job.get('run_mode') == 'dialogue' and job.get('status') == 'failed':
+        st.caption('这次讨论或修改未完成。请在下方重新编辑请求；不会自动重跑科研阶段。')
+        return
     if kind == 'running':
         return
     if kind == 'reply':
-        render_research_reply(project, lambda reply: _research_action(
-            backend_url, f'/api/research/{pid}/reply', reply, continue_after=True))
+        if unified:
+            st.caption('请在下方统一输入框回答；提交后从暂停处继续。')
+        else:
+            render_research_reply(project, lambda reply: _research_action(
+                backend_url, f'/api/research/{pid}/reply', reply, continue_after=True))
     elif kind == 'evidence_review':
         _render_evidence_curation_gate(backend_url, project, False, show_debug)
     elif kind == 'revision_review':
         _render_revision_review_gate(backend_url, project, False, show_debug)
     elif kind == 'approval':
-        _render_plan_approval(backend_url, project, False, show_debug)
+        _render_plan_approval(backend_url, project, False, show_debug, unified=unified)
     elif kind == 'literature_draft':
-        st.markdown('[阅读回答并修改、核查或保存](#research-answer)')
+        st.caption('正文已自动保存。可继续提问、要求修改，或结束本轮。')
     elif kind == 'computation_approval':
-        render_general_computation(backend_url, project, show_debug, approval_only=True)
+        render_general_computation(backend_url, project, show_debug, approval_only=True, unified=unified)
     elif kind in {'prepare_computation', 'resume_assessment'}:
         state = project.get('computation') or {}
         if kind == 'prepare_computation' and state.get('status') in {'needs_input', 'unsupported'}:
@@ -864,7 +789,9 @@ def _render_research_next_action(backend_url: str, project: dict, job: dict | No
             allow_experimental_results=True)
         st.caption('上传不等于执行成功。保存后，顶部会根据实际状态显示下一步；也可在“资料与成果”核对已有材料。')
     elif kind == 'completed':
-        if st.button('查看研究成果', type='primary', key=f'next_action_{pid}'):
+        if unified:
+            st.caption('研究回答与历史已保存；下方可以继续讨论。')
+        elif st.button('查看研究成果', type='primary', key=f'next_action_{pid}'):
             st.session_state[f'research_view_{pid}'] = '资料与成果'
             st.rerun()
     elif kind in {'failed', 'cancelled'}:
@@ -902,12 +829,8 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
         elif st.session_state.research_example_notice == "detached":
             st.info("已保留编辑后的内容，并解除 Competition 示例标记；不会自动运行 benchmark。")
 
-    intake_container = (
-        st.container(border=True)
-        if not st.session_state.research_project_id
-        else st.expander("新建或加载其他研究项目", expanded=False)
-    )
-    with intake_container:
+    # Existing projects have one composer; creation/import belongs to the sidebar's new-project view.
+    if not st.session_state.research_project_id:
         with st.expander('通过项目编号导入（可选）', expanded=False):
             existing_project_id = st.text_input("加载已有项目 ID", key="existing_research_project_id")
             if st.button("加载项目"):
@@ -1068,7 +991,6 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
     if phase == 'EXECUTION_WAITING' and project.get('research_mode') == 'systematic_review' and not project.get('planning_only'):
         phase_label = '文献证据综合'
     st.caption(f"当前阶段：{phase_label} · 研究模式：{research_mode_label(project.get('research_mode'))}")
-    st.caption('使用路径：提出问题 → 自动研究 → 必要时回答或审批 → 查看结果。研究可能因复审返回修订，并非一次直线完成。')
 
     from src.ai_scientist.product_ui import render_result_gallery, render_model_answer
     literature = project.get('literature_review') or {}
@@ -1082,10 +1004,8 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
 
     with st.container(border=True):
         st.subheader('当前进展与下一步')
-        _render_research_next_action(backend_url, project, job, show_debug)
+        _render_research_next_action(backend_url, project, job, show_debug, unified=True)
 
-    view = st.radio('查看研究内容', ['研究对话', '资料与成果', '运行记录'],
-                    horizontal=True, key=f"research_view_{project['project_id']}")
     def submit_literature(payload):
         try:
             created = post_json(backend_url, f"/api/research/{project['project_id']}/literature/action", payload)
@@ -1095,40 +1015,93 @@ def render_research_workspace(backend_url: str, show_debug: bool) -> None:
         except BackendAPIError as exc:
             st.warning(user_error_message(exc))
     literature_submit = submit_literature if phase in {'EXECUTION_WAITING', 'COMPLETED'} else None
-    if view == '研究对话':
-        from src.ai_scientist.literature_ui import render_literature_answer
-        render_literature_answer(project, job_running, literature_submit)
+    from src.ai_scientist.research_timeline import render_timeline, render_composer, live_answer
+    from src.ai_scientist.literature_ui import render_literature_answer
+    try:
+        conversation = get_json(backend_url, f"/api/research/{project['project_id']}/conversation")
+        messages = conversation.get('messages', [])
+    except BackendAPIError:
+        messages = []
+        st.warning('暂时无法加载对话，已有研究记录不会因此丢失。')
+    live = live_answer(messages, job) if literature or phase == 'EXECUTION_WAITING' else None
+    render_timeline(project, messages, PHASE_LABELS, backend_url, get_json, live,
+        render_answer=lambda: render_literature_answer(project, job_running, literature_submit,
+                                                       live=live, unified=True))
+    if report and not (literature.get('draft') or {}).get('report_markdown'):
+        st.markdown('<div id="research-result"></div>', unsafe_allow_html=True)
+        st.subheader('科研报告')
+        render_model_answer(backend_url, project, report.get('markdown', ''), report.get('figures', []),
+                            get_json, f"report_{project['project_id']}")
+        st.download_button('下载科研报告', report.get('export_markdown', report.get('markdown', '')),
+                           file_name=report['filename'], key=f"report_{project['project_id']}")
+    elif phase == 'COMPLETED' and not (literature.get('draft') or literature.get('report_markdown')):
+        st.markdown('<div id="research-result"></div>', unsafe_allow_html=True)
+        st.subheader('研究成果与局限')
+        if project.get('conclusion'):
+            _render_final_synthesis(project['conclusion'])
+        else:
+            st.caption('该历史项目未保存最终综合正文；可下载研究计划，或查看档案中的实际产物。')
+        render_research_downloads(backend_url, project)
+
+    def save_composer_files(uploads, options, text):
+        from src.ai_scientist.composer_delivery import save_attachments_once
+        def save_one(upload):
+            return _save_research_assets(backend_url, project['project_id'], [upload],
+                'data' if options['kind'] in {'data', 'experimental_result'} else 'reference',
+                text[:2000], 'experimental_result' if options['kind'] == 'experimental_result' else 'project_workspace',
+                asset_role='experimental_result' if options['kind'] == 'experimental_result' else 'research_material',
+                research_round=options['round'] if options['kind'] == 'experimental_result' else None,
+                source='human_experiment' if options['kind'] == 'experimental_result' else 'user_upload')
+        cache = st.session_state.setdefault('composer_upload_receipts_' + project['project_id'], {})
+        saved, errors = save_attachments_once(uploads, options, text, cache, save_one)
+        if not errors and options['kind'] == 'experimental_result' and saved:
+            registration = tuple(a['asset_id'] for a in saved)
+            done = st.session_state.setdefault('composer_data_registered_' + project['project_id'], [])
+            if registration not in done:
+                try:
+                    post_json(backend_url, f"/api/research/{project['project_id']}/provide-data", {
+                        'artifact_paths': [a['saved_path'] for a in saved],
+                        'description': text[:2000] or '研究者上传的实验结果', 'data_type': 'uploaded_files'})
+                    done.append(registration)
+                except BackendAPIError:
+                    st.warning('文件已保存，但当前阶段不能登记为待分析实验结果；不会声称实验已完成。')
+        return saved, errors
+
+    def submit_message(payload, composer_key):
         try:
-            conversation = get_json(backend_url, f"/api/research/{project['project_id']}/conversation")
-            messages = conversation.get('messages', [])
-        except BackendAPIError:
-            messages = []
-            st.warning('暂时无法加载对话，已有研究记录不会因此丢失。')
-        render_research_conversation(project, messages, PHASE_LABELS, backend_url, get_json)
+            if not payload.get('message'):
+                st.session_state[composer_key + '_clear'] = True
+                st.session_state[composer_key + '_notice'] = '附件已保存，未调用模型。填写要求并发送后，Qwen 才会处理。'
+                refresh_research_project(backend_url)
+                st.rerun()
+            created = post_json(backend_url, f"/api/research/{project['project_id']}/message", payload)
+            st.session_state.research_job_id = created.get('job_id')
+            # Mark delivery before refreshing: a refresh failure must not resend the turn.
+            st.session_state[composer_key + '_clear'] = True
+            st.session_state.pop(composer_key + '_attempt', None)
+            refresh_research_project(backend_url)
+            st.rerun()
+        except BackendAPIError as exc:
+            st.warning(user_error_message(exc))
+
+    def confirm_message(payload):
+        try:
+            created = post_json(backend_url, f"/api/research/{project['project_id']}/message/confirm", payload)
+            st.session_state.research_job_id = created.get('job_id')
+            refresh_research_project(backend_url)
+            st.rerun()
+        except BackendAPIError as exc:
+            st.warning(user_error_message(exc))
+
+    render_composer(project, job_running, submit_message, confirm_message,
+        lambda payload: _research_action(backend_url, f"/api/research/{project['project_id']}/message/budget", payload),
+        save_files=save_composer_files)
+    with st.expander('研究档案 · 来源、方案与历史产物', expanded=False):
         from src.ai_scientist.product_ui import latest_successful_attempt, has_inline_figures
-        latest_attempt = latest_successful_attempt(project)
-        if latest_attempt and not has_inline_figures(messages, latest_attempt):
-            with st.expander('已有计算成果（尚未关联到模型回答）', expanded=False):
-                st.caption('这些历史记录没有保存回答与图片的关联，或结果尚待模型解读；不会改写原回答。新回答可在解释中直接引用图表。')
-                render_result_gallery(backend_url, project, get_json)
-        if phase == 'BACKGROUND_RESEARCH':
-            with st.expander('本阶段工具进展与补查意见', expanded=False):
-                _render_evidence_curation_gate(backend_url, project, job_running, show_debug)
-    elif view == '资料与成果':
-        from src.ai_scientist.literature_ui import render_literature_answer
-        render_literature_answer(project, job_running, literature_submit)
-        render_result_gallery(backend_url, project, get_json)
-        if report:
-            with st.expander('科研报告 · ' + ('已完成' if project.get('phase') == 'COMPLETED' else '待最终验收'), expanded=True):
-                render_model_answer(backend_url, project, report.get('markdown', ''), report.get('figures', []),
-                                    get_json, f"report_{project['project_id']}")
-                st.download_button('下载科研报告', report.get('export_markdown', report.get('markdown', '')), file_name=report['filename'],
-                                   key=f"report_{project['project_id']}")
-                if report.get('figures'):
-                    st.caption('网页中直接查看图文报告；下载的 Markdown 使用相对图片路径，离线查看需同时保留对应计算文件目录。')
-        with st.expander('研究档案：来源、方案与审核记录', expanded=not bool(literature)):
-            _render_research_details(backend_url, project, job_running, show_debug)
-    else:
+        if latest_successful_attempt(project) and not has_inline_figures(messages, latest_successful_attempt(project)):
+            render_result_gallery(backend_url, project, get_json)
+        _render_research_details(backend_url, project, job_running, show_debug, result_in_main=True)
+    with st.expander('运行记录与技术详情', expanded=False):
         _render_research_history(backend_url, project, show_debug)
 
     if show_debug:
@@ -1179,7 +1152,7 @@ def _poll_research_page(backend_url):
     st.rerun(scope='app')
 
 
-def _render_plan_approval(backend_url: str, project: dict, job_running: bool, show_debug: bool) -> None:
+def _render_plan_approval(backend_url: str, project: dict, job_running: bool, show_debug: bool, *, unified=False) -> None:
     if project.get("phase") == "HUMAN_APPROVAL":
         st.subheader("确认本轮研究方案")
         from src.ai_scientist.experience_ui import approval_summary
@@ -1244,6 +1217,9 @@ def _render_plan_approval(backend_url: str, project: dict, job_running: bool, sh
                     {"reason": "审查者选择稍后继续核对。"},
                 )
 
+    if unified:
+        st.caption('需要调整方案？在下方输入框直接说明，Qwen 会提出对应的修改建议。')
+        return
     with st.expander("请求修订"):
         with st.form(f"plan_revision_{project['project_id']}"):
             target = st.selectbox(
@@ -1302,7 +1278,7 @@ def _render_research_history(backend_url: str, project: dict, show_debug: bool) 
 
 
 
-def _render_research_details(backend_url: str, project: dict, job_running: bool, show_debug: bool) -> None:
+def _render_research_details(backend_url: str, project: dict, job_running: bool, show_debug: bool, *, result_in_main=False) -> None:
     """Reference material and outputs, not another workflow control plane."""
     phase = project.get('phase', '')
     phase_label = PHASE_LABELS.get(phase, phase)
@@ -1310,7 +1286,7 @@ def _render_research_details(backend_url: str, project: dict, job_running: bool,
     computation_available = 'isolated_scientific_python' in (project.get('available_tools') or [])
     literature_answer = bool((project.get('literature_review') or {}).get('draft') or
                              (project.get('literature_review') or {}).get('report_markdown'))
-    if phase == 'COMPLETED' and not literature_answer:
+    if phase == 'COMPLETED' and not literature_answer and not result_in_main:
         st.subheader('研究成果与局限')
         if project.get('conclusion'):
             _render_final_synthesis(project['conclusion'])
@@ -1804,6 +1780,8 @@ def _render_research_details(backend_url: str, project: dict, job_running: bool,
         conclusion = project.get("conclusion")
         if literature_answer:
             st.markdown('本轮研究回答、核查状态与下载见上方[研究回答](#research-answer)。这里不重复生成另一份结论。')
+        elif result_in_main and phase == 'COMPLETED':
+            st.markdown('本轮成果与下载见上方[研究成果](#research-result)。')
         elif conclusion:
             _render_final_synthesis(conclusion)
         else:
@@ -2066,7 +2044,7 @@ def _render_evidence_curation_gate(
             from src.ai_scientist.background_agent_ui import render_background_agent
             render_background_agent(project, job_running,
                 lambda path, payload: _research_action(backend_url, path, payload,
-                    continue_after=path.endswith(('/authorize', '/adopt', '/feedback'))), show_debug)
+                    continue_after=path.endswith(('/authorize', '/adopt', '/feedback'))), show_debug, unified=True)
         return
     if phase in {'BACKGROUND_RESEARCH', 'SEARCH_PLAN_REVIEW', 'HUMAN_SOURCE_REVIEW'}:
         with st.expander('升级当前项目的背景研究方式（保留历史）'):
@@ -2412,15 +2390,27 @@ def _render_research_job_status(backend_url: str, project: dict, show_debug: boo
         substep = {'started': '请求已发出，等待模型响应', 'working': '模型正在处理资料，正文尚未返回', 'streaming': '正在撰写回答',
                    'repair': '修复模型输出格式', 'completed': '回答已返回，正在处理本阶段',
                    'failure': '模型请求失败'}.get(progress.get('status'), '处理当前阶段')
-        st.info('任务已排队' if status == 'queued' else f"{PHASE_LABELS.get(str(phase), phase)} · {substep}{elapsed}")
-        if progress.get('elapsed_seconds') is not None:
+        activity_title = '处理你的补充' if job.get('run_mode') == 'dialogue' else PHASE_LABELS.get(str(phase), phase)
+        active_tool = next((o for o in reversed((project.get('background_agent') or {}).get('observations', []))
+                           if o.get('job_id') == job_id and o.get('status') == 'running'), None)
+        if active_tool:
+            from src.ai_scientist.tool_presentation import tool_view
+            substep = tool_view(active_tool, job_id)
+        st.info('任务已排队' if status == 'queued' else f"{activity_title} · {substep}{elapsed}")
+        if active_tool:
+            st.caption(active_tool.get('purpose', ''))
+        elif progress.get('elapsed_seconds') is not None:
             from src.ai_scientist.experience_ui import model_activity
             st.caption(model_activity(progress))
             if show_debug:
                 st.caption(f"接口调试：已接收 {progress.get('received_chunks', 0)} 个响应片段（不是研究进度）。")
+        if not active_tool and progress.get('status') in {'started', 'working'} and progress.get('timestamp'):
+            waiting = (datetime.now(timezone.utc) - datetime.fromisoformat(progress['timestamp'].replace('Z', '+00:00'))).total_seconds()
+            if waiting > 45:
+                st.caption('当前模型请求尚未返回正文；这不是检索完成度。你可以请求暂停，系统会在当前操作返回后保存并停止。')
         if job.get('pause_requested'):
             st.warning('暂停请求已收到；背景检索会在当前动作保存后停止，其他阶段在阶段结束后停止。已发出的请求不会被伪装成取消。')
-        elif job.get('run_mode') == 'until_human_gate':
+        elif job.get('run_mode') in {'until_human_gate', 'dialogue'}:
             if st.button('暂停研究（保存当前进展）', key=f'pause_{job_id}'):
                 try:
                     post_json(backend_url, f'/api/research/jobs/{job_id}/pause', {})
@@ -2557,5 +2547,5 @@ with st.sidebar.expander('连接与开发设置', expanded=False):
     backend_url = st.text_input("后端地址", value=DEFAULT_BACKEND_URL)
     show_debug = st.checkbox("开发者调试", value=False)
 from src.ai_scientist.product_ui import render_project_sidebar
-render_project_sidebar(backend_url, get_json, refresh_research_project, PHASE_LABELS, _research_patch)
+render_project_sidebar(backend_url, get_json, refresh_research_project, PHASE_LABELS, _research_patch, delete_json)
 render_research_workspace(backend_url, show_debug)

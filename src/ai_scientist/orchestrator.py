@@ -304,6 +304,14 @@ class ResearchOrchestrator:
                     raise AIScientistError("Research mode selection requires a formulated question.")
                 run = self._run_agent(project, MethodologistAgent)
                 project.research_mode = run.output.selected_research_mode
+                if run.output.delivery_scope == 'plan_only' and not project.executor_binding:
+                    project.planning_only = True
+                    project.execution_capability = 'PLANNING_ONLY'
+                project.constraints['delivery_scope_decision'] = {
+                    'scope': 'plan_only' if project.planning_only else 'research_results',
+                    'rationale': run.output.delivery_scope_rationale,
+                    'decided_by': 'methodologist',
+                }
                 project.method_rationale = run.output.methodological_rationale
                 project.validity_threats = run.output.validity_threats
                 project.required_controls = run.output.required_controls
@@ -515,6 +523,11 @@ class ResearchOrchestrator:
                     produced_artifacts += self._write_research_plan(project)
                 else:
                     produced_artifacts += self._legacy_synthesis(project, previous_phase)
+                if project.phase == ResearchPhase.COMPLETED and project.planning_only:
+                    project.human_actions_required = []
+                    for entry in project.human_dialogue.get('messages', []):
+                        if entry.get('action') == 'deliver_plan' and entry.get('status') in {'applying', 'saved'}:
+                            entry.update(status='applied', notice='最终资料解释与研究方案已生成；未开展新的实测或计算。')
             else:
                 raise InvalidTransitionError(f"No stage handler for phase {project.phase.value}")
             project.active_job_id = None
@@ -1037,6 +1050,8 @@ class ResearchOrchestrator:
         approval_next_step = (
             "项目将进入科学综合阶段。"
             if execution_already_analyzed
+            else "本轮仅交付资料解释与研究方案；将整理最终报告，不等待实测数据。"
+            if project.planning_only
             else "项目将进行原文证据提取、对照表与文献综合，不会自动生成或执行代码。"
             if project.research_mode == ResearchMode.SYSTEMATIC_REVIEW and not project.planning_only
             else "项目将进入内部确定性执行阶段。"
@@ -3746,7 +3761,14 @@ class ResearchOrchestrator:
 
             current_substep = "phase_transition"
             self._claim_mapping_event(project, phase, "phase_transition_started", current_substep)
-            self.state_machine.transition(project, "next")
+            recovery = project.human_dialogue.get('evidence_link_repair') or {}
+            repair_ready = (project.study_design is not None and recovery.get('evidence_version') ==
+                            project.active_artifact_versions.get('evidence') and
+                            any(a.artifact_id == recovery.get('repair_artifact_id') and
+                                a.artifact_type == 'evidence_link_repair' for a in project.artifacts))
+            self.state_machine.transition(project, 'restored_evidence' if repair_ready else 'next')
+            if repair_ready:
+                project.human_dialogue.pop('evidence_link_repair', None)
             self.store.save(project)
             self._claim_mapping_event(project, phase, "phase_transition_completed", current_substep)
             return produced
@@ -3988,10 +4010,16 @@ class ResearchOrchestrator:
         evidence_collection: EvidenceCollection,
         track_failure_budget: bool = True,
     ) -> tuple[ClaimEvidenceMappingResult, StructuredCallMetadata]:
+        from src.ai_scientist.research_context import adopted_source_passages, SHARED_CONTEXT_INSTRUCTION
+        collection_payload = evidence_collection.model_dump(mode='json')
+        for item in collection_payload.get('evidence_items', []):
+            item.get('retrieval_provenance', {}).pop('read_receipt', None)
         payload = {
             "question": project.question.model_dump(mode="json") if project.question else None,
             "project_id": project.project_id,
-            "evidence_collection": evidence_collection.model_dump(mode="json"),
+            "evidence_collection": collection_payload,
+            "adopted_source_read_receipts": adopted_source_passages(project),
+            "human_feedback": project.revision_feedback[-4:],
             "research_basis": project.background_agent.get('scope'),
             "basis_approval": project.background_agent.get('basis_approval'),
             "task": (
@@ -4007,7 +4035,8 @@ class ResearchOrchestrator:
         try:
             result = self._structured_client_for_project(project).call(
                 "evidence_researcher",
-                "You are an AI Scientist evidence mapper. Return claim-evidence mapping JSON only.",
+                "You are an AI Scientist evidence mapper. Verify claims against actual read passages; "
+                "source summaries and older claims may be mistaken. " + SHARED_CONTEXT_INSTRUCTION,
                 payload,
                 ClaimEvidenceMappingResult,
             )
@@ -4250,6 +4279,8 @@ class ResearchOrchestrator:
             project.curated_sources = []
             if project.background_agent:
                 from src.ai_scientist.background_agent import BackgroundAgent
+                from src.ai_scientist.research_context import preserve_adopted_read_receipts
+                preserve_adopted_read_receipts(project)
                 BackgroundAgent(self).record(project, 'background_rollback_archive', project.background_agent)
                 project.background_agent = {}
         previous_phase = project.phase

@@ -17,7 +17,7 @@ from pydantic import AliasChoices, Field, field_validator
 from src.ai_scientist.agents.base_agent import parsed_asset_context
 from src.ai_scientist.model_registry import ModelRegistry
 from src.ai_scientist.presentation import determine_output_language, language_instruction
-from src.ai_scientist.research_context import build_research_context, SHARED_CONTEXT_INSTRUCTION
+from src.ai_scientist.research_context import build_research_context, SHARED_CONTEXT_INSTRUCTION, preserve_adopted_read_receipts
 from src.ai_scientist.events import completed_event
 from src.ai_scientist.exceptions import ModelInputRequired
 from src.ai_scientist.schemas import (
@@ -46,7 +46,7 @@ class BackgroundAction(StrictModel):
     query: str = Field(default='', max_length=600)
     source_id: str = ''
     asset_id: str = ''
-    url: str = Field(default='', max_length=500)
+    url: str = Field(default='', max_length=2048)
     offset: int = Field(default=0, ge=0, le=2000000)
     decision: Literal['keep', 'reject', 'uncertain'] = 'uncertain'
     summary: str = Field(default='', max_length=4000)
@@ -154,7 +154,12 @@ Use the user's language for explanations. Choose one action at a time, based on 
 The original objective and approved research scope are binding. Do not alter them implicitly.
 Search metadata is only a lead. Read promising sources before recommending adoption. Missing abstracts
 do not mean irrelevant. Judge multilingual content semantically, not keyword overlap or DOI prestige.
-Use read_source with a discovered source_id (no arbitrary URLs). assess_source must cite an exact short
+Use read_source with a discovered source_id OR an exact HTTPS url returned in a source's links.
+To follow a link, omit source_id. Never combine an old source_id with a different url: this is rejected.
+Linked pages receive their own source identity, snapshot and read receipt. No arbitrary URLs.
+Repeated reading of already shown ranges adds no evidence; use next_offset, follow a relevant link,
+change query, or finish with limitations. Search previews are discovery snippets, not full-text reading.
+assess_source must cite an exact short
 quote from text you have actually been shown to recommend keep; say what it supports and cannot support.
 Use the short source_alias (S1, S2, ...) as source_id when available; canonical IDs also work.
 read_source returns a bounded page with read_ranges, next_offset, eof and cache_truncated. Use next_offset
@@ -171,6 +176,8 @@ available_read_passages preserves actual earlier reading. If a needed passage is
 read_source again at its recorded offset. Never reconstruct an exact quote from memory.
 Your public_response is an ACTION PROPOSAL generated BEFORE the tool runs, not its result.
 Report only changes supported by server_state/actual observations; do not repeat the entire review.
+Use a short natural update about the next action and why it matters, without restating earlier findings.
+Use Markdown links [source title](https://...) instead of bare URLs adjoining Chinese punctuation.
 After failure address recovery and change strategy. A failed assessment is NOT saved or adopted.
 For literature research separately extract population, intervention/exposure, comparator, outcomes,
 study type, effect/uncertainty, bias and certainty when applicable. Distinguish source hypothesis from consensus.
@@ -273,6 +280,9 @@ class BackgroundAgent:
             instructions = instructions_override or instructions
             if schema == BackgroundAction:
                 client.message_kind = 'action_proposal'
+            if schema.__name__ == 'DialogueDecision':
+                client.message_kind = 'conversation_answer'
+                client.narrative_first = True
             shared = build_research_context(p)
             if schema in {SourceAssessmentReview, BasisProposalReview, ReadingNotes} or getattr(schema, 'plain_text_output', False):
                 # Audit source fidelity, not the actor's old tool-repair instructions.
@@ -287,6 +297,7 @@ class BackgroundAgent:
             p.budget.successful_model_calls += result.metadata.successful_calls
             p.budget.failed_model_calls += result.metadata.failed_calls
             self.o._remember_model_message(p, result.metadata)
+            self.last_call_id = result.metadata.call_id
             if schema == BackgroundAction:
                 p.background_agent['last_action_call_id'] = result.metadata.call_id
             receipt.update(status='completed', provider_responses=result.metadata.provider_responses,
@@ -350,6 +361,7 @@ class BackgroundAgent:
         s = p.background_agent
         current = fingerprint(p)
         if s.get('fingerprint') and s['fingerprint'] != current:
+            preserve_adopted_read_receipts(p)
             self.record(p, 'stale_background_run', dict(s))
             p.background_agent = s = {}
         if not s.get('scope'):
@@ -417,8 +429,9 @@ class BackgroundAgent:
             intent_id = self.record(p, 'stage_action_intent', action.model_dump())
             # Persist intent BEFORE execution. An interrupted action is not asserted successful or replayed silently.
             observation = {'id': intent_id, 'action': action.action, 'purpose': action.purpose,
-                           'observation_ids': action.observation_ids, 'status': 'interrupted', 'result': {},
-                           'source_id': action.source_id, 'started_at': utc_now().isoformat()}
+                           'observation_ids': action.observation_ids, 'status': 'running', 'result': {},
+                           'source_id': action.source_id, 'requested_url': action.url,
+                           'job_id': p.active_job_id, 'started_at': utc_now().isoformat()}
             observation['call_id'] = s.get('last_action_call_id')
             if unresolved:
                 observation['unresolved_optional_references'] = unresolved
@@ -440,7 +453,8 @@ class BackgroundAgent:
             observation['finished_at'] = utc_now().isoformat()
             observation['duration_seconds'] = round(time.monotonic() - started, 2)
             unsuccessful = (observation['status'] == 'failed' or observation['result'].get('status') in
-                            {'proposal_requires_revision', 'tool_not_executed', 'no_new_sources', 'phrase_not_found'})
+                            {'proposal_requires_revision', 'tool_not_executed', 'no_new_sources', 'phrase_not_found'}
+                            or observation['result'].get('new_chars') == 0)
             s['consecutive_no_progress'] = s.get('consecutive_no_progress', 0) + 1 if unsuccessful else 0
             s['recovery'] = ({'action': action.action, 'source_id': action.source_id,
                               'error': observation['result'],
@@ -535,6 +549,10 @@ class BackgroundAgent:
                     continue
                 urls.add(c['url'])
                 s['sources'].append(c)
+                preview = (result.get('source_previews') or {}).get(c['url'])
+                if preview:
+                    c.update(retrieval_snapshot=preview, extracted_text=preview['text'],
+                             preview_status='retrieved', retrieval_status='previewed')
                 _ensure_source_aliases(s['sources'])
                 added.append(compact_result(c))
             return {'status': 'retrieved' if added else 'no_new_sources', 'candidates': added,
@@ -562,6 +580,22 @@ class BackgroundAgent:
         if a.action in {'read_source', 'assess_source'}:
             source = next((c for c in s['sources'] if c['candidate_id'] == a.source_id
                            or c['source_alias'] == a.source_id.strip().upper()), None)
+            if source and a.url and a.url not in {source['url'], (source.get('retrieval_snapshot') or {}).get('url')}:
+                raise ValueError('Source target mismatch: source_id resolves to ' + source['url']
+                                 + ' but url requests ' + a.url
+                                 + '. No page was read. To follow an observed link, omit source_id and use url only.')
+            if a.action == 'read_source' and a.url and not a.source_id:
+                source = next((c for c in s['sources'] if c['url'] == a.url), None)
+                if not source:
+                    parent = next((c for c in s['sources'] if a.url in
+                                   (c.get('retrieval_snapshot') or {}).get('links', [])), None)
+                    if not parent or urlsplit(a.url).scheme != 'https':
+                        raise ValueError('Use an exact observed HTTPS link or a discovered source_id; no arbitrary URLs')
+                    source = SearchCandidate(url=a.url, title='', query='', rank=len(s['sources']) + 1,
+                                             source_domain=urlsplit(a.url).netloc).model_dump(mode='json')
+                    source['discovered_from'] = parent['candidate_id']
+                    s['sources'].append(source)
+                    _ensure_source_aliases(s['sources'])
             if not source:
                 known = ', '.join(f"{c['source_alias']} ({c.get('title', '')[:60]})" for c in s['sources'])
                 raise ValueError('Unknown discovered source ID. Use an exact source_alias or candidate_id from '
@@ -584,6 +618,7 @@ class BackgroundAgent:
                     if not source.get('title'):
                         source['title'] = snapshot.get('title') or snapshot['url']
                 snap = source['retrieval_snapshot']
+                source.update(extraction_status='completed', retrieval_status='retrieved')
                 failure = source_access_failure(source['extracted_text'], snap.get('title', ''))
                 if failure:
                     source.update(extraction_status='failed', retrieval_status='read_failed', extraction_error=failure)
@@ -606,10 +641,15 @@ class BackgroundAgent:
                     source['shown_excerpts'].append(text)
                     s.pop('consolidation_attempted', None)
                 end = a.offset + len(text)
+                covered = sum(max(0, min(end, r['end']) - max(a.offset, r['start']))
+                              for r in source.get('read_ranges', []))
+                new_chars = max(0, len(text) - covered)
                 source['read_ranges'] = _merge_read_ranges(source.get('read_ranges', []), a.offset, end)
                 next_offset = end if end < total else None
                 return {'source_id': canonical_id, 'source_alias': source['source_alias'],
-                        'url': snap['url'], 'sha256': snap['sha256'], 'status': 'read_excerpt',
+                        'url': snap['url'], 'requested_url': a.url or source['url'],
+                        'sha256': snap['sha256'], 'status': 'read_excerpt', 'new_chars': new_chars,
+                        'message': '本次返回已读片段，没有新增阅读内容。请换页、跟进引用或整理结论。' if not new_chars else '',
                         'text': text, 'offset': a.offset, 'end_offset': end, 'total_chars': total,
                         'read_ranges': source['read_ranges'], 'next_offset': next_offset,
                         'eof': next_offset is None and not cache_truncated, 'cache_eof': next_offset is None,
@@ -785,6 +825,7 @@ class BackgroundAgent:
         s = p.background_agent
         s.setdefault('feedback', []).append(message)
         if regenerate:
+            preserve_adopted_read_receipts(p)
             self.record(p, 'background_scope_history', dict(s))
             p.background_agent = {'feedback': s['feedback']}
         else:
@@ -805,7 +846,8 @@ class BackgroundAgent:
             raise ValueError('Adoption approval is stale; review the current proposal')
         if s.get('fingerprint') != fingerprint(p):
             raise ValueError('Inputs changed; regenerate background scope')
-        if not source_ids and (s['scope']['external_information'] == 'required' or not confirm_basis):
+        if not source_ids and (not confirm_basis or
+                (s['scope']['external_information'] == 'required' and not p.evidence)):
             raise ValueError('Adopt relevant read sources or explicitly confirm an optional/non-external basis')
         evidence = []
         for sid in dict.fromkeys(source_ids):
@@ -825,12 +867,31 @@ class BackgroundAgent:
                 'not_requested' if assessment.get('assessment_mode') == 'reading_note' else 'checked')
             if assessment.get('assessment_mode') == 'reading_note':
                 evidence[-1].limitations.append('阅读笔记尚未独立核查；来源采用仅确认实际阅读与相关性，不代表科学结论已验证。')
-        p.evidence, _ = self.o._canonicalize_evidence_ids(evidence)
+        # This control adopts additional sources, it does not remove earlier approvals.
+        # Explicit restart_sources clears the prior scope separately and archives it.
+        preserved_ids = [item.evidence_id for item in p.evidence]
+        merged = list(p.evidence)
+        used_ids = set(preserved_ids)
+        for item in evidence:
+            previous = next((i for i, old in enumerate(merged)
+                             if item.source_url and old.source_url == item.source_url), None)
+            if previous is not None:
+                merged[previous] = item.model_copy(update={'evidence_id': merged[previous].evidence_id})
+            else:
+                number = 1
+                while f'EVD-{number:03d}' in used_ids:
+                    number += 1
+                item = item.model_copy(update={'evidence_id': f'EVD-{number:03d}'})
+                used_ids.add(item.evidence_id)
+                merged.append(item)
+        p.evidence = merged
+        preserve_adopted_read_receipts(p)
         p.claims = []
         p.evidence_gaps = list(s['scope']['information_gaps'])
         p.conflicting_evidence = []
         s.update(status='complete', adopted_source_ids=source_ids,
-                 basis_approval={'confirmed_at': utc_now().isoformat(), 'without_external_sources': not source_ids,
+                 basis_approval={'confirmed_at': utc_now().isoformat(), 'without_external_sources': not p.evidence,
+                                 'without_new_sources': not source_ids, 'preserved_evidence_ids': preserved_ids,
                                  'scope_id': s['scope_id'], 'validation_is_planned_not_executed': True})
         record_id = self.record(p, 'evidence_map', EvidenceResearchOutput(evidence=p.evidence,
                                evidence_gaps=s['scope']['information_gaps']).model_dump(mode='json'))

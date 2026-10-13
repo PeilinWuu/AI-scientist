@@ -47,7 +47,7 @@ class BaseResearchAgent(Generic[OutputT]):
         )
         payload = self.build_payload(project)
         payload["shared_research_context"] = build_research_context(project)
-        if project.evidence and self.agent_name != 'scientific_synthesizer':
+        if project.evidence:
             payload['adopted_source_read_receipts'] = adopted_source_passages(project)
         payload['stage_capabilities'] = {
             'current_role': self.agent_name,
@@ -104,6 +104,8 @@ def project_snapshot(project: ResearchProject, fields: list[str]) -> dict[str, A
 
     dumped = project.model_dump(mode="json")
     snapshot = {field: dumped.get(field) for field in fields}
+    for item in snapshot.get('evidence') or []:
+        item.get('retrieval_provenance', {}).pop('read_receipt', None)
     if isinstance(snapshot.get('computation'), dict):
         state = dict(snapshot['computation'])
         # Do not duplicate every previous script and attempt in every reviewer

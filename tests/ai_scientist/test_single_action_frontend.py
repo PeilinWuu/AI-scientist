@@ -67,6 +67,7 @@ class MemoryBackend:
         self.fail_continue_count = 0
         self.continue_transport_error = None
         self.get_transport_errors = {}
+        self.messages = {}
 
     def get(self, url, **kwargs):
         path = urlsplit(url).path
@@ -92,6 +93,23 @@ class MemoryBackend:
     def post(self, url, *, json=None, **kwargs):
         path = urlsplit(url).path
         self.posts.append((path, deepcopy(json)))
+        if path == PREFIX + '/message':
+            if json['message_id'] in self.messages:
+                return MemoryResponse(self.messages[json['message_id']])
+            if self.fail_continue_count:
+                self.fail_continue_count -= 1
+                if self.continue_transport_error is not None:
+                    raise self.continue_transport_error
+                return MemoryResponse({'detail': '模拟消息服务暂时不可用'}, status_code=503)
+            dialogue = self.project['human_dialogue']
+            pending = dialogue.pop('pending', None)
+            if pending:
+                dialogue.setdefault('responses', []).append({**pending, 'response': json['message']})
+            job = {'job_id': f'job_ui_{len(self.posts)}', 'project_id': PID,
+                   'phase': self.project['phase'], 'status': 'completed', 'result': {}}
+            self.jobs[job['job_id']] = job
+            self.messages[json['message_id']] = job
+            return MemoryResponse(job)
         if path == PREFIX + '/reply':
             dialogue = self.project['human_dialogue']
             pending = dialogue.pop('pending')
@@ -192,9 +210,9 @@ def test_pending_question_replaces_continue_and_does_not_duplicate_reply(fronten
     }})
     app, backend = frontend(project)
 
-    assert not button(app, '提交回答并继续研究').disabled
+    assert not button(app, '发送并继续').disabled
     assert '继续研究' not in labels(app)
-    assert len([item for item in app.text_area if item.label == '你的回答']) == 1
+    assert len([item for item in app.text_area if item.label == '你的消息']) == 1
     assert_no_legacy_workflow_buttons(app)
     assert backend.posts == []
 
@@ -207,7 +225,7 @@ def test_question_takes_priority_over_previously_generated_code_approval(fronten
                                    'prompt': '请先确认数据列的含义。'}},
     ))
 
-    assert not button(app, '提交回答并继续研究').disabled
+    assert not button(app, '发送并继续').disabled
     assert '批准并执行计算' not in labels(app)
     assert '继续研究' not in labels(app)
     assert backend.posts == []
@@ -220,17 +238,16 @@ def test_reply_is_saved_exactly_then_continues_without_implicit_approval(fronten
     }})
     app, backend = frontend(project)
     reply = '  仅数学模拟；n=100，随机种子 42。\n不要据此批准联网或代码执行。  '
-    next(item for item in app.text_area if item.label == '你的回答').set_value(reply)
+    next(item for item in app.text_area if item.label == '你的消息').set_value(reply)
 
-    button(app, '提交回答并继续研究').click().run(timeout=20)
+    button(app, '发送并继续').click().run(timeout=20)
 
     assert not app.exception
-    assert backend.posts == [
-        (PREFIX + '/reply', {'request_id': 'question_ui', 'response': reply}),
-        (PREFIX + '/continue_async', None),
-    ]
+    assert len(backend.posts) == 1 and backend.posts[0][0] == PREFIX + '/message'
+    assert backend.posts[0][1]['message'] == reply.strip()
+    assert backend.posts[0][1]['request_id'] == 'question_ui'
     assert 'pending' not in backend.project['human_dialogue']
-    assert '提交回答并继续研究' not in labels(app)
+    assert '发送并继续' not in labels(app)
 
 
 def test_blank_reply_neither_saves_nor_starts_work(frontend):
@@ -238,11 +255,19 @@ def test_blank_reply_neither_saves_nor_starts_work(frontend):
         'request_id': 'question_ui', 'prompt': '请选择数据来源。',
     }}))
 
-    button(app, '提交回答并继续研究').click().run(timeout=20)
+    button(app, '发送并继续').click().run(timeout=20)
 
     assert not app.exception
     assert backend.posts == []
-    assert any('请先填写回答' in item.value for item in app.warning)
+    assert any('请填写消息或添加附件' in item.value for item in app.warning)
+
+
+def test_existing_project_has_one_composer_and_one_upload_widget(frontend):
+    app, _ = frontend(project_snapshot())
+    assert not app.exception
+    assert [field.label for field in app.text_area] == ['你的消息']
+    assert len(app.get('file_uploader')) == 1
+    assert not any(button.label == '保存到项目' for button in app.button)
 
 
 def test_failed_job_id_is_not_busy_and_retry_uses_same_project(frontend):
@@ -299,11 +324,13 @@ def test_computation_preparation_has_only_one_control(frontend):
     assert backend.posts == [(PREFIX + '/computation/prepare', {})]
 
 
-@pytest.mark.parametrize('view', ['资料与成果', '运行记录'])
+@pytest.mark.parametrize('view', ['研究档案 · 来源、方案与历史产物', '运行记录与技术详情'])
 def test_navigation_preserves_single_action_and_keeps_raw_json_hidden(frontend, view):
     app, backend = frontend()
 
-    next(item for item in app.radio if item.label == '查看研究内容').set_value(view).run(timeout=20)
+    assert any(item.label == view for item in app.expander)
+    assert not any(item.label == '查看研究内容' for item in app.radio)
+    app.run(timeout=20)
 
     assert not app.exception
     assert not button(app, '继续研究').disabled
@@ -322,7 +349,8 @@ def test_details_navigation_does_not_duplicate_computation_approval(frontend):
         }))
 
     assert button(app, '批准并执行计算').disabled
-    next(item for item in app.radio if item.label == '查看研究内容').set_value('资料与成果').run(timeout=20)
+    assert any(item.label == '研究档案 · 来源、方案与历史产物' for item in app.expander)
+    app.run(timeout=20)
 
     assert not app.exception
     assert button(app, '批准并执行计算').disabled
@@ -337,10 +365,10 @@ def test_completed_main_action_opens_results_with_one_report_download(frontend):
     app, backend = frontend(project_snapshot(phase='COMPLETED'))
 
     assert '继续研究' not in labels(app)
-    button(app, '查看研究成果').click().run(timeout=20)
+    assert '查看研究成果' not in labels(app)  # Results no longer require a navigation action.
 
     assert not app.exception
-    assert next(item for item in app.radio if item.label == '查看研究内容').value == '资料与成果'
+    assert not any(item.label == '查看研究内容' for item in app.radio)
     report_downloads = [item for item in app.get('download_button')
                         if item.proto.label == '下载研究计划']
     assert len(report_downloads) == 1
@@ -392,7 +420,7 @@ def test_plan_approval_saves_expected_versions_then_continues_without_code_execu
 
 
 @pytest.mark.parametrize('transport_error', [None, requests.ConnectionError, requests.Timeout])
-def test_saved_reply_survives_queue_failure_and_continue_recovers_without_resubmission(frontend, transport_error):
+def test_message_failure_preserves_input_and_retry_uses_same_id(frontend, transport_error):
     app, backend = frontend(project_snapshot(human_dialogue={'pending': {
         'request_id': 'question_queue_retry', 'prompt': '请确认数据来源。',
         'phase': 'QUESTION_FORMULATION',
@@ -401,32 +429,20 @@ def test_saved_reply_survives_queue_failure_and_continue_recovers_without_resubm
     if transport_error:
         backend.continue_transport_error = transport_error('模拟排队连接失败')
     answer = '仅使用模拟数据，不采用真实数据。'
-    next(item for item in app.text_area if item.label == '你的回答').set_value(answer)
-    button(app, '提交回答并继续研究').click().run(timeout=20)
+    next(item for item in app.text_area if item.label == '你的消息').set_value(answer)
+    button(app, '发送并继续').click().run(timeout=20)
 
     assert not app.exception
-    assert backend.posts == [
-        (PREFIX + '/reply', {'request_id': 'question_queue_retry', 'response': answer}),
-        (PREFIX + '/continue_async', None),
-    ]
-    assert not app.session_state['research_project']['human_dialogue'].get('pending')
-    assert app.session_state['research_project']['human_dialogue']['responses'][0]['response'] == answer
-    assert any('已保存' in item.value and '未自动启动' in item.value for item in app.info)
-
-    button(app, '刷新项目').click().run(timeout=20)
-
-    assert not app.exception
-    assert '提交回答并继续研究' not in labels(app)
-    assert not button(app, '继续研究').disabled
-    button(app, '继续研究').click().run(timeout=20)
-
-    assert not app.exception
-    assert backend.posts == [
-        (PREFIX + '/reply', {'request_id': 'question_queue_retry', 'response': answer}),
-        (PREFIX + '/continue_async', None),
-        (PREFIX + '/continue_async', None),
-    ]
+    assert len(backend.posts) == 1
+    assert backend.posts[0][0] == PREFIX + '/message'
+    assert backend.posts[0][1]['message'] == answer
+    assert app.session_state['research_project']['human_dialogue'].get('pending')
+    assert next(item for item in app.text_area if item.label == '你的消息').value == answer
+    button(app, '发送并继续').click().run(timeout=20)
+    assert not app.exception and len(backend.posts) == 2
+    assert backend.posts[0] == backend.posts[1]  # A lost response cannot create another turn.
     assert len(backend.project['human_dialogue']['responses']) == 1
+    assert not next(item for item in app.text_area if item.label == '你的消息').value
 
 
 @pytest.mark.parametrize('error_type', [requests.ConnectionError, requests.Timeout])

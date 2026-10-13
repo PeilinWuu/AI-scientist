@@ -89,6 +89,11 @@ evidence, important uncertainty and the useful next step when relevant.
 Answer the researcher's actual question in a coherent, useful way. Choose the
 length, structure, tables and source links that this stage needs. Do not reduce
 substantive findings to a status announcement. Avoid repetitive boilerplate.
+For intake, mode selection and domain routing, focus on the scope or choice that
+matters to the user; do not narrate internal roles, schemas, artifact IDs or routing.
+Do not call a limited literature synthesis a completed systematic review merely
+because the internal mode is systematic_review. Explain actual methodological limits.
+Use explicit Markdown source links, keeping punctuation outside the URL.
 Internal fields are workflow controls, not a reason to hide useful findings.
 Distinguish plans, attempted actions and observed results. Never claim a tool was run, a source
 was read or a result verified unless the supplied records establish it. Do not
@@ -269,6 +274,9 @@ class StructuredQwenClient:
                 {'role': 'system', 'content': instructions + '\nYou are speaking directly to the researcher. '
                  'FIRST write your useful answer in natural Markdown, with appropriate detail and source links. '
                  'Choose its structure yourself; do not write a JSON-wrapped answer or private reasoning. '
+                 'Avoid internal role names, schema fields, IDs and repeated stage announcements. '
+                 'Use explicit Markdown links with punctuation outside URLs. A limited literature synthesis '
+                 'is not a completed systematic review merely because of its internal mode label. '
                  'Distinguish plans from observed results. Ask a clear question if human input is needed now. '
                  'AFTER the complete answer emit <research-control> on its own line, followed by exactly one '
                  'JSON object matching the control schema. These fields synchronize the fixed workflow; '

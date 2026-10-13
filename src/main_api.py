@@ -89,7 +89,7 @@ project_request_locks: dict[str, asyncio.Lock] = {}
 @app.middleware('http')
 async def serialize_project_mutations(request, call_next):
     """One API worker: prevent project edits from overwriting an active async run."""
-    match = re.match(r'^/api/research/(project_[a-zA-Z0-9]+)/', request.url.path)
+    match = re.match(r'^/api/research/(project_[a-zA-Z0-9]+)(?:/|$)', request.url.path)
     if request.method not in {'POST', 'PATCH', 'DELETE'} or not match:
         return await call_next(request)
     project_id = match.group(1)
@@ -435,6 +435,151 @@ class LiteratureActionRequest(BaseModel):
     max_model_calls: int | None = Field(default=None, ge=1, le=300)
 
 
+@app.get('/api/research/{project_id}/deletion-preview')
+def research_deletion_preview(project_id: str):
+    try:
+        preview = research_orchestrator.store.deletion_preview(project_id)
+        preview['running'] = bool(research_job_store.active_step_job(project_id))
+        return preview
+    except Exception as exc:
+        raise _research_http_error(exc) from exc
+
+
+@app.delete('/api/research/{project_id}')
+def research_delete_project(project_id: str, confirm_project_id: str,
+                            confirmation_token: str, acknowledged: bool = False):
+    try:
+        with computation_queue_lock:
+            if not acknowledged or confirm_project_id != project_id:
+                raise HTTPException(422, '请先核对项目并明确确认永久删除。')
+            if research_job_store.active_step_job(project_id):
+                raise HTTPException(409, '项目正在运行，请先暂停并等待保存。')
+            return research_orchestrator.store.delete_project(project_id, confirmation_token)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise _research_http_error(exc) from exc
+
+
+class ResearchMessageRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=8000)
+    message_id: str = Field(min_length=1, max_length=80, pattern=r'^[a-zA-Z0-9_-]+$')
+    request_id: str | None = None
+    attachment_ids: list[str] = Field(default_factory=list, max_length=20)
+
+
+@app.post('/api/research/{project_id}/message', status_code=202)
+def research_message(project_id: str, request: ResearchMessageRequest):
+    """Persist one user turn; Qwen interprets it asynchronously, never granting approval."""
+    from src.ai_scientist.schemas import utc_now
+    try:
+        with computation_queue_lock:
+            project = research_orchestrator.get_project(project_id)
+            messages = project.human_dialogue.setdefault('messages', [])
+            existing = next((m for m in messages if m['id'] == request.message_id), None)
+            if existing:
+                if existing['text'] != request.message.strip() or existing.get('attachment_ids', []) != request.attachment_ids:
+                    raise HTTPException(409, '消息编号已使用，请刷新后重试。')
+                return JSONResponse({'status': existing['status'], 'job_id': existing.get('job_id')})
+            if research_job_store.active_step_job(project_id):
+                raise HTTPException(409, '请先暂停并等待当前任务保存，再发送补充。')
+            if not request.message.strip():
+                raise HTTPException(422, '请输入你的问题或修改要求。')
+            if not set(request.attachment_ids).issubset({a.asset_id for a in project.research_assets}):
+                raise HTTPException(422, '附件不属于当前项目或已被删除，请重新选择。')
+            from src.ai_scientist.workflow_ui_state import active_human_question
+            pending = active_human_question(project.model_dump(mode='json'))
+            if request.request_id != pending.get('request_id'):
+                raise HTTPException(409, '待回答的问题已变化，请刷新后重新提交。')
+            if project.budget.attempted_model_calls >= project.budget.max_model_calls:
+                raise HTTPException(409, '模型额度已用完，请先追加额度；输入未发送，仍保留在输入框。')
+            if not pending and project.human_dialogue.get('pending'):
+                project.human_dialogue.setdefault('stale_questions', []).append(project.human_dialogue.pop('pending'))
+            if project.human_dialogue.get('proposal'):
+                old_id = project.human_dialogue.pop('proposal')['message_id']
+                for m in messages:
+                    if m['id'] == old_id:
+                        m['status'] = 'superseded'
+            if pending:
+                research_orchestrator.store.save(project)
+                research_reply(project_id, HumanDialogueReply(request_id=request.request_id,
+                                                               response=request.message.strip()))
+                project = research_orchestrator.get_project(project_id)
+                messages = project.human_dialogue.setdefault('messages', [])
+                origin = pending.get('dialogue_origin') or (messages[-1]['id'] if messages else None)
+                for message in messages:
+                    if message['id'] == origin and message.get('status') == 'needs_input':
+                        message['status'] = 'clarified'
+            job = research_job_store.create(project_id, project.phase.value)
+            # A clarification raised in a discussion returns to that discussion,
+            # even when the fixed workflow has already completed.
+            dialogue_reply = pending.get('dialogue_origin') or (
+                pending and project.phase.value in {'COMPLETED', 'FAILED', 'CANCELLED'})
+            job.run_mode = 'until_human_gate' if pending and not dialogue_reply else 'dialogue'
+            job.dialogue_message_id = request.message_id
+            research_job_store.save(job)
+            messages.append({'id': request.message_id, 'text': request.message.strip(),
+                'attachment_ids': request.attachment_ids,
+                'created_at': utc_now().isoformat(),
+                'status': 'saved' if pending and not dialogue_reply else 'queued',
+                'job_id': job.job_id, 'in_reply_to': request.request_id})
+            research_orchestrator.store.save(project)
+            try:
+                threading.Thread(target=_run_research_job, args=(project_id, job.job_id), daemon=True).start()
+            except Exception as exc:
+                research_job_store.save(fail_job(job, exc))
+                messages[-1]['status'] = 'failed'
+                research_orchestrator.store.save(project)
+                raise
+            return job.model_dump(mode='json')
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise _research_http_error(exc) from exc
+
+
+class DialogueConfirmation(BaseModel):
+    proposal_id: str
+    accept: bool
+
+
+class ConversationBudgetRequest(BaseModel):
+    max_model_calls: int = Field(ge=1, le=300)
+    acknowledged: bool = False
+
+
+@app.post('/api/research/{project_id}/message/budget')
+def research_message_budget(project_id: str, request: ConversationBudgetRequest):
+    with computation_queue_lock:
+        if research_job_store.active_step_job(project_id):
+            raise HTTPException(409, '请先等待当前操作结束。')
+        project = research_orchestrator.get_project(project_id)
+        if (not request.acknowledged or request.max_model_calls <=
+                max(project.budget.max_model_calls, project.budget.attempted_model_calls)):
+            raise HTTPException(422, '请明确确认增加调用额度，并设置更高的总上限。')
+        project.budget.max_model_calls = request.max_model_calls
+        research_orchestrator.store.save(project)
+        return {'status': 'budget_updated', 'max_model_calls': request.max_model_calls}
+
+
+@app.post('/api/research/{project_id}/message/confirm')
+def confirm_research_message(project_id: str, request: DialogueConfirmation):
+    from src.ai_scientist.research_dialogue import apply_proposal
+    try:
+        with computation_queue_lock:
+            if research_job_store.active_step_job(project_id):
+                raise HTTPException(409, '当前任务尚未结束。')
+            project = research_orchestrator.get_project(project_id)
+            resume = apply_proposal(research_orchestrator, project, request.proposal_id, request.accept)
+        if resume:
+            return research_continue_async(project_id)
+        return {'status': 'confirmed' if request.accept else 'declined'}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise _research_http_error(exc) from exc
+
+
 @app.post('/api/research/{project_id}/literature/action', status_code=202)
 def research_literature_action(project_id: str, request: LiteratureActionRequest):
     from src.ai_scientist.literature_experience import validate_approval, current_draft
@@ -514,15 +659,16 @@ def research_pause_job(job_id: str):
 
 @app.get('/api/research/{project_id}/conversation')
 def research_conversation(project_id: str):
-    research_orchestrator.get_project(project_id)
+    project = research_orchestrator.get_project(project_id)
     messages = []
     for path in sorted(research_job_store.jobs_dir(project_id).glob('*.json')):
         job = research_job_store.load(project_id, path.stem)
         for update in job.model_updates:
             if update.get('public_response') or update.get('human_input_request'):
-                messages.append({**update, 'job_id': job.job_id})
+                messages.append({**update, 'job_id': job.job_id,
+                                 'dialogue_message_id': job.dialogue_message_id})
     messages.sort(key=lambda item: (item.get('timestamp', ''), item.get('call_id', '')))
-    return {'messages': messages}
+    return {'messages': messages, 'user_messages': project.human_dialogue.get('messages', [])}
 
 
 class HumanDialogueReply(BaseModel):
@@ -578,21 +724,33 @@ def _run_research_job(project_id: str, job_id: str) -> None:
         def observe(event):
             research_job_store.record_model_progress(project_id, job_id, event)
         with model_progress(observe):
-            if job.run_mode == 'until_human_gate':
+            resume_dialogue = False
+            if job.run_mode == 'dialogue':
+                from src.ai_scientist.research_dialogue import run_dialogue
+                resume_dialogue = run_dialogue(research_orchestrator, project_id, job.dialogue_message_id)
+                result = {'current_phase': research_orchestrator.get_project(project_id).phase.value,
+                          'pause_reason': 'conversation_turn_complete'}
+            if job.run_mode == 'until_human_gate' or resume_dialogue:
                 result = continue_research(
                     research_orchestrator, project_id, job_id,
                     should_pause=lambda: research_job_store.load(project_id, job_id).pause_requested,
                     on_stage=lambda phase: research_job_store.update(
                         project_id, job_id, lambda value: setattr(value, 'phase', phase)),
                 )
-            else:
+            elif job.run_mode != 'dialogue':
                 result = research_orchestrator.run_next_step(project_id, job_id=job_id)
+        if job.run_mode == 'dialogue':
+            from src.ai_scientist.research_dialogue import settle_dialogue
+            settle_dialogue(research_orchestrator, project_id, message_id=job.dialogue_message_id)
         job = research_job_store.load(project_id, job_id)
         job.status = "completed"
         job.finished_at = utc_now()
         job.result = result
         research_job_store.save(job)
     except Exception as exc:  # noqa: BLE001 - safe detail is persisted for UI polling.
+        if job.run_mode == 'dialogue':
+            from src.ai_scientist.research_dialogue import settle_dialogue
+            settle_dialogue(research_orchestrator, project_id, failed=True, message_id=job.dialogue_message_id)
         job = research_job_store.load(project_id, job_id)
         job = fail_job(job, exc)
         research_job_store.save(job)

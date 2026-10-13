@@ -6,6 +6,7 @@ from src.ai_scientist.background_agent import BackgroundAgent, assessment_passag
 from src.ai_scientist.grounded_audit import grounded_review, AuditProtocolError
 from src.ai_scientist.schemas import Conclusion, utc_now
 from src.ai_scientist.structured_client import MarkdownDraft
+from src.ai_scientist.research_context import source_for_evidence
 
 
 def validate_approval(orchestrator, project):
@@ -21,8 +22,7 @@ def source_context(project):
     sources = []
     remaining = 54000
     for evidence in project.evidence:
-        source = next((s for s in project.background_agent.get('sources', [])
-                       if s.get('url') == evidence.source_url), {})
+        source = source_for_evidence(project, evidence)
         passages = list(dict.fromkeys(assessment_passages(source, evidence.source_quote or '')))
         allowance = min(18000, remaining // max(1, len(project.evidence) - len(sources)))
         selected = []
@@ -94,11 +94,19 @@ def run_draft(orchestrator, project):
         'conclusions remain open; still deliver what the evidence supports. Follow user revision requests '
         'without blindly treating prior model reviews as source evidence. No JSON, no fixed headings, no private reasoning.')
     old = current_draft(state)
+    if not state.get('answer_created_at'):
+        state['answer_created_at'] = (state.get('draft') or {}).get('saved_at') or utc_now().isoformat()
     if old:
         state.setdefault('draft_history', []).append({'report_markdown': old, 'saved_at': utc_now().isoformat(),
+            'call_id': (state.get('draft') or {}).get('call_id'),
+            'version_id': (state.get('draft') or {}).get('version_id'),
             'review_status': state.get('review_status'), 'review_notes': state.get('review_notes', []),
             'audit': state.get('audit')})
-    state.update(status='draft_ready', draft={'report_markdown': result.text},
+    revision = state.get('revision_request', '')
+    state.update(status='draft_ready', draft={'report_markdown': result.text,
+                 'version_id': hashlib.sha256(result.text.encode()).hexdigest()[:16],
+                 'call_id': getattr(agent, 'last_call_id', None), 'saved_at': utc_now().isoformat(),
+                 'revision_request': revision},
                  review_status='not_requested', revision_request='', review_notes=[],
                  audit_checkpoints={}, last_error=None)
     state.pop('generation_error', None)

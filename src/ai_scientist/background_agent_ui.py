@@ -25,7 +25,7 @@ def readable_error(error):
     return '本次行动未完成，已有成功记录保留。请查看具体原因后调整或补充研究要求。'
 
 
-def render_background_agent(project, busy, action, show_debug=False):
+def render_background_agent(project, busy, action, show_debug=False, *, unified=False):
     pid, phase = project['project_id'], project['phase']
     state = project.get('background_agent') or {}
     scope = state.get('scope') or {}
@@ -43,7 +43,7 @@ def render_background_agent(project, busy, action, show_debug=False):
     adopting = phase == 'HUMAN_SOURCE_REVIEW' and state.get('status') == 'awaiting_adoption'
     selected = []
     if adopting:
-        st.caption('选择愿意采用的来源；采用资料不等于认可其中所有结论。原文和判断可展开查看。')
+        st.caption('选择本轮要追加的来源；此前已采用资料会保留。采用资料不等于认可其中所有结论。')
         for source in sources:
             sid = source['candidate_id']
             assessment = (state.get('assessments') or {}).get(sid) or {}
@@ -66,13 +66,15 @@ def render_background_agent(project, busy, action, show_debug=False):
                 if assessment.get('quote'):
                     st.text(assessment['quote'])
         independent = False
-        if scope.get('external_information') in {'optional', 'not_needed'}:
-            independent = st.checkbox('本轮不采用外部资料，按已确认的其他依据继续', key=f'basis_independent_{pid}')
+        if project.get('evidence') or scope.get('external_information') in {'optional', 'not_needed'}:
+            label = ('本轮不追加资料，保留并沿用此前已采用的资料' if project.get('evidence')
+                     else '本轮不采用外部资料，按已确认的其他依据继续')
+            independent = st.checkbox(label, key=f'basis_independent_{pid}', disabled=busy)
         if st.button('确认研究依据并继续研究', disabled=busy or (not selected and not independent),
                      key=f'basis_adopt_{pid}', type='primary'):
             action(prefix + '/adopt', {'source_ids': selected, 'confirm_basis': independent,
                 'scope_id': state['scope_id'], 'proposal_id': state['proposal_id']})
-    if state.get('partial_answer'):
+    if state.get('partial_answer') and not unified:
         with st.expander('阅读阶段回答（非最终报告）', expanded=False) if adopting else nullcontext():
             st.markdown(state['partial_answer']['markdown'])
             st.caption('基于实际阅读的阶段回答，尚非最终报告。')
@@ -194,6 +196,8 @@ def render_background_agent(project, busy, action, show_debug=False):
                 st.caption('已发现，尚未由模型评估；缺少摘要不代表不相关。')
                 if source.get('snippet'):
                     st.write(source['snippet'])
+                if source.get('verification_note'):
+                    st.caption(source['verification_note'])
             if eligible and phase == 'HUMAN_SOURCE_REVIEW' and state.get('status') == 'awaiting_adoption':
                 if st.checkbox('采用这条已阅读资料', value=False, key=f'basis_source_{pid}_{sid}'):
                     selected.append(sid)
@@ -218,8 +222,10 @@ def render_background_agent(project, busy, action, show_debug=False):
                     st.write(message)
                 st.caption('已保存并将送入后续背景调用；是否落实需查看后续回答与工具记录。')
         if (project.get('human_dialogue') or {}).get('pending'):
-            st.info('当前有待回答的问题，请使用顶部的“提交回答并继续研究”，无需另行提交意见。')
+            st.info('当前有待回答的问题，请在下方“发送消息与附件”中回答，点击“发送并继续”。')
             return
+        if unified:
+            return  # The workspace composer owns ordinary feedback.
         with st.expander('要求补查、纠正或重新判断资料需求'):
             with st.form(f'basis_feedback_form_{pid}'):
                 feedback = st.text_area('你的意见（将原样交给 Qwen）', key=f'basis_feedback_{pid}')

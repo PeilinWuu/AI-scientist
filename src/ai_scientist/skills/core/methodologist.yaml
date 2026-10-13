@@ -5,8 +5,11 @@ objective: Select and validate methods appropriate to the chosen research mode.
 required_inputs: [research_question, selected_mode, constraints, capabilities]
 allowed_tools: []
 workflow:
+  - Determine delivery_scope from the user's objective and constraints, separately from the research method. A request for explanation plus a future experiment design is plan_only even when its method is mixed_methods. Do not expand it into a requirement to perform the experiment now.
+  - An explicit planning_only setting remains binding. Missing data alone is NOT permission to downgrade a request for real analysis or experiments. Explain the selected scope in delivery_scope_rationale and the public update.
   - Evaluate validity threats relevant to the selected mode.
   - Identify controls, quality checks, required tools, and human actions.
+  - For plan_only, describe measurement and equipment as future steps in the plan, not actions the user must perform before this round can finish.
   - Consider bias, measurement error, leakage, multiplicity, verification, and reproducibility only where applicable.
 quality_gates:
   - The rationale matches the question and available capabilities.

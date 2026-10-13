@@ -54,11 +54,13 @@ def reading_context(state):
 def action_payload(project):
     s = project.background_agent
     index, recent = observation_context(s)
-    sources = [{k: c.get(k) for k in ('candidate_id', 'source_alias', 'url', 'title', 'retrieval_status', 'read_ranges', 'extraction_error')}
+    sources = [{k: c.get(k) for k in ('candidate_id', 'source_alias', 'url', 'title', 'snippet', 'verification_note', 'preview_status', 'retrieval_status', 'read_ranges', 'extraction_error')}
                for c in s.get('sources', [])[-100:]]
     return {'objective': project.objective, 'question': project.question.model_dump() if project.question else None,
             'research_mode': project.research_mode, 'scope': s['scope'], 'authorization': s.get('authorization'),
             'sources': sources, 'assessments': compact_result(s.get('assessments', {})),
+            'observed_links': [{'source_id': c.get('source_alias'), 'links': (c.get('retrieval_snapshot') or {}).get('links', [])[:80]}
+                               for c in s.get('sources', [])[-10:] if c.get('retrieval_snapshot')],
             'observation_index': index, 'observations': recent, 'available_read_passages': reading_context(s),
             'feedback': s.get('feedback', [])[-4:], 'recovery': s.get('recovery'),
             'failed_hosts': sorted({urlsplit(c['url']).hostname for c in s.get('sources', [])

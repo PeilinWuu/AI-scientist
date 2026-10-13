@@ -503,7 +503,9 @@ def test_existing_project_workspace_does_not_nest_streamlit_expanders(
     app.run(timeout=20)
 
     assert not app.exception
-    assert any(item.value == "高级设置" for item in app.caption)
+    # An existing project no longer embeds another creation form or its settings.
+    assert not any(item.label == "科学问题" for item in app.text_area)
+    assert [item.label for item in app.text_area] == ["你的消息"]
 
 
 def test_rejected_source_card_does_not_nest_streamlit_expanders(

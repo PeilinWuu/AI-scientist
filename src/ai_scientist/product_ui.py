@@ -7,6 +7,7 @@ from urllib.parse import quote
 import streamlit as st
 
 from src.ai_scientist.figure_refs import answer_blocks, clean_figure_refs, computation_attempts, figures_for_audit
+from src.ai_scientist.markdown_links import readable_links
 
 
 def has_inline_figures(messages, attempt):
@@ -27,7 +28,7 @@ def render_model_answer(backend_url, project, text, figures, get_json, key_prefi
              if allowed.get(f['figure_id']) == f}
     for index, (kind, content) in enumerate(answer_blocks(text)):
         if kind == 'text':
-            st.markdown(content, unsafe_allow_html=False)
+            st.markdown(readable_links(content), unsafe_allow_html=False)
             continue
         figure = bound.get(content)
         if figure is None or get_json is None:
@@ -50,7 +51,7 @@ def render_model_answer(backend_url, project, text, figures, get_json, key_prefi
             st.warning('此处图表无法读取或校验未通过，回答正文仍保留。请稍后重试或查看“资料与成果”。')
 
 
-def render_project_sidebar(backend_url, get_json, refresh_project, phase_labels, rename_project=None):
+def render_project_sidebar(backend_url, get_json, refresh_project, phase_labels, rename_project=None, delete_project=None):
     remembered = st.query_params.get('project')
     if remembered and not st.session_state.get('research_project_id'):
         if remembered.startswith('project_') and remembered.replace('_', '').isalnum():
@@ -117,6 +118,40 @@ def render_project_sidebar(backend_url, get_json, refresh_project, phase_labels,
                                         st.warning('研究正在运行，请暂停并等待当前任务结束后再改名。')
                                     else:
                                         st.error('名称未保存，请检查服务连接后重试。原名称和研究记录不会被清除。')
+                if selected and delete_project is not None:
+                    with st.expander('删除此研究', expanded=False):
+                        st.caption('永久删除此项目目录中的对话、资料、任务记录与产物；不是仅隐藏侧栏记录，应用内无法撤销。')
+                        preview_key = 'delete_preview_' + pid
+                        if st.button('检查删除范围', key='preview_delete_' + pid):
+                            try:
+                                st.session_state[preview_key] = get_json(backend_url, f'/api/research/{pid}/deletion-preview')
+                            except Exception:
+                                st.error('无法安全确认删除范围，未删除任何文件。')
+                        preview = st.session_state.get(preview_key)
+                        if preview:
+                            st.write(preview['title'])
+                            st.caption(f"{preview['file_count']} 个文件 · {preview['size_bytes'] / 1024:.1f} KB · {pid}")
+                            if preview.get('running'):
+                                st.warning('项目正在运行，请先暂停，再重新检查删除范围。')
+                            confirmation = st.checkbox('我确认永久删除这个项目及其文件', key='confirm_delete_' + pid + preview['confirmation_token'])
+                            if st.button('永久删除项目', disabled=not confirmation or preview.get('running', False), key='delete_' + pid):
+                                try:
+                                    delete_project(backend_url, f'/api/research/{pid}?confirm_project_id={pid}'
+                                        f"&confirmation_token={preview['confirmation_token']}&acknowledged=true")
+                                except Exception:
+                                    st.session_state.pop(preview_key, None)
+                                    st.error('删除未确认成功，请刷新核对；可能仍在运行或文件已变化。')
+                                else:
+                                    for key in list(st.session_state):
+                                        if isinstance(key, str) and pid in key:
+                                            del st.session_state[key]
+                                    for key in ('research_project', 'research_project_id', 'research_job_id'):
+                                        st.session_state[key] = None
+                                    st.query_params.clear()
+                                    st.session_state['project_deleted_notice'] = f'已永久删除「{title}」及对应项目文件；应用内不可恢复。'
+                                    st.rerun()
+        if st.session_state.get('project_deleted_notice'):
+            st.success(st.session_state.pop('project_deleted_notice'))
 
 
 def latest_successful_attempt(project):

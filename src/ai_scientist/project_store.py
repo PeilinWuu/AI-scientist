@@ -5,6 +5,9 @@ from __future__ import annotations
 import json
 import os
 import tempfile
+import re
+import hashlib
+import shutil
 from pathlib import Path
 
 from src.ai_scientist.exceptions import ProjectNotFoundError
@@ -21,6 +24,37 @@ class ProjectStore:
 
     def project_dir(self, project_id: str) -> Path:
         return self.root / project_id
+
+    def deletion_preview(self, project_id: str) -> dict:
+        if not re.fullmatch(r'project_[a-zA-Z0-9]+', project_id):
+            raise ValueError('Invalid project identifier')
+        root = self.root.resolve()
+        target = root / project_id
+        if target.is_symlink() or target.resolve().parent != root:
+            raise ValueError('Refusing deletion outside a direct project directory')
+        if not (target / 'project.json').is_file():
+            raise ProjectNotFoundError(f'Research project not found: {project_id}')
+        inventory = []
+        for path in sorted(target.rglob('*')):
+            if path.is_symlink():
+                raise ValueError('项目包含符号链接，请先人工检查；未删除任何文件。')
+            if path.is_file():
+                stat = path.stat()
+                inventory.append([str(path.relative_to(target)), stat.st_size, stat.st_mtime_ns])
+        project = self.load(project_id)
+        token = hashlib.sha256(json.dumps([project_id, inventory]).encode()).hexdigest()
+        return {'project_id': project_id, 'title': project.title, 'file_count': len(inventory),
+                'size_bytes': sum(row[1] for row in inventory), 'confirmation_token': token}
+
+    def delete_project(self, project_id: str, confirmation_token: str) -> dict:
+        preview = self.deletion_preview(project_id)
+        if preview['confirmation_token'] != confirmation_token:
+            raise ValueError('项目文件已变化，请重新核对删除范围。')
+        if not shutil.rmtree.avoids_symlink_attacks:
+            raise ValueError('当前平台不支持安全目录删除，请人工处理。')
+        # Only the validated direct child; never follow stored artifact paths.
+        shutil.rmtree(self.root.resolve() / project_id)
+        return {'deleted': True, 'project_id': project_id, 'file_count': preview['file_count']}
 
     def list_projects(self) -> list[dict]:
         """Small navigation records; never return prompts, credentials or results."""

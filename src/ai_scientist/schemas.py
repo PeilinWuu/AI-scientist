@@ -763,6 +763,9 @@ class Conclusion(StrictModel):
         "simulation, or data analysis has been executed, so it must not be treated as an experimental conclusion."
     )
     supported_findings: list[ConclusionItem] = Field(default_factory=list)
+    traceability_pending_findings: list[str] = Field(default_factory=list,
+        description='Findings whose internal claim/evidence links still need checking. '
+        'Missing internal references are not a scientific judgment that the statement is false.')
     tentative_inferences: list[str] = Field(default_factory=list)
     unsupported_claims: list[str] = Field(default_factory=list)
     negative_results: list[str] = Field(default_factory=list)
@@ -1283,6 +1286,12 @@ class DomainSelectionOutput(StrictModel):
 class MethodologyOutput(StrictModel):
     selected_research_mode: ResearchMode
     methodological_rationale: str
+    delivery_scope: Literal['plan_only', 'research_results'] | None = Field(
+        default=None, description='What the user wants delivered THIS round, independently of research method. '
+        'plan_only includes literature explanation and an unexecuted experiment design; research_results '
+        'requires actually performing the requested literature, computational or empirical research. '
+        'No data alone does not imply plan_only. Null preserves an existing scope.')
+    delivery_scope_rationale: str = ''
     validity_threats: list[str] = Field(default_factory=list)
     required_controls: list[str] = Field(default_factory=list)
     required_quality_checks: list[str] = Field(default_factory=list)
