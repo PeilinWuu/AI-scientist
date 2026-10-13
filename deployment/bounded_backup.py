@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-"""Root-owned daily backup: <=7 archives, <=2 GiB, keep 5 GiB free.
+"""Root-owned daily backup: <=7 archives, <=2 GiB including rollback code.
 
 Install at the existing backup service's ExecStart path. Never touches source
 data during retention. Archives include secrets and must remain root-only.
@@ -17,6 +17,7 @@ DEST = Path('/var/backups/ai-scientist')
 LIMIT = 2 * 1024**3
 RESERVE = 5 * 1024**3
 KEEP = 7
+ROLLBACK = Path('/opt/ai-scientist-previous')
 PATTERN = re.compile(r'ai-scientist-\d{8}-\d{6}(?:-\d{6})?\.tar\.gz')
 
 
@@ -35,6 +36,13 @@ def prune(dest, keep=KEEP, limit=LIMIT):
         total -= size
         print(f'Retention removed {old.name} ({size} bytes)', flush=True)
     return total
+
+
+def rollback_size(root=ROLLBACK):
+    if root.is_symlink():
+        raise RuntimeError('Rollback directory cannot be a symlink')
+    return sum(p.stat().st_size for p in root.rglob('*')
+               if p.is_file() and not p.is_symlink()) if root.exists() else 0
 
 
 class BoundedWriter:
@@ -63,12 +71,15 @@ def main():
     DEST.chmod(0o700)
     with (DEST / '.backup.lock').open('a') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        total = prune(DEST)
+        archive_limit = LIMIT - rollback_size()
+        if archive_limit <= 0:
+            raise RuntimeError('Backup paused: rollback code uses the 2 GiB budget')
+        total = prune(DEST, limit=archive_limit)
         if shutil.disk_usage(DEST).free < RESERVE:
             raise RuntimeError('Backup paused: less than 5 GiB free')
         # Account for the temporary archive too. Do not delete valid archives
         # merely to make room for a new backup that could fail.
-        budget = LIMIT - total
+        budget = archive_limit - total
         if budget <= 0:
             raise RuntimeError('Backup paused: archive storage cap reached')
         sources = [Path('/var/lib/ai-scientist'), Path('/etc/ai-scientist')]
@@ -95,7 +106,7 @@ def main():
             stamp = dt.datetime.now(dt.timezone.utc).strftime('%Y%m%d-%H%M%S-%f')
             target = DEST / f'ai-scientist-{stamp}.tar.gz'
             pending.rename(target)
-            prune(DEST)
+            prune(DEST, limit=archive_limit)
             print(f'Backup verified: {target.name} ({target.stat().st_size} bytes)', flush=True)
         finally:
             pending.unlink(missing_ok=True)

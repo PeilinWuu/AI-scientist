@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from deployment.bounded_backup import BoundedWriter, archives, prune
+from deployment.bounded_backup import BoundedWriter, archives, prune, rollback_size
 
 
 def test_retention_only_removes_old_matching_archives(tmp_path):
@@ -36,3 +36,10 @@ def test_disk_reserve_is_checked_before_writing(tmp_path, monkeypatch):
     writer = BoundedWriter(io.BytesIO(), tmp_path, budget=100, reserve=10)
     with pytest.raises(OSError, match='Disk reserve'):
         writer.write(b'12')
+
+
+def test_rollback_budget_counts_regular_files_not_symlink_targets(tmp_path):
+    (tmp_path / 'code').write_bytes(b'1234')
+    (tmp_path / 'linked').symlink_to(tmp_path / 'code')
+    assert rollback_size(tmp_path) == 4
+    assert rollback_size(tmp_path / 'missing') == 0
